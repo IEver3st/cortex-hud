@@ -1,0 +1,48 @@
+.indicator-container {
+    position: fixed;
+    top: calc(0.5vh * var(--es-ui-scale));
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    width: max-content;
+    background: rgba(16, 16, 16, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: calc(10px * var(--es-ui-scale));
+    pointer-events: none;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.indicator-box {
+    display: flex;
+    align-items: center;
+    padding: calc(8px * var(--es-ui-scale)) calc(16px * var(--es-ui-scale));
+    gap: calc(10px * var(--es-ui-scale));
+    min-width: fit-content;
+}
+
+/* Subtle Vertical Divider */
+.indicator-box + .indicator-box {
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.indicator-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(14px * var(--es-ui-scale));
+    color: var(--health-color);
+    filter: drop-shadow(0 0 calc(3px * var(--es-ui-scale)) var(--health-glow));
+}
+
+.indicator-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(13px * var(--es-ui-scale));
+    font-weight: 700;
+    color: var(--hud-color);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
