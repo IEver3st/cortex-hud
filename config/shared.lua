@@ -32,6 +32,95 @@ Config.restartSound = {
 Config.PolcamForceAircraftHud = false
 Config.disableWantedLevel = true
 
+Config.Fuel = {
+    mode = "ask",
+    debug = false,
+    manual = "legacyfuel",
+    rememberSelection = true,
+    fallbackToNative = true,
+    treatZeroAsInvalid = true,
+    alerts = {
+        enabled = true,
+        thresholds = { 20, 10, 5 },
+        counts = {
+            [20] = 1,
+            [10] = 1,
+            [5] = 2
+        },
+        interval = 220,
+        sound = {
+            name = "Beep_Red",
+            set = "DLC_HEIST_HACKING_SNAKE_SOUNDS"
+        }
+    },
+    providers = {
+        {
+            id = "ox_fuel",
+            label = "ox_fuel",
+            resources = {
+                { name = "ox_fuel", getters = { "GetFuel", "GetFuelLevel" } }
+            }
+        },
+        {
+            id = "ps-fuel",
+            label = "ps-fuel",
+            resources = {
+                { name = "ps-fuel", getters = { "GetFuel", "GetFuelLevel" } }
+            }
+        },
+        {
+            id = "cdn-fuel",
+            label = "cdn-fuel",
+            resources = {
+                { name = "cdn-fuel", getters = { "GetFuel", "GetFuelLevel" } }
+            }
+        },
+        {
+            id = "legacyfuel",
+            label = "LegacyFuel",
+            resources = {
+                { name = "LegacyFuel", getters = { "GetFuel", "GetFuelLevel", "getFuel" } },
+                { name = "legacyfuel", getters = { "GetFuel", "GetFuelLevel", "getFuel" } }
+            }
+        },
+        {
+            id = "fuel",
+            label = "fuel",
+            resources = {
+                { name = "fuel", getters = { "GetFuel", "getFuel" } }
+            }
+        },
+        {
+            id = "frfuel",
+            label = "frfuel",
+            resources = {
+                { name = "frfuel", getters = { "getCurrentFuel" } }
+            }
+        },
+        {
+            id = "esx_fuel",
+            label = "esx_fuel",
+            resources = {
+                { name = "esx_fuel", getters = { "GetFuel" } }
+            }
+        },
+        {
+            id = "qb-fuel",
+            label = "qb-fuel",
+            resources = {
+                { name = "qb-fuel", getters = { "GetFuel" } }
+            }
+        },
+        {
+            id = "lj-fuel",
+            label = "lj-fuel",
+            resources = {
+                { name = "lj-fuel", getters = { "GetFuel" } }
+            }
+        }
+    }
+}
+
 Config.Minimap = {
     offsetX = 0.0,
     offsetY = 0.05,

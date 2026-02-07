@@ -6,7 +6,6 @@ local PlayerPedId = PlayerPedId
 local IsPedInAnyVehicle = IsPedInAnyVehicle
 local GetVehiclePedIsIn = GetVehiclePedIsIn
 local GetVehicleEngineHealth = GetVehicleEngineHealth
-local GetVehicleFuelLevel = GetVehicleFuelLevel
 local GetIsVehicleEngineRunning = GetIsVehicleEngineRunning
 local GetVehicleHighGear = GetVehicleHighGear
 local GetVehicleCurrentGear = GetVehicleCurrentGear
@@ -25,6 +24,7 @@ local Wait = Wait
 
 local VehicleStatusThread = {}
 VehicleStatusThread.__index = VehicleStatusThread
+local Fuel = lib.require("modules.fuel.client")
 
 function VehicleStatusThread.new(seatbeltLogic, stallLogic)
     local self = setmetatable({}, VehicleStatusThread)
@@ -58,10 +58,11 @@ function VehicleStatusThread:start()
             vehicle = GetVehiclePedIsIn(ped, false)
             local vehicleType = GetVehicleType(vehicle)
             local engineHealth = convertEngineHealthToPercentage(GetVehicleEngineHealth(vehicle))
-            local rawFuelValue = GetVehicleFuelLevel(vehicle)
+            local rawFuelValue = Fuel.get(vehicle)
             local fuelValue = math.max(0, math.min(rawFuelValue or 0, 100))
             local engineState = GetIsVehicleEngineRunning(vehicle)
             local fuel = math.floor(fuelValue)
+            Fuel.handleAlerts(vehicle, fuelValue)
             local retval, lightsOn, highbeamsOn = GetVehicleLightsState(vehicle)
 
             local isAircraft = vehicleType == "heli" or vehicleType == "plane"

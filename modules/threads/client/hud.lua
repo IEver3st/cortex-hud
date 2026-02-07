@@ -27,6 +27,7 @@ local minimap = lib.require("modules.utility.shared.minimap")
 local SeatbeltLogic = lib.require("modules.seatbelt.client")
 local StallLogic = lib.require("modules.stall.client")
 local VehicleStatusThread = lib.require("modules.threads.client.vehicle_status")
+local Fuel = lib.require("modules.fuel.client")
 
 local visibilityReasons = {
     user = true,
@@ -143,6 +144,7 @@ local function startPolcamDetection(config)
 end
 
 function hud.start(config)
+    Fuel.init()
     local lastHealth = -1
     local lastArmor = -1
     local lastStreet = ""

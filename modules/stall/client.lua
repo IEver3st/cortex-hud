@@ -272,6 +272,9 @@ end
 
 function StallLogic:stopMonitoring()
     self.isMonitoring = false
+    if self.currentVehicle then
+        self.vehicleStates[self.currentVehicle] = nil
+    end
     self.currentVehicle = nil
 end
 
