@@ -14,8 +14,6 @@ local cinematicMode = false
 local cinematicCommandRegistered = false
 local cinematicKeyRegisteredKey = nil
 
-local lastAppliedFirstPersonFov = nil
-
 -- ============================================================================
 -- KEY MAPPING: es_lib setting keys -> HUD config fields
 -- ============================================================================
@@ -23,6 +21,7 @@ local lastAppliedFirstPersonFov = nil
 -- Maps es_lib flat keys to the HUD's internal Settings.apply() format
 local KEY_MAP = {
     hud_speedUnit           = 'speedUnit',
+    hud_disableSpeedometer  = 'disableSpeedometer',
     hud_showPostal          = 'showPostal',
     hud_showPostalDistance   = 'showPostalDistance',
     hud_hungerThreshold     = 'hungerThreshold',
@@ -42,7 +41,6 @@ local KEY_MAP = {
     hud_color_stress        = 'colorStress',
     hud_color_oxygen        = 'colorOxygen',
     hud_fuelDisplayStyle    = 'fuelDisplayStyle',
-    hud_firstPersonFov      = 'firstPersonFov',
     hud_color_ammo          = 'colorAmmo',
     hud_ammoPosX            = 'ammoPosX',
     hud_ammoPosY            = 'ammoPosY',
@@ -56,57 +54,6 @@ local function clampNumber(value, min, max)
     if value < min then return min end
     if value > max then return max end
     return value
-end
-
-local function getProfileFirstPersonFov()
-    local raw = GetConvar('profile_fpsFieldOfView', '')
-    local fov = tonumber(raw)
-    if not fov then return nil end
-
-    fov = math.floor(fov + 0.5)
-    if fov < 0 then fov = 0 end
-    if fov > 130 then fov = 130 end
-
-    return fov
-end
-
-local function getEffectiveFirstPersonFov()
-    local profileFov = getProfileFirstPersonFov()
-    if profileFov ~= nil then
-        return profileFov
-    end
-
-    local fallback = clampNumber(config.firstPersonFov or 70, 0, 130) or 70
-    return math.floor(fallback + 0.5)
-end
-
-local function applyFirstPersonFov(value)
-    local fov = clampNumber(value, 0, 130)
-    if not fov then return end
-
-    fov = math.floor(fov + 0.5)
-
-    local current = getProfileFirstPersonFov()
-    if current == fov and lastAppliedFirstPersonFov == fov then
-        return
-    end
-
-    local before = current
-
-    ExecuteCommand(('profile_fpsFieldOfView %d'):format(fov))
-
-    local after = getProfileFirstPersonFov()
-    if after ~= fov then
-        ExecuteCommand(('seta profile_fpsFieldOfView %d'):format(fov))
-        ExecuteCommand(('set profile_fpsFieldOfView %d'):format(fov))
-        after = getProfileFirstPersonFov()
-    end
-
-    if after ~= fov then
-        print(('[es_hud] First-person FOV apply failed (before=%s requested=%d after=%s)'):format(tostring(before), fov, tostring(after)))
-    end
-
-    lastAppliedFirstPersonFov = after or fov
 end
 
 local COLOR_OPTIONS = {
@@ -139,6 +86,13 @@ local function getSettingsDefinition()
                 },
             },
             {
+                key = 'hud_disableSpeedometer',
+                type = 'toggle',
+                label = 'Disable Speedometer',
+                description = 'Hide the vehicle speedometer HUD element',
+                default = config.disableSpeedometer == true,
+            },
+            {
                 key = 'hud_showPostal',
                 type = 'toggle',
                 label = 'Show Postal',
@@ -158,16 +112,6 @@ local function getSettingsDefinition()
                 label = 'Crosshair Dot',
                 description = 'yes i cant aim please help',
                 default = config.showCrosshair == true,
-            },
-            {
-                key = 'hud_firstPersonFov',
-                type = 'slider',
-                label = 'First-person FOV',
-                description = 'Adjust your first-person field of view',
-                default = getEffectiveFirstPersonFov(),
-                min = 0,
-                max = 130,
-                suffix = '°',
             },
             {
                 key = 'hud_hungerThreshold',
@@ -359,13 +303,14 @@ local function getSettingsDefinition()
             },
         },
         sections = {
-            { label = 'Display',        keys = { 'hud_speedUnit', 'hud_showPostal', 'hud_showPostalDistance', 'hud_showCrosshair', 'hud_firstPersonFov', 'hud_fuelDisplayStyle' } },
-            { label = 'Colors',         keys = { 'hud_color_health', 'hud_color_armor', 'hud_color_hunger', 'hud_color_thirst', 'hud_color_stress', 'hud_color_oxygen' } },
+            { label = 'Speedometer',    keys = { 'hud_speedUnit', 'hud_fuelDisplayStyle', 'hud_disableSpeedometer', 'hud_speedometerActions' } },
+            { label = 'Postal',         keys = { 'hud_showPostal', 'hud_showPostalDistance' } },
             { label = 'Status Icons',   keys = { 'hud_hungerThreshold', 'hud_thirstThreshold', 'hud_stressThreshold', 'hud_oxygenThreshold' } },
-            { label = 'Cinematic Mode', keys = { 'hud_cinematicKey' } },
+            { label = 'Colors',         keys = { 'hud_color_health', 'hud_color_armor', 'hud_color_hunger', 'hud_color_thirst', 'hud_color_stress', 'hud_color_oxygen' } },
             { label = 'Minimap',        keys = { 'hud_minimapOnlyInVehicle' } },
             { label = 'Notifications',  keys = { 'hud_mapNotifications', 'hud_lowFuelAlert', 'hud_cinematicNotifications' } },
-            { label = 'Layout',         keys = { 'hud_speedometerActions', 'hud_ammoPositionPreset' } },
+            { label = 'Cinematic Mode', keys = { 'hud_cinematicKey' } },
+            { label = 'Ammo',           keys = { 'hud_ammoPositionPreset' } },
         },
     }
 end
@@ -385,6 +330,7 @@ function Settings.apply(data, options)
     end
 
     config.speedUnit = data.speedUnit or config.speedUnit
+    config.disableSpeedometer = data.disableSpeedometer == true
     config.EnablePostal = data.showPostal ~= false
     config.ShowPostalDistance = data.showPostalDistance == true
     config.StatusIcons.hungerThreshold = tonumber(data.hungerThreshold) or config.StatusIcons.hungerThreshold
@@ -417,9 +363,6 @@ function Settings.apply(data, options)
     config.cinematicKey = data.cinematicKey or config.cinematicKey
     config.minimapOnlyInVehicle = data.minimapOnlyInVehicle == true
     config.fuelDisplayStyle = data.fuelDisplayStyle or config.fuelDisplayStyle or 'bar'
-
-    config.firstPersonFov = clampNumber(data.firstPersonFov, 0, 130) or getEffectiveFirstPersonFov()
-    applyFirstPersonFov(config.firstPersonFov)
 
     local posX = tonumber(data.speedometerPosX)
     local posY = tonumber(data.speedometerPosY)
@@ -560,6 +503,7 @@ function Settings.get()
         local posX, posY = getSavedSpeedometerPos()
         return {
             speedUnit = config.speedUnit,
+            disableSpeedometer = config.disableSpeedometer == true,
             showPostal = config.EnablePostal,
             showPostalDistance = config.ShowPostalDistance,
             hungerThreshold = config.StatusIcons.hungerThreshold,
@@ -580,7 +524,6 @@ function Settings.get()
             speedometerPosX = posX,
             speedometerPosY = posY,
             fuelDisplayStyle = config.fuelDisplayStyle or 'bar',
-            firstPersonFov = getEffectiveFirstPersonFov(),
             colorAmmo = config.ammoColor or '#10b981',
             ammoPositionPreset = config.ammoPositionPreset or 'bottom-right',
             showCrosshair = config.showCrosshair == true,
@@ -685,6 +628,7 @@ AddEventHandler('es_lib:settingChanged', function(key, value)
     -- Build a full settings table from current config + the changed value
     local current = {
         speedUnit = config.speedUnit,
+        disableSpeedometer = config.disableSpeedometer == true,
         showPostal = config.EnablePostal,
         showPostalDistance = config.ShowPostalDistance,
         hungerThreshold = config.StatusIcons.hungerThreshold,
@@ -707,7 +651,6 @@ AddEventHandler('es_lib:settingChanged', function(key, value)
         speedometerPosX = posX,
         speedometerPosY = posY,
         fuelDisplayStyle = config.fuelDisplayStyle or 'bar',
-        firstPersonFov = getEffectiveFirstPersonFov(),
     }
     current[hudKey] = value
     local shouldRefreshMinimap = false

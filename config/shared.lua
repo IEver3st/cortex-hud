@@ -13,6 +13,7 @@ Config.ShowPostalDistance = false
 Config.PostalFile = "ocrp-postals.json"
 
 Config.speedUnit = "mph"
+Config.disableSpeedometer = false
 Config.useBuiltInSeatbeltLogic = true
 Config.ejectMinSpeed = 20.0
 
@@ -90,10 +91,6 @@ Config.minimapOnlyInVehicle = false
 Config.minimapOnlyInVehicle = false
 Config.fuelDisplayStyle = 'bar'
 Config.showCrosshair = false
-
--- First-person camera FOV (client profile setting). This is per-player.
--- Value matches GTA/FiveM "First Person Field of View" slider range.
-Config.firstPersonFov = 70
 
 Config.StatusIcons = {
     hungerThreshold = 100,
