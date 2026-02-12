@@ -69,6 +69,7 @@ const AMMO_POSITION_OPTIONS = [
 
 const DEFAULTS = {
     speedUnit: 'mph',
+    disableSpeedometer: false,
     showPostal: true,
     showPostalDistance: false,
     hungerThreshold: 100,
@@ -158,6 +159,19 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
 
                         <div className="settings-row">
                             <div>
+                                <div className="settings-row-label">Disable Speedometer</div>
+                                <div className="settings-row-desc">Hide the vehicle speedometer HUD element</div>
+                            </div>
+                            <div
+                                className={`settings-toggle ${local.disableSpeedometer ? 'active' : ''}`}
+                                onClick={() => set('disableSpeedometer', !local.disableSpeedometer)}
+                            >
+                                <div className="settings-toggle-knob" />
+                            </div>
+                        </div>
+
+                        <div className="settings-row">
+                            <div>
                                 <div className="settings-row-label">Show Postal</div>
                                 <div className="settings-row-desc">Display nearest postal code</div>
                             </div>
@@ -198,82 +212,6 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
 
                     <div className="settings-divider" />
 
-                    {/* Colors Section */}
-                    <div className="settings-section">
-                        <div className="settings-section-title">Colors</div>
-                        
-                        <div className="settings-row">
-                            <div className="settings-row-label">Health Bar</div>
-                            <input 
-                                type="color" 
-                                className="settings-color-input" 
-                                value={local.colorHealth} 
-                                onChange={(e) => set('colorHealth', e.target.value)} 
-                            />
-                        </div>
-
-                        <div className="settings-row">
-                            <div className="settings-row-label">Armor Bar</div>
-                            <input 
-                                type="color" 
-                                className="settings-color-input" 
-                                value={local.colorArmor} 
-                                onChange={(e) => set('colorArmor', e.target.value)} 
-                            />
-                        </div>
-
-                        <div className="settings-row">
-                            <div className="settings-row-label">Hunger Bar</div>
-                            <input 
-                                type="color" 
-                                className="settings-color-input" 
-                                value={local.colorHunger} 
-                                onChange={(e) => set('colorHunger', e.target.value)} 
-                            />
-                        </div>
-
-                        <div className="settings-row">
-                            <div className="settings-row-label">Thirst Bar</div>
-                            <input 
-                                type="color" 
-                                className="settings-color-input" 
-                                value={local.colorThirst} 
-                                onChange={(e) => set('colorThirst', e.target.value)} 
-                            />
-                        </div>
-
-                        <div className="settings-row">
-                            <div className="settings-row-label">Stress Bar</div>
-                            <input 
-                                type="color" 
-                                className="settings-color-input" 
-                                value={local.colorStress} 
-                                onChange={(e) => set('colorStress', e.target.value)} 
-                            />
-                        </div>
-
-                        <div className="settings-row">
-                            <div className="settings-row-label">Oxygen Bar</div>
-                            <input 
-                                type="color" 
-                                className="settings-color-input" 
-                                value={local.colorOxygen} 
-                                onChange={(e) => set('colorOxygen', e.target.value)} 
-                            />
-                        </div>
-
-                        <div className="settings-row">
-                            <div className="settings-row-label">Ammo Counter</div>
-                            <input 
-                                type="color" 
-                                className="settings-color-input" 
-                                value={local.colorAmmo} 
-                                onChange={(e) => set('colorAmmo', e.target.value)} 
-                            />
-                        </div>
-                    </div>
-
-                    <div className="settings-divider" />
                     <div className="settings-section">
                         <div className="settings-section-title">Layout</div>
                         <div className="settings-row">
@@ -412,19 +350,77 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
 
                     <div className="settings-divider" />
 
-                    {/* Cinematic Mode Section */}
+                    {/* Colors Section */}
                     <div className="settings-section">
-                        <div className="settings-section-title">Cinematic Mode</div>
+                        <div className="settings-section-title">Colors</div>
+                        
+                        <div className="settings-row">
+                            <div className="settings-row-label">Health Bar</div>
+                            <input 
+                                type="color" 
+                                className="settings-color-input" 
+                                value={local.colorHealth} 
+                                onChange={(e) => set('colorHealth', e.target.value)} 
+                            />
+                        </div>
 
                         <div className="settings-row">
-                            <div>
-                                <div className="settings-row-label">Cinematic Hotkey</div>
-                                <div className="settings-row-desc">Key to toggle cinematic mode</div>
-                            </div>
-                            <CustomDropdown
-                                value={local.cinematicKey}
-                                options={CINEMATIC_KEY_OPTIONS}
-                                onChange={(val) => set('cinematicKey', val)}
+                            <div className="settings-row-label">Armor Bar</div>
+                            <input 
+                                type="color" 
+                                className="settings-color-input" 
+                                value={local.colorArmor} 
+                                onChange={(e) => set('colorArmor', e.target.value)} 
+                            />
+                        </div>
+
+                        <div className="settings-row">
+                            <div className="settings-row-label">Hunger Bar</div>
+                            <input 
+                                type="color" 
+                                className="settings-color-input" 
+                                value={local.colorHunger} 
+                                onChange={(e) => set('colorHunger', e.target.value)} 
+                            />
+                        </div>
+
+                        <div className="settings-row">
+                            <div className="settings-row-label">Thirst Bar</div>
+                            <input 
+                                type="color" 
+                                className="settings-color-input" 
+                                value={local.colorThirst} 
+                                onChange={(e) => set('colorThirst', e.target.value)} 
+                            />
+                        </div>
+
+                        <div className="settings-row">
+                            <div className="settings-row-label">Stress Bar</div>
+                            <input 
+                                type="color" 
+                                className="settings-color-input" 
+                                value={local.colorStress} 
+                                onChange={(e) => set('colorStress', e.target.value)} 
+                            />
+                        </div>
+
+                        <div className="settings-row">
+                            <div className="settings-row-label">Oxygen Bar</div>
+                            <input 
+                                type="color" 
+                                className="settings-color-input" 
+                                value={local.colorOxygen} 
+                                onChange={(e) => set('colorOxygen', e.target.value)} 
+                            />
+                        </div>
+
+                        <div className="settings-row">
+                            <div className="settings-row-label">Ammo Counter</div>
+                            <input 
+                                type="color" 
+                                className="settings-color-input" 
+                                value={local.colorAmmo} 
+                                onChange={(e) => set('colorAmmo', e.target.value)} 
                             />
                         </div>
                     </div>
@@ -480,6 +476,25 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
                                 <span className="settings-checkbox-check">✓</span>
                             </div>
                             <span className="settings-checkbox-label">Cinematic Mode Notifications Enabled</span>
+                        </div>
+                    </div>
+
+                    <div className="settings-divider" />
+
+                    {/* Cinematic Mode Section */}
+                    <div className="settings-section">
+                        <div className="settings-section-title">Cinematic Mode</div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Cinematic Hotkey</div>
+                                <div className="settings-row-desc">Key to toggle cinematic mode</div>
+                            </div>
+                            <CustomDropdown
+                                value={local.cinematicKey}
+                                options={CINEMATIC_KEY_OPTIONS}
+                                onChange={(val) => set('cinematicKey', val)}
+                            />
                         </div>
                     </div>
                 </div>

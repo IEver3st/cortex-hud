@@ -163,6 +163,23 @@ function VehicleStatusThread:start()
                     })
                 end
             else
+                if config.disableSpeedometer == true then
+                    if lastVehicleState.visible then
+                        lastVehicleState.visible = false
+                        SendNUIMessage({
+                            action = "updateVehicle",
+                            visible = false
+                        })
+                    end
+
+                    if lastAircraftState.visible then
+                        lastAircraftState.visible = false
+                        SendNUIMessage({
+                            action = "updateAircraft",
+                            visible = false
+                        })
+                    end
+                else
                 local highGear = GetVehicleHighGear(vehicle)
                 local currentGear = GetVehicleCurrentGear(vehicle)
                 local newGears = highGear
@@ -281,6 +298,7 @@ function VehicleStatusThread:start()
                         action = "updateAircraft",
                         visible = false
                     })
+                end
                 end
             end
 

@@ -330,7 +330,7 @@ function Settings.apply(data, options)
     end
 
     config.speedUnit = data.speedUnit or config.speedUnit
-    config.disableSpeedometer = data.disableSpeedometer == true
+    config.disableSpeedometer = (data.disableSpeedometer == true) or (data.disableSpeedometer == 1) or (data.disableSpeedometer == '1') or (data.disableSpeedometer == 'true')
     config.EnablePostal = data.showPostal ~= false
     config.ShowPostalDistance = data.showPostalDistance == true
     config.StatusIcons.hungerThreshold = tonumber(data.hungerThreshold) or config.StatusIcons.hungerThreshold
