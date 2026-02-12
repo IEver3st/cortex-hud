@@ -35,15 +35,33 @@ function SeatbeltLogic.new()
 end
 
 function SeatbeltLogic:toggle(state)
+    if self.seatbeltState == state then
+        return
+    end
+
     self.seatbeltState = state
 
     if state then
         SetFlyThroughWindscreenParams(10000.0, 10000.0, 17.0, 500.0)
         self:disableVehicleExitControlThread()
+
+        lib.notify({
+            title = 'Seatbelt',
+            description = 'Seatbelt fastened',
+            type = 'success',
+            duration = 2000,
+        })
         return
     end
 
     SetFlyThroughWindscreenParams(self.ejectVelocity, self.unknownEjectVelocity, self.unknownModifier, self.minDamage)
+
+    lib.notify({
+        title = 'Seatbelt',
+        description = 'Seatbelt removed',
+        type = 'info',
+        duration = 2000,
+    })
 end
 
 function SeatbeltLogic:disableVehicleExitControlThread()

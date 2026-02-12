@@ -29,7 +29,10 @@ client_scripts {
 
 exports {
     'toggleHud',
-    'toggleMap'
+    'toggleMap',
+    'isHarnessOn',
+    'toggleHarness',
+    'getSettingsDefinition',
 }
 
 lua54 'yes'

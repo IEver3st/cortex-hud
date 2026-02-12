@@ -1,16 +1,14 @@
-.aircraft-hud {
+.aircraft-hud-wrapper {
     position: fixed;
-    right: calc(2vw * var(--es-ui-scale));
-    bottom: calc(2vh * var(--es-ui-scale));
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: calc(10px * var(--es-ui-scale));
+    inset: 0;
     pointer-events: none;
     font-family: var(--font-hud);
 }
 
 .aircraft-readouts {
+    position: fixed;
+    right: calc(4vw * var(--es-ui-scale));
+    bottom: calc(1vh * var(--es-ui-scale));
     display: flex;
     align-items: center;
     gap: calc(16px * var(--es-ui-scale));
@@ -18,6 +16,7 @@
     background: rgba(0, 0, 0, 0.55);
     border-radius: calc(6px * var(--es-ui-scale));
     border: 1px solid rgba(255, 255, 255, 0.12);
+    transition: transform 0.4s ease;
 }
 
 .aircraft-readout {
@@ -50,13 +49,18 @@
 }
 
 .aircraft-indicators {
+    position: fixed;
+    top: calc(2.2vh * var(--es-ui-scale));
+    left: 50%;
+    /* transform is handled in JS for skew, but base transform includes translateX(-50%) */
     display: flex;
     align-items: center;
     gap: calc(4px * var(--es-ui-scale));
     padding: calc(6px * var(--es-ui-scale)) calc(10px * var(--es-ui-scale));
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.4); 
     border-radius: calc(4px * var(--es-ui-scale));
     border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.4s ease;
 }
 
 .aircraft-indicator {

@@ -1,5 +1,10 @@
 local Config = {}
 
+-- Framework to use for player state (loaded/unloaded, player data).
+-- 'standalone' = no framework, HUD always active when player is playing
+-- 'qbx'        = uses qbx_core PlayerData, hides HUD until player is loaded
+Config.framework = 'qbx'
+
 Config.UpdateInterval = 200
 Config.PostalUpdateInterval = 400
 Config.EnablePostal = true
@@ -12,8 +17,8 @@ Config.useBuiltInSeatbeltLogic = true
 Config.ejectMinSpeed = 20.0
 
 Config.useStallSystem = true
-Config.stallImpactThreshold = 35.0
-Config.stallDuration = 2000
+Config.stallImpactThreshold = 20.0
+Config.stallDuration = 5000
 Config.stallRecoveryKey = 'E'
 Config.stallMaxCount = 6
 Config.stallPowerReduction = 0.05
@@ -29,14 +34,24 @@ Config.restartSound = {
     set = "HUD_MINI_GAME_SOUNDSET"
 }
 
+Config.useHarnessSystem = true
+Config.harnessKey = 'H'
+Config.harnessApplyDuration = 6000
+Config.harnessRemoveDuration = 5000
+Config.harnessEjectSpeed = 10000.0
+Config.harnessProgressStyle = 'bar'
+Config.harnessCanCancel = true
+Config.harnessDisableControls = {
+    move = false,
+    car = false,
+    combat = true,
+}
+
 Config.PolcamForceAircraftHud = false
 Config.disableWantedLevel = true
 
 Config.Fuel = {
-    mode = "ask",
     debug = false,
-    manual = "legacyfuel",
-    rememberSelection = true,
     fallbackToNative = true,
     treatZeroAsInvalid = true,
     alerts = {
@@ -53,71 +68,46 @@ Config.Fuel = {
             set = "DLC_HEIST_HACKING_SNAKE_SOUNDS"
         }
     },
-    providers = {
-        {
-            id = "ox_fuel",
-            label = "ox_fuel",
-            resources = {
-                { name = "ox_fuel", getters = { "GetFuel", "GetFuelLevel" } }
-            }
-        },
-        {
-            id = "ps-fuel",
-            label = "ps-fuel",
-            resources = {
-                { name = "ps-fuel", getters = { "GetFuel", "GetFuelLevel" } }
-            }
-        },
-        {
-            id = "cdn-fuel",
-            label = "cdn-fuel",
-            resources = {
-                { name = "cdn-fuel", getters = { "GetFuel", "GetFuelLevel" } }
-            }
-        },
-        {
-            id = "legacyfuel",
-            label = "LegacyFuel",
-            resources = {
-                { name = "LegacyFuel", getters = { "GetFuel", "GetFuelLevel", "getFuel" } },
-                { name = "legacyfuel", getters = { "GetFuel", "GetFuelLevel", "getFuel" } }
-            }
-        },
-        {
-            id = "fuel",
-            label = "fuel",
-            resources = {
-                { name = "fuel", getters = { "GetFuel", "getFuel" } }
-            }
-        },
-        {
-            id = "frfuel",
-            label = "frfuel",
-            resources = {
-                { name = "frfuel", getters = { "getCurrentFuel" } }
-            }
-        },
-        {
-            id = "esx_fuel",
-            label = "esx_fuel",
-            resources = {
-                { name = "esx_fuel", getters = { "GetFuel" } }
-            }
-        },
-        {
-            id = "qb-fuel",
-            label = "qb-fuel",
-            resources = {
-                { name = "qb-fuel", getters = { "GetFuel" } }
-            }
-        },
-        {
-            id = "lj-fuel",
-            label = "lj-fuel",
-            resources = {
-                { name = "lj-fuel", getters = { "GetFuel" } }
-            }
-        }
+}
+
+Config.StatusUpdateInterval = 500
+Config.VoipUpdateInterval = 150
+
+-- Voice resource to use for VOIP status indicator.
+-- 'auto'             = auto-detect from running resources
+-- 'pma-voice'        = pma-voice (proximity + talking + connected)
+-- 'saltychat'        = SaltyChat
+-- 'mumble-voip'      = mumble-voip
+-- 'tokovoip_script'  = TokoVOIP
+Config.voipResource = 'auto'
+
+Config.cinematicKey = 'F7'
+Config.mapNotifications = true
+Config.lowFuelAlert = true
+Config.cinematicNotifications = true
+Config.minimapOnlyInVehicle = false
+
+Config.minimapOnlyInVehicle = false
+Config.fuelDisplayStyle = 'bar'
+Config.showCrosshair = false
+
+-- First-person camera FOV (client profile setting). This is per-player.
+-- Value matches GTA/FiveM "First Person Field of View" slider range.
+Config.firstPersonFov = 70
+
+Config.StatusIcons = {
+    hungerThreshold = 100,
+    thirstThreshold = 100,
+    stressThreshold = 100,
+    oxygenThreshold = 100,
+    showVoip = true,
+    colors = {
+        health = "#10b981",
+        armor = "#5eb2ff",
+        hunger = "#f59e0b",
+        thirst = "#38bdf8",
+        stress = "#ef4444",
+        oxygen = "#06b6d4",
     }
 }
 

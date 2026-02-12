@@ -1,0 +1,563 @@
+/* Settings Modal - Matches es_hud design language */
+/* Dark translucent glass, Share Tech Mono, green accents */
+
+.settings-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    pointer-events: all;
+    animation: settingsOverlayIn 0.2s ease-out;
+}
+
+@keyframes settingsOverlayIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.settings-modal {
+    width: calc(560px * var(--es-ui-scale));
+    max-height: 80vh;
+    background: rgba(16, 16, 16, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: calc(12px * var(--es-ui-scale));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: settingsModalIn 0.25s ease-out;
+}
+
+@keyframes settingsModalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Header */
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: calc(14px * var(--es-ui-scale)) calc(20px * var(--es-ui-scale));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(15px * var(--es-ui-scale));
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.settings-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(28px * var(--es-ui-scale));
+    height: calc(28px * var(--es-ui-scale));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: calc(6px * var(--es-ui-scale));
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(14px * var(--es-ui-scale));
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.settings-close:hover {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: rgba(255, 68, 68, 0.3);
+    color: #ff4444;
+}
+
+/* Body */
+.settings-body {
+    padding: calc(16px * var(--es-ui-scale)) calc(20px * var(--es-ui-scale));
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: calc(6px * var(--es-ui-scale));
+}
+
+.settings-body::-webkit-scrollbar {
+    width: 4px;
+}
+
+.settings-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.settings-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+}
+
+/* Section */
+.settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: calc(8px * var(--es-ui-scale));
+}
+
+.settings-section-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(11px * var(--es-ui-scale));
+    font-weight: 700;
+    color: var(--es-success);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding-bottom: calc(4px * var(--es-ui-scale));
+    border-bottom: 1px solid rgba(16, 185, 129, 0.15);
+    text-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(16, 185, 129, 0.3);
+}
+
+.settings-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.06);
+    margin: calc(6px * var(--es-ui-scale)) 0;
+}
+
+/* Row - single setting */
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: calc(8px * var(--es-ui-scale)) calc(10px * var(--es-ui-scale));
+    border-radius: calc(6px * var(--es-ui-scale));
+    transition: background 0.12s ease;
+}
+
+.settings-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.settings-row-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(12px * var(--es-ui-scale));
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 0.5px;
+}
+
+.settings-row-desc {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(10px * var(--es-ui-scale));
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 0.3px;
+    margin-top: calc(2px * var(--es-ui-scale));
+}
+
+/* Toggle Switch - Square */
+.settings-toggle {
+    position: relative;
+    width: calc(38px * var(--es-ui-scale));
+    height: calc(20px * var(--es-ui-scale));
+    border-radius: calc(4px * var(--es-ui-scale));
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.settings-toggle.active {
+    background: rgba(16, 185, 129, 0.25);
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
+.settings-toggle-knob {
+    position: absolute;
+    top: calc(2px * var(--es-ui-scale));
+    left: calc(2px * var(--es-ui-scale));
+    width: calc(14px * var(--es-ui-scale));
+    height: calc(14px * var(--es-ui-scale));
+    border-radius: calc(2px * var(--es-ui-scale));
+    background: rgba(255, 255, 255, 0.5);
+    transition: all 0.2s ease;
+}
+
+.settings-toggle.active .settings-toggle-knob {
+    left: calc(20px * var(--es-ui-scale));
+    background: var(--es-success);
+    box-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(16, 185, 129, 0.5);
+}
+
+/* Custom Dropdown */
+.settings-dropdown {
+    position: relative;
+    min-width: calc(110px * var(--es-ui-scale));
+    flex-shrink: 0;
+}
+
+.settings-dropdown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(8px * var(--es-ui-scale));
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(11px * var(--es-ui-scale));
+    font-weight: 600;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: calc(4px * var(--es-ui-scale));
+    padding: calc(6px * var(--es-ui-scale)) calc(12px * var(--es-ui-scale));
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    width: 100%;
+}
+
+.settings-dropdown-trigger:hover {
+    border-color: rgba(16, 185, 129, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.settings-dropdown.open .settings-dropdown-trigger {
+    border-color: rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(16, 185, 129, 0.15);
+}
+
+.settings-dropdown-arrow {
+    font-size: calc(8px * var(--es-ui-scale));
+    color: rgba(255, 255, 255, 0.4);
+    transition: transform 0.2s ease;
+}
+
+.settings-dropdown.open .settings-dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.settings-dropdown-menu {
+    position: absolute;
+    top: calc(100% + calc(4px * var(--es-ui-scale)));
+    left: 0;
+    right: 0;
+    background: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: calc(4px * var(--es-ui-scale));
+    overflow: hidden;
+    z-index: 10;
+    animation: dropdownIn 0.15s ease-out;
+}
+
+@keyframes dropdownIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.settings-dropdown-option {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(11px * var(--es-ui-scale));
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    padding: calc(7px * var(--es-ui-scale)) calc(12px * var(--es-ui-scale));
+    cursor: pointer;
+    transition: all 0.1s ease;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.settings-dropdown-option:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+}
+
+.settings-dropdown-option.selected {
+    color: var(--es-success);
+    background: rgba(16, 185, 129, 0.1);
+    text-shadow: 0 0 calc(4px * var(--es-ui-scale)) rgba(16, 185, 129, 0.3);
+}
+
+/* Slider */
+.settings-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: calc(10px * var(--es-ui-scale));
+    flex-shrink: 0;
+}
+
+.settings-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: calc(100px * var(--es-ui-scale));
+    height: calc(4px * var(--es-ui-scale));
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: calc(2px * var(--es-ui-scale));
+    outline: none;
+    cursor: pointer;
+}
+
+.settings-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: calc(12px * var(--es-ui-scale));
+    height: calc(12px * var(--es-ui-scale));
+    border-radius: 50%;
+    background: var(--es-success);
+    box-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(16, 185, 129, 0.5);
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+
+.settings-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.settings-slider-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(11px * var(--es-ui-scale));
+    font-weight: 700;
+    color: var(--es-success);
+    min-width: calc(30px * var(--es-ui-scale));
+    text-align: right;
+    text-shadow: 0 0 calc(4px * var(--es-ui-scale)) rgba(16, 185, 129, 0.3);
+}
+
+/* Footer */
+.settings-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: calc(10px * var(--es-ui-scale));
+    padding: calc(12px * var(--es-ui-scale)) calc(20px * var(--es-ui-scale));
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(11px * var(--es-ui-scale));
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: calc(8px * var(--es-ui-scale)) calc(20px * var(--es-ui-scale));
+    border-radius: calc(6px * var(--es-ui-scale));
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.settings-btn-save {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.35);
+    color: var(--es-success);
+}
+
+.settings-btn-save:hover {
+    background: rgba(16, 185, 129, 0.3);
+    border-color: rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 calc(10px * var(--es-ui-scale)) rgba(16, 185, 129, 0.2);
+}
+
+.settings-btn-cancel {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.settings-btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.settings-btn-reset {
+    background: rgba(255, 68, 68, 0.08);
+    border-color: rgba(255, 68, 68, 0.2);
+    color: rgba(255, 68, 68, 0.6);
+    margin-right: auto;
+}
+
+.settings-btn-reset:hover {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: rgba(255, 68, 68, 0.35);
+    color: rgba(255, 68, 68, 0.85);
+}
+
+/* Checkbox - Yellow square style */
+.settings-checkbox {
+    display: flex;
+    align-items: center;
+    gap: calc(10px * var(--es-ui-scale));
+    cursor: pointer;
+    padding: calc(6px * var(--es-ui-scale)) calc(10px * var(--es-ui-scale));
+    border-radius: calc(4px * var(--es-ui-scale));
+    transition: background 0.12s ease;
+}
+
+.settings-checkbox:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.settings-checkbox-box {
+    width: calc(18px * var(--es-ui-scale));
+    height: calc(18px * var(--es-ui-scale));
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: calc(3px * var(--es-ui-scale));
+    background: rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.settings-checkbox.checked .settings-checkbox-box {
+    background: rgba(234, 179, 8, 0.85);
+    border-color: rgba(234, 179, 8, 1);
+    box-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(234, 179, 8, 0.3);
+}
+
+.settings-checkbox-check {
+    font-size: calc(11px * var(--es-ui-scale));
+    color: #000000;
+    font-weight: 900;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.settings-checkbox.checked .settings-checkbox-check {
+    opacity: 1;
+}
+
+.settings-checkbox-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(12px * var(--es-ui-scale));
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 0.5px;
+}
+
+/* Keybind Input */
+.settings-keybind {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(11px * var(--es-ui-scale));
+    font-weight: 700;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: calc(4px * var(--es-ui-scale));
+    padding: calc(6px * var(--es-ui-scale)) calc(12px * var(--es-ui-scale));
+    min-width: calc(60px * var(--es-ui-scale));
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.settings-keybind:hover {
+    border-color: rgba(16, 185, 129, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.settings-keybind:focus {
+    border-color: rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(16, 185, 129, 0.15);
+}
+
+.settings-keybind.listening {
+    border-color: rgba(234, 179, 8, 0.6);
+    box-shadow: 0 0 calc(8px * var(--es-ui-scale)) rgba(234, 179, 8, 0.2);
+    color: rgba(234, 179, 8, 0.9);
+    animation: keybindPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes keybindPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Small Button - for inline actions */
+.settings-btn-small {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: calc(10px * var(--es-ui-scale));
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: calc(6px * var(--es-ui-scale)) calc(12px * var(--es-ui-scale));
+    border-radius: calc(4px * var(--es-ui-scale));
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
+    min-width: calc(60px * var(--es-ui-scale));
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-btn-small:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.settings-btn-small:active {
+    transform: translateY(0);
+    box-shadow: none;
+    opacity: 0.8;
+}
+
+/* Move Action Variant */
+.settings-btn-move {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: rgba(16, 185, 129, 0.9);
+}
+
+.settings-btn-move:hover {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #ffffff;
+    box-shadow: 0 0 calc(10px * var(--es-ui-scale)) rgba(16, 185, 129, 0.15);
+}
+
+/* Reset Action Variant */
+.settings-btn-reset-small:hover {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: rgba(255, 68, 68, 0.35);
+    color: #ff4444;
+    box-shadow: 0 0 calc(10px * var(--es-ui-scale)) rgba(255, 68, 68, 0.15);
+}
+
+/* Color Input Styling */
+.settings-color-input {
+    -webkit-appearance: none;
+    appearance: none;
+    width: calc(42px * var(--es-ui-scale));
+    height: calc(24px * var(--es-ui-scale));
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: calc(4px * var(--es-ui-scale));
+    cursor: pointer;
+    padding: 0;
+}
+
+.settings-color-input::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.settings-color-input::-webkit-color-swatch {
+    border: none;
+    border-radius: calc(3px * var(--es-ui-scale));
+}

@@ -80,16 +80,16 @@ local function notify(data)
 end
 
 local function applySmokeDamage(vehicle, stallCount, maxStalls)
-    local damageProgress = stallCount / maxStalls
-    damageProgress = math.min(damageProgress, 1.5)
-
     local targetHealth
     if stallCount >= maxStalls then
         targetHealth = SMOKE_THRESHOLDS.fire
     else
-        local startHealth = 500
-        local healthRange = startHealth - SMOKE_THRESHOLDS.heavy
-        targetHealth = startHealth - (healthRange * damageProgress)
+        -- Scale from 800 down to 310 across stalls, staying above 300
+        -- so GTA's native engine death doesn't kick in early
+        local safeFloor = 310
+        local startHealth = 800
+        local progress = (stallCount - 1) / math.max(maxStalls - 1, 1)
+        targetHealth = startHealth - ((startHealth - safeFloor) * progress)
     end
 
     SetVehicleEngineHealth(vehicle, targetHealth)
@@ -102,19 +102,27 @@ function StallLogic.new()
 
     local self = setmetatable({}, StallLogic)
 
-    self.speedConversion = string.lower(config.speedUnit) == "mph" and 2.236936 or 3.6
-    self.impactThreshold = config.stallImpactThreshold / self.speedConversion
-    self.stallDuration = config.stallDuration or 2000
-    self.maxStalls = config.stallMaxCount or 3
-    self.powerReduction = config.stallPowerReduction or 0.15
-    self.breakdownDisables = config.stallBreakdownDisablesEngine
+    -- Read config values dynamically so changes to the config table
+    -- (e.g. from settings module or resource hot-reload) take effect
+    self:refreshConfig()
 
     self.vehicleStates = {}
     self.isMonitoring = false
     self.currentVehicle = nil
 
-
     return self
+end
+
+--- Re-read all stall parameters from the live config table.
+--- Called on creation and when starting monitoring so config.lua edits
+--- that modify the cached table are picked up immediately.
+function StallLogic:refreshConfig()
+    self.speedConversion = string.lower(config.speedUnit) == "mph" and 2.236936 or 3.6
+    self.impactThreshold = (config.stallImpactThreshold or 20.0) / self.speedConversion
+    self.stallDuration = config.stallDuration or 2000
+    self.maxStalls = config.stallMaxCount or 3
+    self.powerReduction = config.stallPowerReduction or 0.15
+    self.breakdownDisables = config.stallBreakdownDisablesEngine
 end
 
 function StallLogic:getVehicleState(vehicle)
@@ -218,6 +226,17 @@ function StallLogic:restartEngine(vehicle)
     SetVehicleEngineOn(vehicle, true, false, true)
     SetVehicleEnginePowerMultiplier(vehicle, state.powerMultiplier)
 
+    -- Restore engine health to safe level for current stall count
+    -- This prevents GTA's native degradation from killing the engine
+    -- before the stall system reaches maxStalls
+    if state.stallCount < self.maxStalls then
+        local safeFloor = 310
+        local startHealth = 800
+        local progress = (state.stallCount - 1) / math.max(self.maxStalls - 1, 1)
+        local targetHealth = startHealth - ((startHealth - safeFloor) * progress)
+        SetVehicleEngineHealth(vehicle, targetHealth + 50)
+    end
+
     playRestartSound()
     notify({
         title = "Engine Started",
@@ -234,6 +253,12 @@ function StallLogic:startMonitoring(vehicle)
     
     if NetworkGetEntityOwner(vehicle) ~= PlayerId() then return end
 
+    -- Re-read config values in case speedUnit or stall parameters changed
+    self:refreshConfig()
+
+    -- If the stall system was disabled via config after creation, bail out
+    if not config.useStallSystem then return end
+
     self.isMonitoring = true
     self.currentVehicle = vehicle
 
@@ -248,8 +273,18 @@ function StallLogic:startMonitoring(vehicle)
         local hadCollision = false
 
         while self.isMonitoring and IsPedInAnyVehicle(PlayerPedId(), false) do
+            local vehState = self:getVehicleState(vehicle)
             local currentSpeed = GetEntitySpeed(vehicle)
             local hasCollision = HasEntityCollidedWithAnything(vehicle)
+
+            -- Prevent GTA's native engine death from interfering
+            -- Keep engine health above 300 while not broken by our system
+            if not vehState.isBroken and not vehState.isStalled then
+                local currentHealth = GetVehicleEngineHealth(vehicle)
+                if currentHealth < 300 and currentHealth > 0 then
+                    SetVehicleEngineHealth(vehicle, 310.0)
+                end
+            end
 
             if hasCollision and not hadCollision then
                 local speedDrop = lastSpeed - currentSpeed
@@ -319,6 +354,13 @@ function StallLogic:repair(vehicle)
         duration = 2000,
         sound = false
     })
+end
+
+-- When stall system is explicitly disabled in config, return nil so that
+-- hud.lua's `StallLogic and StallLogic.new()` evaluates to nil correctly.
+-- Returning false (a falsy value in Lua) also works, but nil is cleaner.
+if config.useStallSystem == false then
+    return nil
 end
 
 return StallLogic

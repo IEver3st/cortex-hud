@@ -13,6 +13,7 @@ local DisplayRadar = DisplayRadar
 local SetMapZoomDataLevel = SetMapZoomDataLevel
 local SetRadarZoom = SetRadarZoom
 local RequestScaleformMovie = RequestScaleformMovie
+local HasScaleformMovieLoaded = HasScaleformMovieLoaded
 local SetRadarBigmapEnabled = SetRadarBigmapEnabled
 local BeginScaleformMovieMethod = BeginScaleformMovieMethod
 local ScaleformMovieMethodAddParamInt = ScaleformMovieMethodAddParamInt
@@ -22,6 +23,7 @@ local Wait = Wait
 local minimapReady = false
 local zoomDataApplied = false
 local healthArmorHidden = false
+local bigmapResetActive = false
 
 local function getAspectOffset()
     local defaultAspectRatio = 1920 / 1080
@@ -68,10 +70,14 @@ local function ensureMinimapTextures()
 end
 
 local function preventBigmapFromStayingActive()
+    if bigmapResetActive then return end
+    bigmapResetActive = true
+
     local timeout = 0
     while true do
         SetBigmapActive(false, false)
         if timeout >= 10000 then
+            bigmapResetActive = false
             return
         end
         timeout = timeout + 1000
@@ -85,12 +91,16 @@ local function removeHealthArmorBars()
 
     CreateThread(function()
         local minimapScaleform = RequestScaleformMovie("minimap")
+        while not HasScaleformMovieLoaded(minimapScaleform) do
+            Wait(100)
+        end
+
         SetRadarBigmapEnabled(false, false)
         while true do
-            Wait(0)
             BeginScaleformMovieMethod(minimapScaleform, "SETUP_HEALTH_ARMOUR")
             ScaleformMovieMethodAddParamInt(3)
             EndScaleformMovieMethod()
+            Wait(1500)
         end
     end)
 end
@@ -113,6 +123,9 @@ function minimap.apply(config)
 
     local blurSizeX = m.blurSizeX or 0.262
     local blurSizeY = m.blurSizeY or 0.300
+
+    -- 3D perspective mode uses CSS rotateY which does NOT distort native minimap
+    -- No minimap offset needed - the perspective transform preserves layout bounds
 
     ensureMapZoomData()
     ensureMinimapTextures()

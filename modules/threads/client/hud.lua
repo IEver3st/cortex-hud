@@ -22,17 +22,21 @@ local math_abs = math.abs
 local math_floor = math.floor
 local math_max = math.max
 local math_min = math.min
+local math_sqrt = math.sqrt
 
 local minimap = lib.require("modules.utility.shared.minimap")
 local SeatbeltLogic = lib.require("modules.seatbelt.client")
 local StallLogic = lib.require("modules.stall.client")
+local HarnessLogic = lib.require("modules.harness.client")
 local VehicleStatusThread = lib.require("modules.threads.client.vehicle_status")
-local Fuel = lib.require("modules.fuel.client")
+local Bridge = lib.require("modules.bridge.client")
 
 local visibilityReasons = {
     user = true,
     polcam = true,
-    external = true
+    external = true,
+    cinematic = true,
+    framework = Bridge.isPlayerLoaded()
 }
 
 local aircraftHudForced = false
@@ -144,7 +148,14 @@ local function startPolcamDetection(config)
 end
 
 function hud.start(config)
-    Fuel.init()
+    Bridge.onPlayerLoaded(function()
+        setVisibilityReason('framework', true)
+    end)
+
+    Bridge.onPlayerUnloaded(function()
+        setVisibilityReason('framework', false)
+    end)
+
     local lastHealth = -1
     local lastArmor = -1
     local lastStreet = ""
@@ -161,7 +172,9 @@ function hud.start(config)
 
     local stall = StallLogic and StallLogic.new() or nil
 
-    local vehicleStatus = VehicleStatusThread.new(seatbelt, stall)
+    local harness = HarnessLogic and HarnessLogic.new() or nil
+
+    local vehicleStatus = VehicleStatusThread.new(seatbelt, stall, harness)
 
     if config.disableWantedLevel then
         CreateThread(function()
@@ -179,7 +192,18 @@ function hud.start(config)
     end
 
     CreateThread(function()
-        while not IsPlayerPlaying(PlayerId()) do
+        local HideHudComponentThisFrame = HideHudComponentThisFrame
+        while true do
+            HideHudComponentThisFrame(6) -- Vehicle Name
+            HideHudComponentThisFrame(7) -- Area Name
+            HideHudComponentThisFrame(8) -- Street Name / Waypoint Distance
+            HideHudComponentThisFrame(9) -- Help Text
+            Wait(0)
+        end
+    end)
+
+    CreateThread(function()
+        while not Bridge.isPlayerLoaded() do
             Wait(200)
         end
 
@@ -210,7 +234,11 @@ function hud.start(config)
             if raw then
                 postals = json.decode(raw)
                 for i, p in ipairs(postals) do
-                    postals[i] = {vec(p.x, p.y), code = p.code}
+                    postals[i] = {
+                        x = p.x,
+                        y = p.y,
+                        code = p.code,
+                    }
                 end
             else
                 print("^1[ES HUD] Error: Could not load postal file from nearest-postal resource!^7")
@@ -223,22 +251,26 @@ function hud.start(config)
             if config.EnablePostal and postals then
                 local ped = PlayerPedId()
                 local coords = GetEntityCoords(ped)
-                local playerXY = vec(coords.x, coords.y)
+                local playerX = coords.x
+                local playerY = coords.y
 
-                local minD = nil
+                local minD2 = nil
                 local minCode = ""
 
                 for i = 1, #postals do
-                    local d = #(playerXY - postals[i][1])
-                    if not minD or d < minD then
-                        minD = d
-                        minCode = postals[i].code
+                    local postal = postals[i]
+                    local dx = playerX - postal.x
+                    local dy = playerY - postal.y
+                    local d2 = (dx * dx) + (dy * dy)
+                    if not minD2 or d2 < minD2 then
+                        minD2 = d2
+                        minCode = postal.code
                     end
                 end
 
                 nearestPostalCode = minCode
                 if config.ShowPostalDistance then
-                    nearestPostalDist = minD
+                    nearestPostalDist = minD2 and math_sqrt(minD2) or -1
                 else
                     nearestPostalDist = -1
                 end
@@ -259,7 +291,8 @@ function hud.start(config)
                 local maxHealth = GetEntityMaxHealth(ped)
                 local armor = GetPedArmour(ped)
 
-                local healthPercent = math_max(0, math_min(100, ((health - 100) / (maxHealth - 100)) * 100))
+                local healthBase = math_max(1, maxHealth - 100)
+                local healthPercent = math_max(0, math_min(100, ((health - 100) / healthBase) * 100))
                 local armorPercent = math_max(0, math_min(100, armor))
 
                 if health ~= lastHealth or armor ~= lastArmor then
@@ -305,12 +338,129 @@ function hud.start(config)
         end
     end)
 
+    -- Waypoint distance tracker
+    local GetFirstBlipInfoId = GetFirstBlipInfoId
+    local DoesBlipExist = DoesBlipExist
+    local GetBlipInfoIdCoord = GetBlipInfoIdCoord
+    local lastWpDist = -1
+    local useMiles = (config.speedUnit == "mph")
+
+    CreateThread(function()
+        local IsPedInAnyVehicle = IsPedInAnyVehicle
+        local PlayerPedId = PlayerPedId
+        while true do
+            if isFullyVisible() and IsPedInAnyVehicle(PlayerPedId(), false) then
+                local wpBlip = GetFirstBlipInfoId(8)
+                if DoesBlipExist(wpBlip) then
+                    local wpCoords = GetBlipInfoIdCoord(wpBlip)
+                    local ped = PlayerPedId()
+                    local pCoords = GetEntityCoords(ped)
+                    local distM = #(pCoords - wpCoords)
+
+                    local distDisplay
+                    local distUnit
+                    if useMiles then
+                        local distMi = distM / 1609.34
+                        distDisplay = distMi
+                        distUnit = "mi"
+                    else
+                        local distKm = distM / 1000.0
+                        distDisplay = distKm
+                        distUnit = "km"
+                    end
+
+                    if math_abs(distDisplay - lastWpDist) > 0.01 then
+                        lastWpDist = distDisplay
+                        SendNUIMessage({
+                            action = 'updateWaypoint',
+                            waypointDist = math_floor(distDisplay * 100 + 0.5) / 100,
+                            waypointUnit = distUnit
+                        })
+                    end
+                else
+                    if lastWpDist ~= -1 then
+                        lastWpDist = -1
+                        SendNUIMessage({
+                            action = 'updateWaypoint',
+                            waypointDist = -1,
+                            waypointUnit = ""
+                        })
+                    end
+                end
+            else
+                if lastWpDist ~= -1 then
+                    lastWpDist = -1
+                    SendNUIMessage({
+                        action = 'updateWaypoint',
+                        waypointDist = -1,
+                        waypointUnit = ""
+                    })
+                end
+            end
+
+            Wait(500)
+        end
+    end)
+
+    -- Weapon ammo tracker
+    local GetSelectedPedWeapon = GetSelectedPedWeapon
+    local GetAmmoInClip = GetAmmoInClip
+    local GetAmmoInPedWeapon = GetAmmoInPedWeapon
+    local UNARMED_HASH = `WEAPON_UNARMED`
+    local lastAmmoClip = -1
+    local lastAmmoReserve = -1
+    local lastIsArmed = false
+
+    CreateThread(function()
+        while true do
+            if isFullyVisible() then
+                local ped = PlayerPedId()
+                local weaponHash = GetSelectedPedWeapon(ped)
+                local isArmed = weaponHash ~= UNARMED_HASH
+
+                if isArmed then
+                    local _, clipAmmo = GetAmmoInClip(ped, weaponHash)
+                    local totalAmmo = GetAmmoInPedWeapon(ped, weaponHash)
+                    local reserveAmmo = totalAmmo - clipAmmo
+
+                    if clipAmmo ~= lastAmmoClip or reserveAmmo ~= lastAmmoReserve or isArmed ~= lastIsArmed then
+                        lastAmmoClip = clipAmmo
+                        lastAmmoReserve = reserveAmmo
+                        lastIsArmed = isArmed
+                        SendNUIMessage({
+                            action = 'updateAmmo',
+                            ammoClip = clipAmmo,
+                            ammoReserve = reserveAmmo,
+                            isArmed = isArmed
+                        })
+                    end
+                else
+                    if lastIsArmed then
+                        lastAmmoClip = -1
+                        lastAmmoReserve = -1
+                        lastIsArmed = false
+                        SendNUIMessage({
+                            action = 'updateAmmo',
+                            ammoClip = -1,
+                            ammoReserve = -1,
+                            isArmed = false
+                        })
+                    end
+                end
+            end
+            Wait(100)
+        end
+    end)
+
     RegisterCommand('togglehud', function()
         local currentUserState = getVisibilityReason('user')
         setVisibilityReason('user', not currentUserState)
     end, false)
 
     CreateThread(function()
+        while not Bridge.isPlayerLoaded() do
+            Wait(200)
+        end
         Wait(2000)
         startPolcamDetection(config)
         SendNUIMessage({
@@ -388,6 +538,22 @@ function hud.start(config)
     exports('repairEngine', function(vehicle)
         if stall then
             stall:repair(vehicle)
+        end
+    end)
+
+    exports('isHarnessOn', function()
+        return harness and harness:isHarnessOn() or false
+    end)
+
+    exports('toggleHarness', function(state)
+        if harness then
+            if state == nil then
+                harness:toggle()
+            elseif state then
+                harness:apply()
+            else
+                harness:remove()
+            end
         end
     end)
 

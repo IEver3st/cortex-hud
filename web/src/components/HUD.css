@@ -1,493 +1,718 @@
-/* HUD Container - Positioned directly under minimap */
-/* Uses es_lib design tokens and scaling system */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* es_hud – Clean single-pass CSS                                            */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-    /* es_lib HUD design tokens */
-    --hud-color: #ffffff;
-    --hud-glow: rgba(255, 255, 255, 0.4);
-    --hud-dim: rgba(200, 200, 200, 0.8);
+  --hud-color: #ffffff;
+  --hud-glow: rgba(255, 255, 255, 0.4);
+  --hud-dim: rgba(200, 200, 200, 0.8);
+  --font-hud: "Share Tech Mono", "Courier New", monospace;
 
-    --font-hud: 'Share Tech Mono', 'Courier New', monospace;
+  --es-success: #10b981;
+  --es-error: #ff4444;
+  --es-warning: #ffaa00;
 
-    --es-success: #10b981;
-    --es-error: #ff4444;
-    --es-warning: #ffaa00;
+  --es-ui-scale: 1;
+  --es-radius: calc(2px * var(--es-ui-scale));
+  --es-border: rgba(255, 255, 255, 0.15);
 
-    /* Resolution scaling */
-    --es-ui-scale: 1;
-    --es-radius: calc(2px * var(--es-ui-scale));
-    --es-border: rgba(255, 255, 255, 0.15);
+  --health-color: #10b981;
+  --health-glow: rgba(16, 185, 129, 0.4);
+  --armor-color: #5eb2ff;
+  --armor-glow: rgba(94, 178, 255, 0.4);
 
-    /* Health/Armor specific colors */
-    --health-color: #10b981;
-    --health-glow: rgba(16, 185, 129, 0.4);
-    --armor-color: #5eb2ff;
-    --armor-glow: rgba(94, 178, 255, 0.4);
+  --hunger-color: #f59e0b;
+  --hunger-glow: rgba(245, 158, 11, 0.45);
+  --thirst-color: #38bdf8;
+  --thirst-glow: rgba(56, 189, 248, 0.45);
+  --stress-color: #ef4444;
+  --stress-glow: rgba(239, 68, 68, 0.4);
+  --oxygen-color: #06b6d4;
+  --oxygen-glow: rgba(6, 182, 212, 0.4);
+  --voip-color: #10b981;
+  --voip-glow: rgba(16, 185, 129, 0.4);
 
-    --hud-minimap-left: 1.3vw;
-    --hud-minimap-width: 16.38vw; /* Native GTA V minimap width ~314px at 1080p */
-    --hud-minimap-height: 18.3vh; /* Native GTA V minimap height */
-    --hud-safezone-bottom: 2vh;
+  --hud-minimap-left: 1.3vw;
+  --hud-minimap-width: 16.38vw;
+  --hud-minimap-height: 18.3vh;
+  --hud-safezone-bottom: 2vh;
 
-    --speedo-green: #10b981;
-    --speedo-green-glow: rgba(16, 185, 129, 0.5);
+  --speedo-green: #10b981;
+  --speedo-green-glow: rgba(16, 185, 129, 0.5);
 }
 
-/* Vanilla GTA V minimap is ~12% of screen width (circular, default safezone) */
-/* Bars sit directly below the minimap, matching its width */
+/* ── Waypoint Distance (above minimap) ── */
+.waypoint-distance {
+  position: fixed;
+  bottom: calc(
+    var(--hud-safezone-bottom) + var(--hud-minimap-height) + calc(56px * var(--es-ui-scale))
+  );
+  left: var(--hud-minimap-left);
+  display: flex;
+  align-items: center;
+  gap: calc(6px * var(--es-ui-scale));
+  padding: calc(5px * var(--es-ui-scale)) calc(10px * var(--es-ui-scale));
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: calc(6px * var(--es-ui-scale));
+  z-index: 1001;
+  animation: waypoint-fade-in 0.3s ease;
+  transition: transform 0.4s ease;
+}
+
+.waypoint-icon {
+  color: #a855f7;
+  font-size: calc(12px * var(--es-ui-scale));
+  filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) rgba(168, 85, 247, 0.5));
+}
+
+.waypoint-value {
+  color: #ffffff;
+  font-size: calc(13px * var(--es-ui-scale));
+  font-weight: 700;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.waypoint-unit {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: calc(11px * var(--es-ui-scale));
+  font-weight: 500;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  text-transform: lowercase;
+}
+
+@keyframes waypoint-fade-in {
+  from { opacity: 0; transform: translateY(calc(6px * var(--es-ui-scale))); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── HUD Container (Health/Armor) ── */
+/* Anchored right under the minimap */
 .hud-container {
-    position: fixed;
-    bottom: calc(var(--hud-safezone-bottom) + calc(0.4vh * var(--es-ui-scale)));
-    left: var(--hud-minimap-left);
-    display: flex;
-    flex-direction: column;
-    gap: calc(5px * var(--es-ui-scale));
-    z-index: 1000;
-    width: var(--hud-minimap-width);
+  position: fixed;
+  bottom: calc(var(--hud-safezone-bottom) + calc(0px * var(--es-ui-scale)));
+  left: var(--hud-minimap-left);
+  display: flex;
+  flex-direction: column;
+  gap: calc(3px * var(--es-ui-scale));
+  z-index: 1000;
+  width: var(--hud-minimap-width);
+  transition: transform 0.4s ease;
 }
 
-/* Speedometer - bottom right */
-.speedo-container {
-    position: fixed;
-    right: calc(2vw * var(--es-ui-scale));
-    bottom: calc(2vh * var(--es-ui-scale));
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: calc(6px * var(--es-ui-scale));
-    pointer-events: none;
-}
-
-.speedo-ring {
-    position: relative;
-    width: calc(14vw * var(--es-ui-scale));
-    min-width: calc(150px * var(--es-ui-scale));
-    max-width: calc(220px * var(--es-ui-scale));
-    aspect-ratio: 1 / 1;
-}
-
-.speedo-svg {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-}
-
-/* Track arc - 270° arc with gap at bottom, starts at 135° */
-.speedo-track {
-    fill: none;
-    stroke: rgba(12, 12, 12, 0.55);
-    stroke-width: 7;
-    stroke-linecap: round;
-    stroke-dasharray: 212;
-    stroke-dashoffset: 0;
-    transform: rotate(135deg);
-    transform-origin: 50% 50%;
-}
-
-/* RPM fill arc - bright green */
-/* Arc grows from bottom-left (0) to bottom-right (7) using strokeDasharray */
-.speedo-arc {
-    fill: none;
-    stroke: var(--speedo-green);
-    stroke-width: 7;
-    stroke-linecap: round;
-    transform: rotate(135deg);
-    transform-origin: 50% 50%;
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) var(--speedo-green-glow));
-    transition: stroke-dasharray 0.12s ease-out;
-}
-
-/* Tick marks - thin, refined lines */
-.speedo-ticks line {
-    stroke: rgba(255, 255, 255, 0.6);
-    stroke-width: 1.2;
-    stroke-linecap: round;
-}
-
-/* Numbers inside arc - upright text */
-.speedo-numbers text {
-    font-family: var(--font-hud);
-    font-size: 8px;
-    font-weight: 600;
-    fill: rgba(255, 255, 255, 0.75);
-}
-
-/* Center speed display */
-.speedo-center {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: var(--hud-color);
-}
-
-.speedo-speed {
-    font-family: var(--font-hud);
-    font-size: calc(38px * var(--es-ui-scale));
-    font-weight: 900;
-    letter-spacing: 1px;
-    line-height: 1;
-    text-shadow: 0 0 calc(10px * var(--es-ui-scale)) rgba(0, 0, 0, 0.7);
-}
-
-.speedo-unit {
-    font-family: var(--font-hud);
-    font-size: calc(10px * var(--es-ui-scale));
-    font-weight: 600;
-    letter-spacing: 2px;
-    color: rgba(255, 255, 255, 0.7);
-    margin-top: calc(2px * var(--es-ui-scale));
-}
-
-.speedo-gear {
-    font-family: var(--font-hud);
-    font-size: calc(16px * var(--es-ui-scale));
-    font-weight: 800;
-    letter-spacing: 1px;
-    color: var(--speedo-green);
-    text-shadow: 0 0 calc(8px * var(--es-ui-scale)) var(--speedo-green-glow);
-    margin-top: calc(4px * var(--es-ui-scale));
-}
-
-/* NOS Arcs */
-.speedo-track-nos {
-    fill: none;
-    stroke: rgba(168, 85, 247, 0.08);
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-dasharray: 191;
-    transform: rotate(135deg);
-    transform-origin: 50% 50%;
-}
-
-.speedo-arc-nos {
-    fill: none;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    transform: rotate(135deg);
-    transform-origin: 50% 50%;
-    transition: stroke-dasharray 0.3s ease, stroke 0.3s ease, filter 0.3s ease;
-}
-
-/* Status row - es_lib-style tiny meters */
-.speedo-status {
-    display: flex;
-    gap: calc(22px * var(--es-ui-scale));
-    align-items: flex-end;
-    justify-content: center;
-}
-
-.speedo-statusItem {
-    display: flex;
-    flex-direction: column;
-    gap: calc(4px * var(--es-ui-scale));
-    align-items: center;
-    justify-content: center;
-}
-
-.speedo-statusIcon {
-    padding-bottom: calc(3px * var(--es-ui-scale));
-}
-
-.speedo-statusIcon .speedo-statusLabel {
-    color: rgba(255, 255, 255, 0.4);
-}
-
-.speedo-statusIcon.active .speedo-statusLabel {
-    color: var(--speedo-green);
-    text-shadow: 0 0 calc(6px * var(--es-ui-scale)) var(--speedo-green-glow);
-}
-
-.speedo-statusIcon.highbeam .speedo-statusLabel {
-    color: #5eb2ff;
-    text-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(94, 178, 255, 0.5);
-}
-
-.speedo-statusIcon.warning .speedo-statusLabel {
-    color: rgba(255, 170, 0, 0.95);
-    text-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(255, 170, 0, 0.4);
-}
-
-.speedo-statusLabel {
-    font-family: var(--font-hud);
-    font-size: calc(11px * var(--es-ui-scale));
-    font-weight: 800;
-    letter-spacing: 1px;
-    color: rgba(255, 255, 255, 0.78);
-}
-
-/* Icon-based status labels */
-.speedo-statusIcon-label {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255, 255, 255, 0.65);
-    transition: color 0.15s ease-out, filter 0.15s ease-out;
-}
-
-.speedo-statusIcon-label svg {
-    width: calc(18px * var(--es-ui-scale));
-    height: calc(18px * var(--es-ui-scale));
-}
-
-.speedo-statusItem.warning .speedo-statusIcon-label {
-    color: rgba(255, 170, 0, 0.95);
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(255, 170, 0, 0.5));
-}
-
-.speedo-statusIcon .speedo-statusIcon-label {
-    color: rgba(255, 255, 255, 0.35);
-}
-
-.speedo-statusIcon.active .speedo-statusIcon-label {
-    color: var(--speedo-green);
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) var(--speedo-green-glow));
-}
-
-.speedo-statusIcon.highbeam .speedo-statusIcon-label {
-    color: #5eb2ff;
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(94, 178, 255, 0.5));
-}
-
-.speedo-statusIcon.warning .speedo-statusIcon-label {
-    color: rgba(255, 170, 0, 0.95);
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(255, 170, 0, 0.5));
-}
-
-.speedo-statusIcon.critical .speedo-statusIcon-label {
-    color: rgba(255, 68, 68, 0.95);
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(255, 68, 68, 0.5));
-}
-
-.speedo-statusBar {
-    width: calc(42px * var(--es-ui-scale));
-    height: calc(4px * var(--es-ui-scale));
-    background: rgba(255, 255, 255, 0.08);
-    border: none;
-    border-radius: calc(2px * var(--es-ui-scale));
-    overflow: hidden;
-}
-
-.speedo-statusBar-vertical {
-    width: calc(4px * var(--es-ui-scale));
-    height: calc(24px * var(--es-ui-scale));
-}
-
-.speedo-statusFill {
-    height: 100%;
-    width: 0;
-    background: var(--speedo-green);
-    box-shadow: 0 0 calc(6px * var(--es-ui-scale)) var(--speedo-green-glow);
-    border-radius: calc(2px * var(--es-ui-scale));
-    transition: width 0.12s ease-out;
-}
-
-.speedo-statusFill-vertical {
-    width: 100%;
-    height: 0;
-    position: absolute;
-    bottom: 0;
-    transition: height 0.12s ease-out;
-}
-
-.speedo-statusBar-vertical {
-    position: relative;
-}
-
-.speedo-statusItem-fuel {
-    flex-direction: row;
-    gap: calc(6px * var(--es-ui-scale));
-}
-
-.speedo-statusItem.warning .speedo-statusLabel {
-    color: rgba(255, 170, 0, 0.95);
-    text-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(255, 170, 0, 0.4);
-}
-
-.speedo-statusItem.warning .speedo-statusFill {
-    background: var(--es-warning);
-    box-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(255, 170, 0, 0.5);
-}
-
-/* Individual Bar Container - es_lib style, no background overlay */
 .hud-bar {
-    display: flex;
-    align-items: center;
-    gap: calc(8px * var(--es-ui-scale));
-    padding: 0;
-    background: transparent;
-    border: none;
-    box-shadow: none;
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--es-ui-scale));
+  padding: 0;
+  background: transparent;
 }
 
-/* Bar Icon */
 .bar-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(14px * var(--es-ui-scale));
-    width: calc(18px * var(--es-ui-scale));
-    flex-shrink: 0;
-}
-
-.health-bar .bar-icon {
-    color: var(--health-color);
-    filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) var(--health-glow));
-}
-
-.health-bar.low .bar-icon {
-    color: var(--es-warning);
-    filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) rgba(255, 170, 0, 0.5));
-}
-
-.health-bar.critical .bar-icon {
-    color: var(--es-error);
-    filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) rgba(255, 68, 68, 0.5));
-    animation: pulse-critical 0.6s ease-in-out infinite;
-}
-
-.armor-bar .bar-icon {
-    color: var(--armor-color);
-    filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) var(--armor-glow));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: calc(14px * var(--es-ui-scale));
+  height: calc(14px * var(--es-ui-scale));
+  color: #ffffff;
+  transform: translateX(calc(3px * var(--es-ui-scale)));
 }
 
 .bar-icon svg {
-    color: #ffffff;
-    filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) rgba(255, 255, 255, 0.5));
+  width: 100%;
+  height: 100%;
 }
 
-/* Bar Value Text */
+.armor-bar.is-hidden {
+  visibility: hidden;
+}
+
 .bar-value {
-    font-family: var(--font-hud);
-    font-size: calc(12px * var(--es-ui-scale));
-    font-weight: 900;
-    min-width: calc(28px * var(--es-ui-scale));
-    text-align: right;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
+  font-family: var(--font-hud);
+  font-size: calc(12px * var(--es-ui-scale));
+  font-weight: 900;
+  min-width: calc(28px * var(--es-ui-scale));
+  text-align: right;
+  color: white;
 }
 
-.health-bar .bar-value {
-    color: var(--health-color);
-    text-shadow: 0 0 calc(6px * var(--es-ui-scale)) var(--health-glow);
-}
-
-.health-bar.low .bar-value {
-    color: var(--es-warning);
-    text-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(255, 170, 0, 0.5);
-}
-
-.health-bar.critical .bar-value {
-    color: var(--es-error);
-    text-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(255, 68, 68, 0.5);
-}
-
-.armor-bar .bar-value {
-    color: var(--armor-color);
-    text-shadow: 0 0 calc(6px * var(--es-ui-scale)) var(--armor-glow);
-}
-
-/* Bar Track - es_lib progress bar style */
 .bar-track {
     position: relative;
     flex: 1;
     height: calc(10px * var(--es-ui-scale));
-    background: rgba(0, 0, 0, 0.35);
-    border-radius: var(--es-radius);
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: calc(3px * var(--es-ui-scale));
     overflow: hidden;
-    border: 1px solid var(--es-border);
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) var(--hud-glow));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transform: skewX(-12deg);
 }
 
-/* Bar Fill - es_lib progress fill style */
 .bar-fill {
     position: absolute;
     top: 0;
     left: 0;
     height: 100%;
-    border-radius: 0;
-    transition: width 0.15s ease-out;
-    overflow: hidden;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
 }
 
-/* Health Fill - es_lib style */
-.health-fill {
-    background: rgba(16, 185, 129, 0.6);
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) var(--health-glow));
-}
+.health-fill { background-color: var(--health-color); box-shadow: 0 0 10px var(--health-glow); }
+.armor-fill { background-color: var(--armor-color); box-shadow: 0 0 10px var(--armor-glow); }
 
-.health-bar.low .health-fill {
-    background: rgba(255, 170, 0, 0.6);
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(255, 170, 0, 0.5));
-}
-
-.health-bar.critical .health-fill {
-    background: rgba(255, 68, 68, 0.6);
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(255, 68, 68, 0.5));
-    animation: pulse-bar 0.6s ease-in-out infinite;
-}
-
-/* Armor Fill - es_lib style */
-.armor-fill {
-    background: rgba(94, 178, 255, 0.6);
-    filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) var(--armor-glow));
-}
-
-/* Glow Effect on Fill - subtle shimmer */
-.bar-glow {
+.bar-segments {
     position: absolute;
-    top: 0;
-    right: -20px;
-    width: 40px;
-    height: 100%;
-    background: linear-gradient(90deg,
-            transparent 0%,
-            rgba(255, 255, 255, 0.3) 50%,
-            transparent 100%);
-    transform: skewX(-25deg);
-    animation: shimmer 3s ease-in-out infinite;
-    opacity: 0.5;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.4) 0,
+        rgba(0, 0, 0, 0.4) 2px,
+        transparent 2px,
+        transparent 12.5%
+    );
+    background-size: 100% 100%;
 }
 
-/* Animations */
+/* ── VOIP Container Modern (Bottom Right) ── */
+.voip-container-modern {
+  position: fixed;
+  bottom: calc(var(--hud-safezone-bottom) + calc(0.5vh * var(--es-ui-scale)));
+  right: calc(0.25vw * var(--es-ui-scale));
+  z-index: 1000;
+  transition: transform 0.4s ease;
+}
+
+.voip-content-modern {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; /* Keep everything right-aligned */
+}
+
+.voip-indicator-group {
+  display: flex;
+  align-items: center;
+  gap: calc(12px * var(--es-ui-scale));
+}
+
+.voip-main-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* VITAL: Centers visualizer over pips */
+  gap: calc(6px * var(--es-ui-scale));
+}
+
+.voip-radio-icon-modern {
+  color: #e79403;
+  filter: drop-shadow(0 0 5px rgba(252, 211, 77, 0.4));
+  flex-shrink: 0;
+}
+
+.voip-radio-icon-modern svg {
+  width: calc(20px * var(--es-ui-scale));
+  height: calc(20px * var(--es-ui-scale));
+}
+
+.voip-waveform {
+  display: flex;
+  align-items: center;
+  width: calc(52px * var(--es-ui-scale)); /* Exactly matches 3 pips width */
+  height: calc(24px * var(--es-ui-scale));
+  padding: 0;
+}
+
+.voip-waveform-bar {
+  width: calc(3px * var(--es-ui-scale));
+  height: var(--base-height);
+  border-radius: calc(1.5px * var(--es-ui-scale));
+  margin-right: calc(1.33px * var(--es-ui-scale)); /* Internal grouping gap */
+  transition:
+    height 0.1s ease,
+    background-color 0.3s ease;
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Extra gap between groups of 4 bars to line up with pip gaps */
+.voip-waveform-bar:nth-child(4),
+.voip-waveform-bar:nth-child(8) {
+  margin-right: calc(2.05px * var(--es-ui-scale));
+}
+
+.voip-waveform-bar:last-child {
+  margin-right: 0;
+}
+
+.voip-waveform.active .voip-waveform-bar {
+  animation: voip-viz-jump 0.6s infinite ease-in-out;
+  animation-delay: calc(var(--bar-index) * 0.04s);
+}
+
+@keyframes voip-viz-jump {
+  0%,
+  100% {
+    height: var(--base-height);
+  }
+  50% {
+    height: calc(var(--base-height) * 1.6 + 15%);
+  }
+}
+
+.voip-range-modern {
+  display: flex;
+  width: calc(52px * var(--es-ui-scale));
+  gap: calc(2px * var(--es-ui-scale));
+}
+
+.voip-pip-modern {
+  width: calc(16px * var(--es-ui-scale));
+  height: calc(3.5px * var(--es-ui-scale));
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: calc(1px * var(--es-ui-scale));
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.voip-pip-modern.on {
+  background: #ffffff;
+}
+
+.talking .voip-pip-modern.on {
+  background: var(--es-success);
+  box-shadow: 0 0 6px var(--voip-glow);
+}
+.radio-talking .voip-pip-modern.on {
+  background: var(--es-error);
+  box-shadow: 0 0 6px rgba(255, 68, 68, 0.4);
+}
+
+/* ── Status Tray (Bottom Left) ── */
+/* Moved to bottom to avoid overlapping top-anchored bars */
+.status-tray {
+  position: fixed;
+  bottom: calc(var(--hud-safezone-bottom) + calc(0.5vh * var(--es-ui-scale)));
+  left: calc(
+    var(--hud-minimap-left) + var(--hud-minimap-width) +
+      calc(12px * var(--es-ui-scale))
+  );
+  display: flex;
+  align-items: flex-end;
+  gap: calc(12px * var(--es-ui-scale));
+  z-index: 1000;
+  transition: transform 0.4s ease;
+}
+
+.status-tray-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.status-meter-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: calc(5px * var(--es-ui-scale));
+}
+
+.status-meter-bar {
+  position: relative;
+  width: calc(5px * var(--es-ui-scale));
+  height: calc(30px * var(--es-ui-scale));
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: calc(2.5px * var(--es-ui-scale));
+  overflow: hidden;
+}
+
+.status-meter-bar-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.status-hunger .status-meter-bar-fill {
+  background: var(--hunger-color);
+}
+.status-thirst .status-meter-bar-fill {
+  background: var(--thirst-color);
+}
+.status-stress .status-meter-bar-fill {
+  background: var(--stress-color);
+}
+.status-oxygen .status-meter-bar-fill {
+  background: var(--oxygen-color);
+}
+
+.status-meter-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.status-meter-icon svg {
+  width: calc(16px * var(--es-ui-scale));
+  height: calc(16px * var(--es-ui-scale));
+}
+
+/* ── Speedometer ── */
+.speedo-container {
+  position: fixed;
+  right: calc(2vw * var(--es-ui-scale));
+  bottom: calc(2vh * var(--es-ui-scale));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(4px * var(--es-ui-scale));
+  pointer-events: none;
+  transition: transform 0.4s ease;
+}
+
+.speedo-ring {
+  position: relative;
+  width: calc(14vw * var(--es-ui-scale));
+  min-width: calc(150px * var(--es-ui-scale));
+  max-width: calc(220px * var(--es-ui-scale));
+  aspect-ratio: 1 / 1;
+}
+
+.speedo-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.speedo-track {
+  fill: none;
+  stroke: rgba(12, 12, 12, 0.55);
+  stroke-width: 7;
+  stroke-linecap: butt;
+  stroke-dasharray: 212;
+  stroke-dashoffset: 0;
+  transform: rotate(135deg);
+  transform-origin: 50% 50%;
+}
+
+.speedo-arc {
+  fill: none;
+  stroke: var(--speedo-green);
+  stroke-width: 7;
+  stroke-linecap: butt;
+  transform: rotate(135deg);
+  transform-origin: 50% 50%;
+  filter: drop-shadow(
+    0 0 calc(6px * var(--es-ui-scale)) var(--speedo-green-glow)
+  );
+  transition: stroke-dasharray 0.12s ease-out;
+}
+
+.speedo-ticks line {
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.speedo-numbers text {
+  font-family: var(--font-hud);
+  font-size: 8px;
+  font-weight: 600;
+  fill: rgba(255, 255, 255, 0.75);
+}
+
+.speedo-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--hud-color);
+}
+
+.speedo-speed {
+  font-family: var(--font-hud);
+  font-size: calc(38px * var(--es-ui-scale));
+  font-weight: 900;
+  letter-spacing: 1px;
+  line-height: 1;
+  text-shadow: 0 0 calc(10px * var(--es-ui-scale)) rgba(0, 0, 0, 0.7);
+}
+
+.speedo-unit {
+  font-family: var(--font-hud);
+  font-size: calc(10px * var(--es-ui-scale));
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: calc(2px * var(--es-ui-scale));
+}
+
+.speedo-gear {
+  font-family: var(--font-hud);
+  font-size: calc(16px * var(--es-ui-scale));
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--speedo-green);
+  text-shadow: 0 0 calc(8px * var(--es-ui-scale)) var(--speedo-green-glow);
+  margin-top: calc(4px * var(--es-ui-scale));
+}
+
+.speedo-track-nos {
+  fill: none;
+  stroke: rgba(168, 85, 247, 0.08);
+  stroke-width: 1.5;
+  stroke-linecap: butt;
+  stroke-dasharray: 191;
+  transform: rotate(135deg);
+  transform-origin: 50% 50%;
+}
+
+.speedo-arc-nos {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: butt;
+  transform: rotate(135deg);
+  transform-origin: 50% 50%;
+  transition:
+    stroke-dasharray 0.3s ease,
+    stroke 0.3s ease,
+    filter 0.3s ease;
+}
+
+.speedo-status {
+  display: flex;
+  gap: calc(16px * var(--es-ui-scale));
+  align-items: flex-end;
+  justify-content: center;
+  margin-top: calc(-12px * var(--es-ui-scale));
+}
+
+.speedo-statusItem {
+  display: flex;
+  flex-direction: column;
+  gap: calc(4px * var(--es-ui-scale));
+  align-items: center;
+  justify-content: center;
+}
+
+.speedo-statusIcon-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.speedo-statusIcon {
+  padding-bottom: calc(3px * var(--es-ui-scale));
+}
+
+.speedo-statusIcon .speedo-statusIcon-label {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.speedo-statusIcon.active .speedo-statusIcon-label {
+  color: var(--speedo-green);
+  filter: drop-shadow(
+    0 0 calc(6px * var(--es-ui-scale)) var(--speedo-green-glow)
+  );
+}
+
+.speedo-statusIcon.warning .speedo-statusIcon-label {
+  color: var(--es-warning);
+  filter: drop-shadow(
+    0 0 calc(6px * var(--es-ui-scale)) rgba(255, 170, 0, 0.45)
+  );
+}
+
+.speedo-statusIcon.critical .speedo-statusIcon-label {
+  color: var(--es-error);
+  filter: drop-shadow(
+    0 0 calc(6px * var(--es-ui-scale)) rgba(255, 68, 68, 0.6)
+  );
+  animation: status-icon-pulse 1s infinite;
+}
+
+.speedo-statusIcon-label svg {
+  width: calc(18px * var(--es-ui-scale));
+  height: calc(18px * var(--es-ui-scale));
+}
+
+.speedo-statusBar {
+  width: calc(42px * var(--es-ui-scale));
+  height: calc(4px * var(--es-ui-scale));
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: calc(2px * var(--es-ui-scale));
+  overflow: hidden;
+  position: relative;
+}
+
+.speedo-statusFill {
+  height: 100%;
+  width: 0;
+  background: var(--speedo-green);
+  box-shadow: 0 0 calc(6px * var(--es-ui-scale)) var(--speedo-green-glow);
+  border-radius: calc(2px * var(--es-ui-scale));
+  transition: width 0.12s ease-out;
+}
+
+.speedo-statusFill-vertical {
+  width: 100%;
+  height: 0;
+  position: absolute;
+  bottom: 0;
+  transition: height 0.12s ease-out;
+}
+
+.speedo-statusBar-vertical {
+  width: calc(4px * var(--es-ui-scale));
+  height: calc(24px * var(--es-ui-scale));
+}
+
+/* ── Animations ── */
+@keyframes status-icon-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 @keyframes shimmer {
-
-    0%,
-    100% {
-        transform: skewX(-25deg) translateX(-60px);
-        opacity: 0;
-    }
-
-    50% {
-        transform: skewX(-25deg) translateX(200px);
-        opacity: 0.5;
-    }
+  0%,
+  100% {
+    transform: skewX(-25deg) translateX(-60px);
+    opacity: 0;
+  }
+  50% {
+    transform: skewX(-25deg) translateX(200px);
+    opacity: 0.5;
+  }
 }
 
-@keyframes pulse-critical {
-
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 0.6;
-        transform: scale(1.1);
-    }
+/* ── Radial Fuel Arc (curved, left side of speedo) ── */
+.speedo-fuel-radial {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
 }
 
-@keyframes pulse-bar {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.7;
-    }
+.speedo-fuel-radial-track {
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 4;
+  stroke-linecap: butt;
 }
+
+.speedo-fuel-radial-fill {
+  stroke: #ffffff;
+  stroke-width: 4;
+  stroke-linecap: butt;
+  filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) rgba(255, 255, 255, 0.35));
+  transition: stroke-dasharray 0.3s ease;
+}
+
+.speedo-fuel-radial-fill.low {
+  stroke: var(--es-error);
+  filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) rgba(255, 68, 68, 0.5));
+  animation: status-icon-pulse 1s infinite;
+}
+
+.speedo-fuel-radial-label {
+  position: absolute;
+  top: 4%;
+  left: 12%;
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.speedo-fuel-radial-label svg {
+  width: calc(10px * var(--es-ui-scale));
+  height: calc(10px * var(--es-ui-scale));
+}
+
+/* Bar mode: fuel icon white */
+.speedo-statusItem-fuel .speedo-statusIcon-label {
+  color: #ffffff;
+}
+
+/* Active harness blue */
+.harness-on .speedo-statusIcon-label {
+  color: #5eb2ff;
+  filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(94, 178, 255, 0.5));
+}
+
+/* ── Ammo Display ── */
+.ammo-display {
+  position: fixed;
+  right: calc(4vw * var(--es-ui-scale));
+  bottom: calc(1vh * var(--es-ui-scale));
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: calc(8px * var(--es-ui-scale));
+  padding: calc(6px * var(--es-ui-scale)) calc(12px * var(--es-ui-scale));
+  z-index: 1001;
+  animation: ammo-fade-in 0.25s ease;
+  pointer-events: none;
+}
+
+.ammo-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.ammo-main-icon {
+  width: calc(26px * var(--es-ui-scale));
+  height: calc(26px * var(--es-ui-scale));
+  filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) rgba(255, 255, 255, 0.1));
+  opacity: 0.45;
+}
+
+.ammo-divider {
+  width: calc(1px * var(--es-ui-scale));
+  height: calc(26px * var(--es-ui-scale));
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 calc(2px * var(--es-ui-scale));
+}
+
+.ammo-info-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(1px * var(--es-ui-scale));
+}
+
+.ammo-clip {
+  font-size: calc(28px * var(--es-ui-scale));
+  font-weight: 500;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 calc(8px * var(--es-ui-scale)) currentColor;
+}
+
+.ammo-reserve {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: calc(18px * var(--es-ui-scale));
+  font-weight: 600;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+@keyframes ammo-fade-in {
+  from { opacity: 0; transform: translateX(calc(10px * var(--es-ui-scale))); }
+  to { opacity: 1; transform: translateX(0); }
+}
+

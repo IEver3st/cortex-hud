@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import './AircraftHUD.css'
 
-const AircraftHUD = React.memo(({ altitude, altitudeAgl, airspeed, heading, fuel, engineHealth, engines, lightsOn, gearDown, hasFixedGear, tailRotorHealth, mainRotorHealth, isHelicopter, isStalled }) => {
+const AircraftHUD = React.memo(({ altitude, altitudeAgl, airspeed, heading, fuel, hasFuelProvider, engineHealth, engines, lightsOn, gearDown, hasFixedGear, tailRotorHealth, mainRotorHealth, isHelicopter, isStalled }) => {
     const fuelPercent = useMemo(() => Math.max(0, Math.min(1, fuel / 100)), [fuel])
 
     const compassDir = useMemo(() => {
@@ -40,8 +40,9 @@ const AircraftHUD = React.memo(({ altitude, altitudeAgl, airspeed, heading, fuel
         return gearDown ? 'ok' : 'warning'
     }, [hasFixedGear, gearDown])
 
+
     return (
-        <div className="aircraft-hud">
+        <div className="aircraft-hud-wrapper">
             <div className="aircraft-readouts">
                 <div className="aircraft-readout">
                     <span className="aircraft-readout-value">{airspeed}</span>
@@ -75,10 +76,12 @@ const AircraftHUD = React.memo(({ altitude, altitudeAgl, airspeed, heading, fuel
                         <span className="aircraft-indicator-label">TAIL</span>
                     </div>
                 )}
-                <div className={`aircraft-indicator ${fuelStatus}`}>
-                    <div className="aircraft-indicator-light" />
-                    <span className="aircraft-indicator-label">FUEL</span>
-                </div>
+                {hasFuelProvider && (
+                    <div className={`aircraft-indicator ${fuelStatus}`}>
+                        <div className="aircraft-indicator-light" />
+                        <span className="aircraft-indicator-label">FUEL</span>
+                    </div>
+                )}
                 {!hasFixedGear && (
                     <div className={`aircraft-indicator ${gearStatus}`}>
                         <div className="aircraft-indicator-light" />

@@ -26,10 +26,11 @@ local VehicleStatusThread = {}
 VehicleStatusThread.__index = VehicleStatusThread
 local Fuel = lib.require("modules.fuel.client")
 
-function VehicleStatusThread.new(seatbeltLogic, stallLogic)
+function VehicleStatusThread.new(seatbeltLogic, stallLogic, harnessLogic)
     local self = setmetatable({}, VehicleStatusThread)
     self.seatbelt = seatbeltLogic
     self.stall = stallLogic
+    self.harness = harnessLogic
     self.isRunning = false
 
     SetHudComponentPosition(6, 999999.0, 999999.0)
@@ -49,6 +50,8 @@ function VehicleStatusThread:start()
         local convertRpmToPercentage = utility.convertRpmToPercentage
         local convertEngineHealthToPercentage = utility.convertEngineHealthToPercentage
         local vehicle = GetVehiclePedIsIn(ped, false)
+        local lastVehicleState = { visible = false }
+        local lastAircraftState = { visible = false }
 
         if self.stall then
             self.stall:startMonitoring(vehicle)
@@ -58,18 +61,19 @@ function VehicleStatusThread:start()
             vehicle = GetVehiclePedIsIn(ped, false)
             local vehicleType = GetVehicleType(vehicle)
             local engineHealth = convertEngineHealthToPercentage(GetVehicleEngineHealth(vehicle))
-            local rawFuelValue = Fuel.get(vehicle)
+            local rawFuelValue, hasFuelProvider = Fuel.get(vehicle)
             local fuelValue = math.max(0, math.min(rawFuelValue or 0, 100))
             local engineState = GetIsVehicleEngineRunning(vehicle)
             local fuel = math.floor(fuelValue)
             Fuel.handleAlerts(vehicle, fuelValue)
-            local retval, lightsOn, highbeamsOn = GetVehicleLightsState(vehicle)
+            local _, lightsOn, highbeamsOn = GetVehicleLightsState(vehicle)
 
             local isAircraft = vehicleType == "heli" or vehicleType == "plane"
 
             if isAircraft then
                 local coords = GetEntityCoords(vehicle)
                 local heading = GetEntityHeading(vehicle)
+                local headingRounded = math.floor(heading)
                 local altitudeFeet = math.floor(coords.z * 3.28084)
                 local altitudeAgl = math.floor(GetEntityHeightAboveGround(vehicle) * 3.28084)
                 local speedMs = GetEntitySpeed(vehicle)
@@ -98,24 +102,66 @@ function VehicleStatusThread:start()
                     gearDown = landingGearState == 0 or landingGearState == 1
                 end
 
-                SendNUIMessage({
-                    action = "updateAircraft",
-                    visible = true,
-                    altitude = altitudeFeet,
-                    altitudeAgl = altitudeAgl,
-                    airspeed = airspeedKnots,
-                    heading = math.floor(heading),
-                    fuel = fuel,
-                    engineHealth = engineHealth,
-                    engines = { engineHealth },
-                    lightsOn = lightsActive,
-                    gearDown = gearDown,
-                    hasFixedGear = hasFixedGear,
-                    tailRotorHealth = tailRotorHealth,
-                    mainRotorHealth = mainRotorHealth,
-                    isHelicopter = isHelicopter,
-                    isStalled = false
-                })
+                local aircraftChanged =
+                    not lastAircraftState.visible
+                    or lastAircraftState.altitude ~= altitudeFeet
+                    or lastAircraftState.altitudeAgl ~= altitudeAgl
+                    or lastAircraftState.airspeed ~= airspeedKnots
+                    or lastAircraftState.heading ~= headingRounded
+                    or lastAircraftState.fuel ~= fuel
+                    or lastAircraftState.hasFuelProvider ~= hasFuelProvider
+                    or lastAircraftState.engineHealth ~= engineHealth
+                    or lastAircraftState.lightsOn ~= lightsActive
+                    or lastAircraftState.gearDown ~= gearDown
+                    or lastAircraftState.hasFixedGear ~= hasFixedGear
+                    or lastAircraftState.tailRotorHealth ~= tailRotorHealth
+                    or lastAircraftState.mainRotorHealth ~= mainRotorHealth
+                    or lastAircraftState.isHelicopter ~= isHelicopter
+
+                if aircraftChanged then
+                    lastAircraftState.visible = true
+                    lastAircraftState.altitude = altitudeFeet
+                    lastAircraftState.altitudeAgl = altitudeAgl
+                    lastAircraftState.airspeed = airspeedKnots
+                    lastAircraftState.heading = headingRounded
+                    lastAircraftState.fuel = fuel
+                    lastAircraftState.hasFuelProvider = hasFuelProvider
+                    lastAircraftState.engineHealth = engineHealth
+                    lastAircraftState.lightsOn = lightsActive
+                    lastAircraftState.gearDown = gearDown
+                    lastAircraftState.hasFixedGear = hasFixedGear
+                    lastAircraftState.tailRotorHealth = tailRotorHealth
+                    lastAircraftState.mainRotorHealth = mainRotorHealth
+                    lastAircraftState.isHelicopter = isHelicopter
+
+                    SendNUIMessage({
+                        action = "updateAircraft",
+                        visible = true,
+                        altitude = altitudeFeet,
+                        altitudeAgl = altitudeAgl,
+                        airspeed = airspeedKnots,
+                        heading = headingRounded,
+                        fuel = fuel,
+                        hasFuelProvider = hasFuelProvider,
+                        engineHealth = engineHealth,
+                        engines = { engineHealth },
+                        lightsOn = lightsActive,
+                        gearDown = gearDown,
+                        hasFixedGear = hasFixedGear,
+                        tailRotorHealth = tailRotorHealth,
+                        mainRotorHealth = mainRotorHealth,
+                        isHelicopter = isHelicopter,
+                        isStalled = false
+                    })
+                end
+
+                if lastVehicleState.visible then
+                    lastVehicleState.visible = false
+                    SendNUIMessage({
+                        action = "updateVehicle",
+                        visible = false
+                    })
+                end
             else
                 local highGear = GetVehicleHighGear(vehicle)
                 local currentGear = GetVehicleCurrentGear(vehicle)
@@ -157,30 +203,85 @@ function VehicleStatusThread:start()
                 local headlights = (lightsOn and highbeamsOn) and 100 or (lightsOn or highbeamsOn) and 50 or 0
 
                 local isSeatbeltOn = self.seatbelt and self.seatbelt:isSeatbeltOn() or false
+                local useSeatbelt = self.seatbelt ~= nil
+                local isHarnessOn = self.harness and self.harness:isHarnessOn() or false
 
                 local isStalled = self.stall and self.stall:isStalled() or false
                 local isBroken = self.stall and self.stall:isBroken() or false
                 local stallCount = self.stall and self.stall:getStallCount() or 0
                 local enginePower = self.stall and self.stall:getPowerMultiplier() or 1.0
+                local enginePowerPercent = math.floor(enginePower * 100)
 
-                SendNUIMessage({
-                    action = "updateVehicle",
-                    visible = true,
-                    speedUnit = config.speedUnit,
-                    speed = speed,
-                    rpm = rpm,
-                    engineHealth = engineHealth,
-                    engineState = engineState,
-                    gears = newGears,
-                    currentGear = gearString,
-                    fuel = fuel,
-                    headlights = headlights,
-                    belt = isSeatbeltOn,
-                    stalled = isStalled,
-                    broken = isBroken,
-                    stallCount = stallCount,
-                    enginePower = math.floor(enginePower * 100)
-                })
+                local vehicleChanged =
+                    not lastVehicleState.visible
+                    or lastVehicleState.speedUnit ~= config.speedUnit
+                    or lastVehicleState.speed ~= speed
+                    or lastVehicleState.rpm ~= rpm
+                    or lastVehicleState.engineHealth ~= engineHealth
+                    or lastVehicleState.engineState ~= engineState
+                    or lastVehicleState.gears ~= newGears
+                    or lastVehicleState.currentGear ~= gearString
+                    or lastVehicleState.fuel ~= fuel
+                    or lastVehicleState.hasFuelProvider ~= hasFuelProvider
+                    or lastVehicleState.headlights ~= headlights
+                    or lastVehicleState.belt ~= isSeatbeltOn
+                    or lastVehicleState.useSeatbelt ~= useSeatbelt
+                    or lastVehicleState.harness ~= isHarnessOn
+                    or lastVehicleState.stalled ~= isStalled
+                    or lastVehicleState.broken ~= isBroken
+                    or lastVehicleState.stallCount ~= stallCount
+                    or lastVehicleState.enginePower ~= enginePowerPercent
+
+                if vehicleChanged then
+                    lastVehicleState.visible = true
+                    lastVehicleState.speedUnit = config.speedUnit
+                    lastVehicleState.speed = speed
+                    lastVehicleState.rpm = rpm
+                    lastVehicleState.engineHealth = engineHealth
+                    lastVehicleState.engineState = engineState
+                    lastVehicleState.gears = newGears
+                    lastVehicleState.currentGear = gearString
+                    lastVehicleState.fuel = fuel
+                    lastVehicleState.hasFuelProvider = hasFuelProvider
+                    lastVehicleState.headlights = headlights
+                    lastVehicleState.belt = isSeatbeltOn
+                    lastVehicleState.useSeatbelt = useSeatbelt
+                    lastVehicleState.harness = isHarnessOn
+                    lastVehicleState.stalled = isStalled
+                    lastVehicleState.broken = isBroken
+                    lastVehicleState.stallCount = stallCount
+                    lastVehicleState.enginePower = enginePowerPercent
+
+                    SendNUIMessage({
+                        action = "updateVehicle",
+                        visible = true,
+                        speedUnit = config.speedUnit,
+                        speed = speed,
+                        rpm = rpm,
+                        engineHealth = engineHealth,
+                        engineState = engineState,
+                        gears = newGears,
+                        currentGear = gearString,
+                        fuel = fuel,
+                        hasFuelProvider = hasFuelProvider,
+                        headlights = headlights,
+                        belt = isSeatbeltOn,
+                        useSeatbelt = useSeatbelt,
+                        harness = isHarnessOn,
+                        stalled = isStalled,
+                        broken = isBroken,
+                        stallCount = stallCount,
+                        enginePower = enginePowerPercent
+                    })
+                end
+
+                if lastAircraftState.visible then
+                    lastAircraftState.visible = false
+                    SendNUIMessage({
+                        action = "updateAircraft",
+                        visible = false
+                    })
+                end
             end
 
             Wait(100)
@@ -194,15 +295,23 @@ function VehicleStatusThread:start()
             self.stall:stopMonitoring()
         end
 
-        SendNUIMessage({
-            action = "updateVehicle",
-            visible = false
-        })
+        if self.harness then
+            self.harness:forceRemove()
+        end
 
-        SendNUIMessage({
-            action = "updateAircraft",
-            visible = false
-        })
+        if lastVehicleState.visible then
+            SendNUIMessage({
+                action = "updateVehicle",
+                visible = false
+            })
+        end
+
+        if lastAircraftState.visible then
+            SendNUIMessage({
+                action = "updateAircraft",
+                visible = false
+            })
+        end
 
         self.isRunning = false
     end)

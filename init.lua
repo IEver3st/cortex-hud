@@ -8,6 +8,11 @@ if not lib then
 end
 
 local config = lib.require("config.shared")
+lib.require("modules.settings.client")
 local hud = lib.require("modules.threads.client.hud")
+local Status = lib.require("modules.status.client")
 
 hud.start(config)
+Status.start(config, function()
+    return exports.es_hud:isHudVisible()
+end)
