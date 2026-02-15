@@ -36,24 +36,44 @@ local function fireUnloaded()
 end
 
 if framework == 'qbx' then
-    -- Wait for qbx_core to be available, then check initial state
+    local function syncQbxLoadedState(isLoaded)
+        if isLoaded then
+            fireLoaded()
+            return
+        end
+
+        fireUnloaded()
+    end
+
+    AddStateBagChangeHandler('isLoggedIn', nil, function(bagName, _, value)
+        if bagName ~= ('player:%s'):format(GetPlayerServerId(PlayerId())) then
+            return
+        end
+
+        syncQbxLoadedState(value == true)
+    end)
+
     CreateThread(function()
         while GetResourceState('qbx_core') ~= 'started' do
             Wait(500)
         end
 
-        local playerData = exports.qbx_core:GetPlayerData()
-        if playerData and playerData.citizenid then
-            fireLoaded()
+        local isLoggedIn = LocalPlayer and LocalPlayer.state and LocalPlayer.state.isLoggedIn
+        if isLoggedIn ~= nil then
+            syncQbxLoadedState(isLoggedIn == true)
+            return
         end
+
+        local playerData = exports.qbx_core:GetPlayerData()
+        syncQbxLoadedState(playerData and playerData.citizenid ~= nil)
     end)
 
     RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
-        fireLoaded()
+        syncQbxLoadedState(true)
     end)
 
     RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
-        fireUnloaded()
+        syncQbxLoadedState(false)
     end)
 else
     -- Standalone: player is considered loaded as soon as they are playing

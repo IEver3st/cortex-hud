@@ -33,6 +33,8 @@ exports {
     'isHarnessOn',
     'toggleHarness',
     'getSettingsDefinition',
+    'setCharacterSelectionActive',
+    'setSpawnSelectorActive',
 }
 
 lua54 'yes'

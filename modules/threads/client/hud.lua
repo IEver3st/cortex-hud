@@ -36,14 +36,16 @@ local visibilityReasons = {
     polcam = true,
     external = true,
     cinematic = true,
-    framework = Bridge.isPlayerLoaded()
+    framework = Bridge.isPlayerLoaded(),
+    qbxCharacter = true,
+    qbxSpawn = true
 }
 
 local aircraftHudForced = false
 
 local minimapVisible = true
 
-local lastVisibleState = true
+local lastVisibleState = nil
 
 local function updateVisibility()
     local shouldBeVisible = true
@@ -147,6 +149,35 @@ local function startPolcamDetection(config)
     end)
 end
 
+local function startQbxVisibilityHooks()
+    RegisterNetEvent('qbx_core:client:playerLoggedOut', function()
+        setVisibilityReason('qbxCharacter', false)
+        setVisibilityReason('qbxSpawn', true)
+    end)
+
+    RegisterNetEvent('qb-spawn:client:setupSpawns', function()
+        setVisibilityReason('qbxSpawn', false)
+    end)
+
+    RegisterNetEvent('qb-spawn:client:openUI', function(isOpen)
+        if isOpen == nil then
+            isOpen = true
+        end
+
+        setVisibilityReason('qbxSpawn', not isOpen)
+    end)
+
+    RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+        setVisibilityReason('qbxCharacter', true)
+        setVisibilityReason('qbxSpawn', true)
+    end)
+
+    RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
+        setVisibilityReason('qbxCharacter', false)
+        setVisibilityReason('qbxSpawn', true)
+    end)
+end
+
 function hud.start(config)
     Bridge.onPlayerLoaded(function()
         setVisibilityReason('framework', true)
@@ -155,6 +186,12 @@ function hud.start(config)
     Bridge.onPlayerUnloaded(function()
         setVisibilityReason('framework', false)
     end)
+
+    if config.framework == 'qbx' then
+        startQbxVisibilityHooks()
+    end
+
+    updateVisibility()
 
     local lastHealth = -1
     local lastArmor = -1
@@ -199,6 +236,16 @@ function hud.start(config)
             HideHudComponentThisFrame(8) -- Street Name / Waypoint Distance
             HideHudComponentThisFrame(9) -- Help Text
             Wait(0)
+        end
+    end)
+
+    CreateThread(function()
+        while not Bridge.isPlayerLoaded() do
+            SendNUIMessage({
+                action = 'init',
+                visible = isFullyVisible()
+            })
+            Wait(1000)
         end
     end)
 
@@ -507,6 +554,14 @@ function hud.start(config)
     exports('setHudVisibleReason', function(reason, visible)
         reason = reason or 'external'
         setVisibilityReason(reason, visible)
+    end)
+
+    exports('setCharacterSelectionActive', function(active)
+        setVisibilityReason('qbxCharacter', not (active == true))
+    end)
+
+    exports('setSpawnSelectorActive', function(active)
+        setVisibilityReason('qbxSpawn', not (active == true))
     end)
 
     exports('isSeatbeltOn', function()
