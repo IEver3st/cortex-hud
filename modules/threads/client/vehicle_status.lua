@@ -22,15 +22,58 @@ local GetHeliTailRotorHealth = GetHeliTailRotorHealth
 local GetHeliMainRotorHealth = GetHeliMainRotorHealth
 local Wait = Wait
 
+--- @param a number[]|nil
+--- @param b number[]|nil
+local function enginesListEqual(a, b)
+    if not a or not b or #a ~= #b then
+        return false
+    end
+    for i = 1, #a do
+        if a[i] ~= b[i] then
+            return false
+        end
+    end
+    return true
+end
+
+--- @return number[] percentages 0-100 per engine column (NUI bars use x10 as 0-1000)
+local function buildAircraftEnginesHudList(vehicle, isHelicopter, engineHealthPct, mainRotorHealth)
+    if isHelicopter then
+        return { math.floor(mainRotorHealth / 10) }
+    end
+    local model = GetEntityModel(vehicle)
+    local map = config.AircraftHudPlaneEngineCountByModel
+    local n = (map and map[model]) or config.AircraftHudDefaultPlaneEngines or 1
+    n = math.max(1, math.min(8, math.floor(n)))
+    local list = {}
+    for i = 1, n do
+        list[i] = engineHealthPct
+    end
+    return list
+end
+
+--- Elevator-specific health not exposed; use body + broken wing / control-panel flags as hydraulics / flight-control proxy.
+local function computePlaneHydraulicsHealth1000(vehicle)
+    local h = math.floor(GetVehicleBodyHealth(vehicle))
+    if not ArePlaneWingsIntact(vehicle) then
+        h = math.min(h, 420)
+    end
+    if not ArePlaneControlPanelsIntact(vehicle) then
+        h = math.min(h, 420)
+    end
+    return math.max(0, math.min(1000, h))
+end
+
 local VehicleStatusThread = {}
 VehicleStatusThread.__index = VehicleStatusThread
 local Fuel = lib.require("modules.fuel.client")
 
-function VehicleStatusThread.new(seatbeltLogic, stallLogic, harnessLogic)
+function VehicleStatusThread.new(seatbeltLogic, stallLogic, harnessLogic, cruiseLogic)
     local self = setmetatable({}, VehicleStatusThread)
     self.seatbelt = seatbeltLogic
     self.stall = stallLogic
     self.harness = harnessLogic
+    self.cruise = cruiseLogic
     self.isRunning = false
 
     SetHudComponentPosition(6, 999999.0, 999999.0)
@@ -46,19 +89,28 @@ function VehicleStatusThread:start()
     self.isRunning = true
 
     CreateThread(function()
-        local ped = PlayerPedId()
         local convertRpmToPercentage = utility.convertRpmToPercentage
         local convertEngineHealthToPercentage = utility.convertEngineHealthToPercentage
-        local vehicle = GetVehiclePedIsIn(ped, false)
         local lastVehicleState = { visible = false }
         local lastAircraftState = { visible = false }
 
-        if self.stall then
-            self.stall:startMonitoring(vehicle)
-        end
+        local ok, err = xpcall(function()
+            local ped = PlayerPedId()
+            local vehicle = GetVehiclePedIsIn(ped, false)
 
-        while IsPedInAnyVehicle(ped, false) do
-            vehicle = GetVehiclePedIsIn(ped, false)
+            if self.stall then
+                self.stall:startMonitoring(vehicle)
+            end
+
+            while true do
+                ped = PlayerPedId()
+                if ped == 0 or not IsPedInAnyVehicle(ped, false) then
+                    break
+                end
+                vehicle = GetVehiclePedIsIn(ped, false)
+                if vehicle == 0 then
+                    break
+                end
             local vehicleType = GetVehicleType(vehicle)
             local engineHealth = convertEngineHealthToPercentage(GetVehicleEngineHealth(vehicle))
             local rawFuelValue, hasFuelProvider = Fuel.get(vehicle)
@@ -81,15 +133,15 @@ function VehicleStatusThread:start()
                 local lightsActive = IsVehicleSearchlightOn(vehicle) or lightsOn
 
                 local isHelicopter = vehicleType == "heli"
-                local tailRotorHealth = 100
-                local mainRotorHealth = 100
+                local tailRotorHealth = 1000
+                local mainRotorHealth = 1000
                 local hasFixedGear = false
                 local gearDown = true
 
                 if isHelicopter then
                     tailRotorHealth = GetHeliTailRotorHealth(vehicle)
                     mainRotorHealth = GetHeliMainRotorHealth(vehicle)
-                    
+
                     local landingGearState = GetLandingGearState(vehicle)
                     if landingGearState == -1 then
                         hasFixedGear = true
@@ -98,8 +150,27 @@ function VehicleStatusThread:start()
                         gearDown = landingGearState == 0 or landingGearState == 1
                     end
                 else
+                    mainRotorHealth = math.floor(engineHealth * 10)
                     local landingGearState = GetLandingGearState(vehicle)
-                    gearDown = landingGearState == 0 or landingGearState == 1
+                    if landingGearState == -1 then
+                        hasFixedGear = true
+                        gearDown = true
+                    else
+                        gearDown = landingGearState == 0 or landingGearState == 1
+                    end
+                end
+
+                local gearHealth = 1000
+                if not hasFixedGear then
+                    gearHealth = math.floor(GetVehicleBodyHealth(vehicle))
+                end
+
+                local enginesHud = buildAircraftEnginesHudList(vehicle, isHelicopter, engineHealth, mainRotorHealth)
+
+                local hydraulicsHudEnabled = not isHelicopter and config.AircraftHudShowHydraulics ~= false
+                local hydraulicsHealth1000 = 1000
+                if hydraulicsHudEnabled then
+                    hydraulicsHealth1000 = computePlaneHydraulicsHealth1000(vehicle)
                 end
 
                 local aircraftChanged =
@@ -117,6 +188,10 @@ function VehicleStatusThread:start()
                     or lastAircraftState.tailRotorHealth ~= tailRotorHealth
                     or lastAircraftState.mainRotorHealth ~= mainRotorHealth
                     or lastAircraftState.isHelicopter ~= isHelicopter
+                    or lastAircraftState.gearHealth ~= gearHealth
+                    or not enginesListEqual(lastAircraftState.enginesHud, enginesHud)
+                    or lastAircraftState.hydraulicsHudEnabled ~= hydraulicsHudEnabled
+                    or lastAircraftState.hydraulicsHealth1000 ~= hydraulicsHealth1000
 
                 if aircraftChanged then
                     lastAircraftState.visible = true
@@ -133,6 +208,10 @@ function VehicleStatusThread:start()
                     lastAircraftState.tailRotorHealth = tailRotorHealth
                     lastAircraftState.mainRotorHealth = mainRotorHealth
                     lastAircraftState.isHelicopter = isHelicopter
+                    lastAircraftState.gearHealth = gearHealth
+                    lastAircraftState.enginesHud = enginesHud
+                    lastAircraftState.hydraulicsHudEnabled = hydraulicsHudEnabled
+                    lastAircraftState.hydraulicsHealth1000 = hydraulicsHealth1000
 
                     SendNUIMessage({
                         action = "updateAircraft",
@@ -144,13 +223,16 @@ function VehicleStatusThread:start()
                         fuel = fuel,
                         hasFuelProvider = hasFuelProvider,
                         engineHealth = engineHealth,
-                        engines = { engineHealth },
+                        engines = enginesHud,
                         lightsOn = lightsActive,
                         gearDown = gearDown,
                         hasFixedGear = hasFixedGear,
                         tailRotorHealth = tailRotorHealth,
                         mainRotorHealth = mainRotorHealth,
                         isHelicopter = isHelicopter,
+                        gearHealth = gearHealth,
+                        hydraulicsHudEnabled = hydraulicsHudEnabled,
+                        hydraulicsHealth = hydraulicsHealth1000,
                         isStalled = false
                     })
                 end
@@ -229,6 +311,11 @@ function VehicleStatusThread:start()
                 local enginePower = self.stall and self.stall:getPowerMultiplier() or 1.0
                 local enginePowerPercent = math.floor(enginePower * 100)
 
+                local cruiseActive, cruiseSpeed = false, 0
+                if self.cruise and self.cruise.getNuiState then
+                    cruiseActive, cruiseSpeed = self.cruise:getNuiState()
+                end
+
                 local vehicleChanged =
                     not lastVehicleState.visible
                     or lastVehicleState.speedUnit ~= config.speedUnit
@@ -248,6 +335,8 @@ function VehicleStatusThread:start()
                     or lastVehicleState.broken ~= isBroken
                     or lastVehicleState.stallCount ~= stallCount
                     or lastVehicleState.enginePower ~= enginePowerPercent
+                    or lastVehicleState.cruiseActive ~= cruiseActive
+                    or lastVehicleState.cruiseSpeed ~= cruiseSpeed
 
                 if vehicleChanged then
                     lastVehicleState.visible = true
@@ -268,6 +357,8 @@ function VehicleStatusThread:start()
                     lastVehicleState.broken = isBroken
                     lastVehicleState.stallCount = stallCount
                     lastVehicleState.enginePower = enginePowerPercent
+                    lastVehicleState.cruiseActive = cruiseActive
+                    lastVehicleState.cruiseSpeed = cruiseSpeed
 
                     SendNUIMessage({
                         action = "updateVehicle",
@@ -288,7 +379,9 @@ function VehicleStatusThread:start()
                         stalled = isStalled,
                         broken = isBroken,
                         stallCount = stallCount,
-                        enginePower = enginePowerPercent
+                        enginePower = enginePowerPercent,
+                        cruiseActive = cruiseActive,
+                        cruiseSpeed = cruiseSpeed,
                     })
                 end
 
@@ -303,6 +396,11 @@ function VehicleStatusThread:start()
             end
 
             Wait(100)
+        end
+        end, debug.traceback)
+
+        if not ok then
+            print("^1[es_hud] vehicle_status thread error:^7 " .. tostring(err))
         end
 
         if self.seatbelt then

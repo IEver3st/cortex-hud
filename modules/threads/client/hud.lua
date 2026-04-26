@@ -1,5 +1,6 @@
 local hud = {}
 
+local CreateThread = CreateThread
 local PlayerId = PlayerId
 local PlayerPedId = PlayerPedId
 local IsPlayerPlaying = IsPlayerPlaying
@@ -17,6 +18,7 @@ local GetActiveScreenResolution = GetActiveScreenResolution
 local SendNUIMessage = SendNUIMessage
 local IsPedInAnyVehicle = IsPedInAnyVehicle
 local DisplayRadar = DisplayRadar
+local DisplayHud = DisplayHud
 local Wait = Wait
 local math_abs = math.abs
 local math_floor = math.floor
@@ -29,6 +31,7 @@ local SeatbeltLogic = lib.require("modules.seatbelt.client")
 local StallLogic = lib.require("modules.stall.client")
 local HarnessLogic = lib.require("modules.harness.client")
 local VehicleStatusThread = lib.require("modules.threads.client.vehicle_status")
+local CruiseControl = lib.require("modules.cruise.client")
 local Bridge = lib.require("modules.bridge.client")
 
 local visibilityReasons = {
@@ -42,20 +45,49 @@ local visibilityReasons = {
 }
 
 local aircraftHudForced = false
-
 local minimapVisible = true
-
 local lastVisibleState = nil
+local lastRadarState = nil
+local lastNuiRadarState = nil
+local activeConfig = nil
+local minimapRefreshInProgress = false
+local queuedMinimapRefreshReason = nil
+local initialMinimapRecoveryStarted = false
 
-local function updateVisibility()
-    local shouldBeVisible = true
+local function debugMinimap(message, ...)
+    local minimapConfig = activeConfig and activeConfig.Minimap or nil
+    if not minimapConfig or minimapConfig.debug ~= true then return end
+    print(("[es_hud:minimap] " .. message):format(...))
+end
+
+local function isFullyVisible()
     for _, allowed in pairs(visibilityReasons) do
         if not allowed then
-            shouldBeVisible = false
-            break
+            return false
         end
     end
-    
+
+    return true
+end
+
+local function shouldRadarBeVisible()
+    if not isFullyVisible() or not minimapVisible then
+        return false
+    end
+
+    if activeConfig and activeConfig.minimapOnlyInVehicle then
+        local ped = PlayerPedId()
+        if ped == 0 or not IsPedInAnyVehicle(ped, false) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function updateVisibility(reason, forceRadarApply)
+    local shouldBeVisible = isFullyVisible()
+
     if shouldBeVisible ~= lastVisibleState then
         lastVisibleState = shouldBeVisible
         SendNUIMessage({
@@ -65,27 +97,48 @@ local function updateVisibility()
         })
     end
 
-    DisplayRadar(shouldBeVisible and minimapVisible)
-    
-    return shouldBeVisible
+    local radarVisible = shouldRadarBeVisible()
+    if forceRadarApply or radarVisible ~= lastRadarState then
+        local wasRadarOn = lastRadarState == true
+        DisplayRadar(radarVisible)
+        -- toggleHud skips minimap.refresh; game keeps expanded radar until SetRadarBigmapEnabled/SetBigmapActive reset
+        if radarVisible and not wasRadarOn then
+            minimap.collapseBigmap()
+        elseif not radarVisible and wasRadarOn then
+            minimap.collapseBigmap()
+        end
+        if radarVisible ~= lastRadarState or reason ~= 'radar_authority_tick' then
+            debugMinimap(
+                "Radar visibility=%s reason='%s' hud=%s map=%s onlyVehicle=%s",
+                tostring(radarVisible),
+                reason or "unspecified",
+                tostring(shouldBeVisible),
+                tostring(minimapVisible),
+                tostring(activeConfig and activeConfig.minimapOnlyInVehicle == true)
+            )
+        end
+    end
+
+    lastRadarState = radarVisible
+
+    if radarVisible ~= lastNuiRadarState then
+        lastNuiRadarState = radarVisible
+        SendNUIMessage({
+            action = 'setRadarVisible',
+            visible = radarVisible == true,
+        })
+    end
+
+    return shouldBeVisible, radarVisible
 end
 
 local function setVisibilityReason(reason, visible)
     visibilityReasons[reason] = visible
-    return updateVisibility()
+    return updateVisibility(("reason:%s"):format(reason), true)
 end
 
 local function getVisibilityReason(reason)
     return visibilityReasons[reason]
-end
-
-local function isFullyVisible()
-    for _, allowed in pairs(visibilityReasons) do
-        if not allowed then
-            return false
-        end
-    end
-    return true
 end
 
 local function setForceAircraftHud(forced)
@@ -96,9 +149,76 @@ local function setForceAircraftHud(forced)
     })
 end
 
-local function pushMinimapLayout(config)
-    minimap.apply(config)
-    updateVisibility()
+local function runMinimapRefresh(reason)
+    if not activeConfig then return end
+
+    minimap.checkExternalMapResource(activeConfig)
+    local result = minimap.refresh(activeConfig, { reason = reason })
+    debugMinimap(
+        "Refresh reason='%s' texturesReady=%s rendering=%s",
+        reason or "unspecified",
+        tostring(result and result.texturesReady),
+        tostring(result and result.rendering)
+    )
+    updateVisibility(reason or "refresh", true)
+end
+
+local function requestMinimapRefresh(reason)
+    if not activeConfig then return end
+
+    if minimapRefreshInProgress then
+        queuedMinimapRefreshReason = reason or queuedMinimapRefreshReason or "queued_refresh"
+        return
+    end
+
+    minimapRefreshInProgress = true
+
+    CreateThread(function()
+        runMinimapRefresh(reason or "refresh")
+        minimapRefreshInProgress = false
+
+        if queuedMinimapRefreshReason then
+            local queuedReason = queuedMinimapRefreshReason
+            queuedMinimapRefreshReason = nil
+            requestMinimapRefresh(queuedReason)
+        end
+    end)
+end
+
+local function syncMinimapState(reason, refreshLayout)
+    if refreshLayout then
+        requestMinimapRefresh(reason or "sync_refresh")
+        return
+    end
+
+    updateVisibility(reason or "sync", true)
+end
+
+local function startInitialMinimapRecovery()
+    if initialMinimapRecoveryStarted then return end
+    initialMinimapRecoveryStarted = true
+
+    CreateThread(function()
+        local retryDelays = { 500, 1500, 3000 }
+
+        for i = 1, #retryDelays do
+            Wait(retryDelays[i])
+
+            if not activeConfig then
+                return
+            end
+
+            local ped = PlayerPedId()
+            if ped ~= 0 and not IsPedInAnyVehicle(ped, false) then
+                local rendering = minimap.isRendering()
+                if rendering ~= true then
+                    requestMinimapRefresh(("initial_on_foot_retry_%d"):format(retryDelays[i]))
+                else
+                    debugMinimap("Skipping on-foot retry after %dms; minimap is already rendering.", retryDelays[i])
+                end
+            end
+        end
+    end)
 end
 
 local function startPolcamDetection(config)
@@ -179,8 +299,11 @@ local function startQbxVisibilityHooks()
 end
 
 function hud.start(config)
+    activeConfig = config
+
     Bridge.onPlayerLoaded(function()
         setVisibilityReason('framework', true)
+        requestMinimapRefresh('player_loaded')
     end)
 
     Bridge.onPlayerUnloaded(function()
@@ -191,7 +314,50 @@ function hud.start(config)
         startQbxVisibilityHooks()
     end
 
-    updateVisibility()
+    minimap.checkExternalMapResource(config, true)
+    updateVisibility('hud_start', true)
+
+    AddEventHandler('es_hud:client:syncMinimap', function(reason, refreshLayout)
+        syncMinimapState(reason, refreshLayout == true)
+    end)
+
+    AddEventHandler('onClientResourceStart', function(resourceName)
+        if not activeConfig then return end
+
+        local externalMapResource = activeConfig.Minimap.externalMapResource
+        if externalMapResource == false then return end
+        if resourceName ~= (externalMapResource or 'map-postalmap-streetname') then
+            return
+        end
+
+        CreateThread(function()
+            Wait(500)
+            requestMinimapRefresh(("resource_start:%s"):format(resourceName))
+        end)
+    end)
+
+    AddEventHandler('onClientResourceStop', function(resourceName)
+        if not activeConfig then return end
+
+        local externalMapResource = activeConfig.Minimap.externalMapResource
+        if externalMapResource == false then return end
+        if resourceName ~= (externalMapResource or 'map-postalmap-streetname') then
+            return
+        end
+
+        minimap.checkExternalMapResource(activeConfig, true)
+        CreateThread(function()
+            Wait(250)
+            requestMinimapRefresh(("resource_stop:%s"):format(resourceName))
+        end)
+    end)
+
+    local currentResource = GetCurrentResourceName()
+    AddEventHandler('onClientResourceStop', function(resourceName)
+        if resourceName ~= currentResource then return end
+        DisplayHud(true)
+        DisplayRadar(true)
+    end)
 
     local lastHealth = -1
     local lastArmor = -1
@@ -205,13 +371,15 @@ function hud.start(config)
     local nearestPostalCode = ""
     local nearestPostalDist = 0
 
-    local seatbelt = SeatbeltLogic and SeatbeltLogic.new() or nil
+    local seatbelt = (type(SeatbeltLogic) == 'table') and SeatbeltLogic.new() or nil
 
-    local stall = StallLogic and StallLogic.new() or nil
+    local stall = (type(StallLogic) == 'table') and StallLogic.new() or nil
 
-    local harness = HarnessLogic and HarnessLogic.new() or nil
+    local harness = (type(HarnessLogic) == 'table') and HarnessLogic.new() or nil
 
-    local vehicleStatus = VehicleStatusThread.new(seatbelt, stall, harness)
+    local cruise = (type(CruiseControl) == 'table') and CruiseControl.new() or nil
+
+    local vehicleStatus = VehicleStatusThread.new(seatbelt, stall, harness, cruise)
 
     if config.disableWantedLevel then
         CreateThread(function()
@@ -231,10 +399,23 @@ function hud.start(config)
     CreateThread(function()
         local HideHudComponentThisFrame = HideHudComponentThisFrame
         while true do
+            -- Keep native DisplayHud on so weapon wheel / selection UI still work; NUI handles rest.
+            -- DisplayHud(false) with custom HUD breaks the weapon wheel in many builds.
+            DisplayHud(true)
+
+            HideHudComponentThisFrame(1) -- Wanted Stars
+            HideHudComponentThisFrame(2) -- Weapon Icon
+            HideHudComponentThisFrame(3) -- Cash
+            HideHudComponentThisFrame(4) -- MP Message
+            HideHudComponentThisFrame(5) -- Vehicle Name (reticle)
             HideHudComponentThisFrame(6) -- Vehicle Name
             HideHudComponentThisFrame(7) -- Area Name
             HideHudComponentThisFrame(8) -- Street Name / Waypoint Distance
             HideHudComponentThisFrame(9) -- Help Text
+            HideHudComponentThisFrame(14) -- Reticle / crosshair (NUI replaces when enabled)
+            HideHudComponentThisFrame(13) -- Cash Change
+            HideHudComponentThisFrame(17) -- Saving Game
+            HideHudComponentThisFrame(20) -- Weapon Wheel Stats
             Wait(0)
         end
     end)
@@ -243,7 +424,8 @@ function hud.start(config)
         while not Bridge.isPlayerLoaded() do
             SendNUIMessage({
                 action = 'init',
-                visible = isFullyVisible()
+                visible = isFullyVisible(),
+                radarVisible = lastRadarState == true,
             })
             Wait(1000)
         end
@@ -254,12 +436,8 @@ function hud.start(config)
             Wait(200)
         end
 
-        pushMinimapLayout(config)
-
-        for i = 1, 4 do
-            Wait(750)
-            pushMinimapLayout(config)
-        end
+        requestMinimapRefresh('initial_player_loaded')
+        startInitialMinimapRecovery()
 
         local lastSafezone = GetSafeZoneSize()
         local lastResX, lastResY = GetActiveScreenResolution()
@@ -270,8 +448,15 @@ function hud.start(config)
             if safezone ~= lastSafezone or resX ~= lastResX or resY ~= lastResY then
                 lastSafezone = safezone
                 lastResX, lastResY = resX, resY
-                pushMinimapLayout(config)
+                requestMinimapRefresh('layout_changed')
             end
+        end
+    end)
+
+    CreateThread(function()
+        while true do
+            updateVisibility('radar_authority_tick', true)
+            Wait(500)
         end
     end)
 
@@ -512,7 +697,8 @@ function hud.start(config)
         startPolcamDetection(config)
         SendNUIMessage({
             action = 'init',
-            visible = isFullyVisible()
+            visible = isFullyVisible(),
+            radarVisible = lastRadarState == true,
         })
     end)
 
@@ -535,7 +721,11 @@ function hud.start(config)
 
     exports('toggleMap', function(state)
         minimapVisible = state == nil and not minimapVisible or state
-        updateVisibility()
+        syncMinimapState('export:toggleMap', true)
+    end)
+
+    exports('refreshMinimap', function(reason)
+        requestMinimapRefresh(reason or 'export:refreshMinimap')
     end)
 
     exports('hideHud', function(reason)
@@ -565,43 +755,43 @@ function hud.start(config)
     end)
 
     exports('isSeatbeltOn', function()
-        return seatbelt and seatbelt:isSeatbeltOn() or false
+        return (type(seatbelt) == 'table') and seatbelt:isSeatbeltOn() or false
     end)
 
     exports('toggleSeatbelt', function(state)
-        if seatbelt then
+        if (type(seatbelt) == 'table') then
             seatbelt:toggle(state)
         end
     end)
 
     exports('isEngineStalled', function()
-        return stall and stall:isStalled() or false
+        return (type(stall) == 'table') and stall:isStalled() or false
     end)
 
     exports('isEngineBroken', function()
-        return stall and stall:isBroken() or false
+        return (type(stall) == 'table') and stall:isBroken() or false
     end)
 
     exports('getStallCount', function()
-        return stall and stall:getStallCount() or 0
+        return (type(stall) == 'table') and stall:getStallCount() or 0
     end)
 
     exports('getEnginePower', function()
-        return stall and stall:getPowerMultiplier() or 1.0
+        return (type(stall) == 'table') and stall:getPowerMultiplier() or 1.0
     end)
 
     exports('repairEngine', function(vehicle)
-        if stall then
+        if (type(stall) == 'table') then
             stall:repair(vehicle)
         end
     end)
 
     exports('isHarnessOn', function()
-        return harness and harness:isHarnessOn() or false
+        return (type(harness) == 'table') and harness:isHarnessOn() or false
     end)
 
     exports('toggleHarness', function(state)
-        if harness then
+        if (type(harness) == 'table') then
             if state == nil then
                 harness:toggle()
             elseif state then
@@ -618,6 +808,10 @@ function hud.start(config)
 
     exports('isAircraftHudForced', function()
         return aircraftHudForced
+    end)
+
+    exports('isCruiseControlActive', function()
+        return (type(cruise) == 'table') and cruise:isCruiseOn() or false
     end)
 
     AddEventHandler('es_nos:update', function(data)

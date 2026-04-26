@@ -149,11 +149,19 @@ Config.PolcamForceAircraftHud = false  -- Force aircraft HUD for pilot when polc
 
 ```lua
 Config.Minimap = {
+    clipType = 0,         -- 0 = square style, 1 = round style
     sizeX   = 0.1638,    -- Minimap width
     sizeY   = 0.183,     -- Minimap height
     maskSizeX = 0.128,   -- Mask width
     maskSizeY = 0.20,    -- Mask height
     blurSizeX = 0.262,   -- Blur width
     blurSizeY = 0.300,   -- Blur height
+    textureReplacement = {
+        enabled = true,                           -- Disable for minimap packs that don't provide squaremap/radarmask textures
+        dict = "squaremap",                       -- Texture dictionary to load from stream/
+        texture = "radarmasksm",                  -- Texture inside that dictionary
+        targets = { "radarmasksm", "radarmask1g" }, -- Vanilla textures to replace
+        loadTimeoutMs = 5000                      -- Prevents infinite wait on bad/missing dicts
+    }
 }
 ```

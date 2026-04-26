@@ -1,59 +1,286 @@
 local config = lib.require("config.shared")
-local minimap = lib.require("modules.utility.shared.minimap")
 
 local Settings = {}
 
 local SendNUIMessage = SendNUIMessage
-local DisplayRadar = DisplayRadar
-local IsPedInAnyVehicle = IsPedInAnyVehicle
-local PlayerPedId = PlayerPedId
-local ExecuteCommand = ExecuteCommand
-local GetConvar = GetConvar
+local TriggerEvent = TriggerEvent
+local Wait = Wait
+local math_floor = math.floor
 
 local cinematicMode = false
 local cinematicCommandRegistered = false
 local cinematicKeyRegisteredKey = nil
 
--- ============================================================================
--- KEY MAPPING: es_lib setting keys -> HUD config fields
--- ============================================================================
+local DEFAULT_PRESET_ORDER = { 'classic', 'street', 'dispatch', 'ghost' }
 
--- Maps es_lib flat keys to the HUD's internal Settings.apply() format
-local KEY_MAP = {
-    hud_speedUnit           = 'speedUnit',
-    hud_disableSpeedometer  = 'disableSpeedometer',
-    hud_showPostal          = 'showPostal',
-    hud_showPostalDistance   = 'showPostalDistance',
-    hud_hungerThreshold     = 'hungerThreshold',
-    hud_thirstThreshold     = 'thirstThreshold',
-    hud_stressThreshold     = 'stressThreshold',
-    hud_oxygenThreshold     = 'oxygenThreshold',
-    hud_mapNotifications    = 'mapNotifications',
-    hud_lowFuelAlert        = 'lowFuelAlert',
-    hud_cinematicNotifications = 'cinematicNotifications',
-    hud_cinematicKey        = 'cinematicKey',
-    hud_minimapOnlyInVehicle = 'minimapOnlyInVehicle',
-    hud_speedometerPosY     = 'speedometerPosY',
-    hud_color_health        = 'colorHealth',
-    hud_color_armor         = 'colorArmor',
-    hud_color_hunger        = 'colorHunger',
-    hud_color_thirst        = 'colorThirst',
-    hud_color_stress        = 'colorStress',
-    hud_color_oxygen        = 'colorOxygen',
-    hud_fuelDisplayStyle    = 'fuelDisplayStyle',
-    hud_color_ammo          = 'colorAmmo',
-    hud_ammoPosX            = 'ammoPosX',
-    hud_ammoPosY            = 'ammoPosY',
-    hud_ammoPositionPreset   = 'ammoPositionPreset',
-    hud_showCrosshair       = 'showCrosshair',
+local DEFAULT_STATUS_COLORS = {
+    health = '#10b981',
+    armor = '#5eb2ff',
+    hunger = '#f59e0b',
+    thirst = '#38bdf8',
+    stress = '#ef4444',
+    oxygen = '#06b6d4',
 }
 
-local function clampNumber(value, min, max)
-    value = tonumber(value)
-    if not value then return nil end
-    if value < min then return min end
-    if value > max then return max end
-    return value
+local KEY_MAP = {
+    hud_layoutPreset = 'layoutPreset',
+    hud_colorPreset = 'colorPreset',
+    hud_speedUnit = 'speedUnit',
+    hud_disableSpeedometer = 'disableSpeedometer',
+    hud_showPostal = 'showPostal',
+    hud_showPostalDistance = 'showPostalDistance',
+    hud_statusIconShape = 'statusIconShape',
+    hud_hungerThreshold = 'hungerThreshold',
+    hud_thirstThreshold = 'thirstThreshold',
+    hud_stressThreshold = 'stressThreshold',
+    hud_oxygenThreshold = 'oxygenThreshold',
+    hud_mapNotifications = 'mapNotifications',
+    hud_lowFuelAlert = 'lowFuelAlert',
+    hud_cinematicNotifications = 'cinematicNotifications',
+    hud_cinematicKey = 'cinematicKey',
+    hud_minimapOnlyInVehicle = 'minimapOnlyInVehicle',
+    hud_speedometerPositionMode = 'speedometerPositionMode',
+    hud_speedometerPosX = 'speedometerPosX',
+    hud_speedometerPosY = 'speedometerPosY',
+    hud_color_health = 'colorHealth',
+    hud_color_armor = 'colorArmor',
+    hud_color_hunger = 'colorHunger',
+    hud_color_thirst = 'colorThirst',
+    hud_color_stress = 'colorStress',
+    hud_color_oxygen = 'colorOxygen',
+    hud_fuelDisplayStyle = 'fuelDisplayStyle',
+    hud_color_ammo = 'colorAmmo',
+    hud_ammoPosX = 'ammoPosX',
+    hud_ammoPosY = 'ammoPosY',
+    hud_ammoPositionPreset = 'ammoPositionPreset',
+    hud_showCrosshair = 'showCrosshair',
+    hud_sectionedBars = 'sectionedBars',
+    hud_sectionedIndicator = 'sectionedIndicator',
+    hud_backdropBlur = 'backdropBlur',
+    hud_panelOpacity = 'panelOpacity',
+    hud_oxygenDisplayLocation = 'oxygenDisplayLocation',
+    hud_cruiseAutoThrottle = 'cruiseAutoThrottle',
+}
+
+local HUD_TO_ES_KEY = {}
+for esKey, hudKey in pairs(KEY_MAP) do
+    HUD_TO_ES_KEY[hudKey] = esKey
+end
+
+local function copyTable(value)
+    if type(value) ~= 'table' then
+        return value
+    end
+
+    local clone = {}
+    for key, item in pairs(value) do
+        clone[key] = copyTable(item)
+    end
+    return clone
+end
+
+local function mergeTable(base, overrides)
+    local merged = copyTable(base or {})
+
+    if type(overrides) ~= 'table' then
+        return merged
+    end
+
+    for key, value in pairs(overrides) do
+        if type(value) == 'table' and type(merged[key]) == 'table' then
+            merged[key] = mergeTable(merged[key], value)
+        else
+            merged[key] = copyTable(value)
+        end
+    end
+
+    return merged
+end
+
+local function toBoolean(value, default)
+    if value == nil then
+        return default == true
+    end
+
+    if type(value) == 'boolean' then
+        return value
+    end
+
+    if type(value) == 'number' then
+        return value ~= 0
+    end
+
+    if type(value) == 'string' then
+        local normalized = value:lower()
+        if normalized == 'true' or normalized == '1' then
+            return true
+        end
+
+        if normalized == 'false' or normalized == '0' then
+            return false
+        end
+    end
+
+    return default == true
+end
+
+--- Full cruise (on) unless server config sets cruiseControl.autoThrottle = false (speed limiter)
+local function cruiseModeFullDefault()
+    local cc = config.cruiseControl
+    if not cc then
+        return true
+    end
+    return cc.autoThrottle ~= false
+end
+
+local function getDefaultPresetName()
+    if config.HudPresets and config.HudPresets[config.defaultHudPreset] then
+        return config.defaultHudPreset
+    end
+
+    if config.HudPresets and config.HudPresets.classic then
+        return 'classic'
+    end
+
+    if config.HudPresets then
+        for name in pairs(config.HudPresets) do
+            return name
+        end
+    end
+
+    return 'classic'
+end
+
+local function getPresetByName(name, fallbackName)
+    local presets = config.HudPresets or {}
+    if type(name) == 'string' and presets[name] then
+        return name, presets[name]
+    end
+
+    if type(fallbackName) == 'string' and presets[fallbackName] then
+        return fallbackName, presets[fallbackName]
+    end
+
+    local defaultName = getDefaultPresetName()
+    return defaultName, presets[defaultName] or {}
+end
+
+local function buildPresetOptions()
+    local presets = config.HudPresets or {}
+    local options = {}
+    local seen = {}
+
+    for _, name in ipairs(DEFAULT_PRESET_ORDER) do
+        local preset = presets[name]
+        if preset then
+            options[#options + 1] = {
+                value = name,
+                label = preset.label or name,
+            }
+            seen[name] = true
+        end
+    end
+
+    for name, preset in pairs(presets) do
+        if not seen[name] then
+            options[#options + 1] = {
+                value = name,
+                label = preset.label or name,
+            }
+        end
+    end
+
+    return options
+end
+
+local BACKDROP_BLUR_MIN = 0.25
+local BACKDROP_BLUR_MAX = 3.0
+
+local PANEL_OPACITY_MIN = 0.15
+local PANEL_OPACITY_MAX = 1.0
+
+local function normalizePanelOpacity(value)
+    local n = tonumber(value)
+    if not n then
+        return nil
+    end
+
+    if n >= 15 and n <= 100 then
+        n = n / 100
+    end
+
+    if n < PANEL_OPACITY_MIN then
+        return PANEL_OPACITY_MIN
+    end
+
+    if n > PANEL_OPACITY_MAX then
+        return PANEL_OPACITY_MAX
+    end
+
+    return n
+end
+
+local function normalizeBackdropBlur(value)
+    local n = tonumber(value)
+    if not n then
+        return nil
+    end
+
+    if n >= 25 and n <= 300 then
+        n = n / 100
+    end
+
+    if n < BACKDROP_BLUR_MIN then
+        return BACKDROP_BLUR_MIN
+    end
+
+    if n > BACKDROP_BLUR_MAX then
+        return BACKDROP_BLUR_MAX
+    end
+
+    return n
+end
+
+local function buildDefaultSettings()
+    return {
+        layoutPreset = getDefaultPresetName(),
+        colorPreset = getDefaultPresetName(),
+        speedUnit = config.speedUnit or 'mph',
+        disableSpeedometer = config.disableSpeedometer == true,
+        showPostal = config.EnablePostal ~= false,
+        showPostalDistance = config.ShowPostalDistance == true,
+        statusIconShape = 'preset',
+        hungerThreshold = config.StatusIcons.hungerThreshold or 100,
+        thirstThreshold = config.StatusIcons.thirstThreshold or 100,
+        stressThreshold = config.StatusIcons.stressThreshold or 100,
+        oxygenThreshold = config.StatusIcons.oxygenThreshold or 100,
+        colorHealth = 'preset',
+        colorArmor = 'preset',
+        colorHunger = 'preset',
+        colorThirst = 'preset',
+        colorStress = 'preset',
+        colorOxygen = 'preset',
+        mapNotifications = config.mapNotifications ~= false,
+        lowFuelAlert = config.lowFuelAlert ~= false,
+        cinematicNotifications = config.cinematicNotifications ~= false,
+        cinematicKey = config.cinematicKey or 'F7',
+        minimapOnlyInVehicle = config.minimapOnlyInVehicle == true,
+        speedometerPositionMode = 'preset',
+        speedometerPosX = 0,
+        speedometerPosY = 0,
+        fuelDisplayStyle = 'preset',
+        colorAmmo = 'preset',
+        ammoPosX = 0,
+        ammoPosY = 0,
+        ammoPositionPreset = 'preset',
+        showCrosshair = config.showCrosshair == true,
+        sectionedBars = config.sectionedBars == true,
+        sectionedIndicator = config.sectionedIndicator == true,
+        backdropBlur = normalizeBackdropBlur(config.backdropBlur) or 1.0,
+        panelOpacity = normalizePanelOpacity(config.panelOpacity) or 1.0,
+        oxygenDisplayLocation = config.oxygenDisplayLocation or 'statusCluster',
+        cruiseAutoThrottle = cruiseModeFullDefault(),
+    }
 end
 
 local COLOR_OPTIONS = {
@@ -66,14 +293,91 @@ local COLOR_OPTIONS = {
     { value = '#8b5cf6', label = 'Violet' },
 }
 
--- ============================================================================
--- SETTINGS DEFINITION FOR ES_LIB AUTO-DETECTION
--- ============================================================================
+local SHAPE_OPTIONS = {
+    { value = 'hexagon', label = 'Hexagon' },
+    { value = 'circle', label = 'Circle' },
+    { value = 'bar', label = 'Bar' },
+}
+
+local FUEL_DISPLAY_OPTIONS = {
+    { value = 'bar', label = 'Bar' },
+    { value = 'radial', label = 'Radial' },
+}
+
+local OXYGEN_DISPLAY_OPTIONS = {
+    { value = 'statusCluster', label = 'Status Cluster' },
+    { value = 'indicator', label = 'Indicator Bar' },
+}
+
+local AMMO_POSITION_OPTIONS = {
+    { value = 'custom', label = 'Custom (Drag)' },
+    { value = 'bottom-right', label = 'Bottom Right' },
+    { value = 'top-right', label = 'Top Right' },
+    { value = 'top-left', label = 'Top Left' },
+    { value = 'bottom-center', label = 'Bottom Middle' },
+}
 
 local function getSettingsDefinition()
+    local defaultShape = config.StatusIcons.iconShape
+    if not defaultShape or defaultShape == '' or defaultShape == 'preset' then
+        defaultShape = 'hexagon'
+    end
+
+    local defaultHealthColor = (config.StatusIcons and config.StatusIcons.colors and config.StatusIcons.colors.health) or DEFAULT_STATUS_COLORS.health
+    local defaultArmorColor = (config.StatusIcons and config.StatusIcons.colors and config.StatusIcons.colors.armor) or DEFAULT_STATUS_COLORS.armor
+    local defaultHungerColor = (config.StatusIcons and config.StatusIcons.colors and config.StatusIcons.colors.hunger) or DEFAULT_STATUS_COLORS.hunger
+    local defaultThirstColor = (config.StatusIcons and config.StatusIcons.colors and config.StatusIcons.colors.thirst) or DEFAULT_STATUS_COLORS.thirst
+    local defaultStressColor = (config.StatusIcons and config.StatusIcons.colors and config.StatusIcons.colors.stress) or DEFAULT_STATUS_COLORS.stress
+    local defaultOxygenColor = (config.StatusIcons and config.StatusIcons.colors and config.StatusIcons.colors.oxygen) or DEFAULT_STATUS_COLORS.oxygen
+
+    local defaultFuelDisplayStyle = config.fuelDisplayStyle
+    if not defaultFuelDisplayStyle or defaultFuelDisplayStyle == '' or defaultFuelDisplayStyle == 'preset' then
+        defaultFuelDisplayStyle = 'bar'
+    end
+
+    local defaultAmmoColor = config.ammoColor
+    if not defaultAmmoColor or defaultAmmoColor == '' or defaultAmmoColor == 'preset' then
+        defaultAmmoColor = '#10b981'
+    end
+
+    local defaultAmmoPosition = config.ammoPositionPreset
+    if not defaultAmmoPosition or defaultAmmoPosition == '' or defaultAmmoPosition == 'preset' then
+        defaultAmmoPosition = 'bottom-right'
+    end
+
     return {
         label = 'HUD',
         settings = {
+            {
+                key = 'hud_colorPreset',
+                type = 'select',
+                label = 'Color Preset',
+                description = 'Choose a unified HUD color and accent theme',
+                default = getDefaultPresetName(),
+                options = buildPresetOptions(),
+            },
+            {
+                key = 'hud_backdropBlur',
+                type = 'slider',
+                label = 'Glass blur',
+                description = 'Frost strength (rim + fill density). Real backdrop-filter blur breaks in FiveM CEF (black rects); this simulates glass with tint.',
+                default = math.floor((normalizeBackdropBlur(config.backdropBlur) or 1.0) * 100 + 0.5),
+                min = 25,
+                max = 300,
+                step = 5,
+                suffix = '%',
+            },
+            {
+                key = 'hud_panelOpacity',
+                type = 'slider',
+                label = 'Panel opacity',
+                description = 'Multiplies glass fill. Floor at 15% so panels never go fully see-through; combine with Glass blur for readability.',
+                default = math.floor((normalizePanelOpacity(config.panelOpacity) or 1.0) * 100 + 0.5),
+                min = 15,
+                max = 100,
+                step = 5,
+                suffix = '%',
+            },
             {
                 key = 'hud_speedUnit',
                 type = 'select',
@@ -110,8 +414,30 @@ local function getSettingsDefinition()
                 key = 'hud_showCrosshair',
                 type = 'toggle',
                 label = 'Crosshair Dot',
-                description = 'yes i cant aim please help',
+                description = 'Show a small aiming dot while armed',
                 default = config.showCrosshair == true,
+            },
+            {
+                key = 'hud_statusIconShape',
+                type = 'select',
+                label = 'Status Icon Shape',
+                description = 'Choose the status icon style',
+                default = defaultShape,
+                options = SHAPE_OPTIONS,
+            },
+            {
+                key = 'hud_sectionedBars',
+                type = 'toggle',
+                label = 'Sectioned Bars',
+                description = 'Health/armor bar mode: four 25% capsule segments with gaps (bar layout only)',
+                default = config.sectionedBars == true,
+            },
+            {
+                key = 'hud_sectionedIndicator',
+                type = 'toggle',
+                label = 'Segmented top bar',
+                description = 'Location strip as separate rounded capsules with gaps (same vibe as sectioned bars)',
+                default = config.sectionedIndicator == true,
             },
             {
                 key = 'hud_hungerThreshold',
@@ -154,51 +480,74 @@ local function getSettingsDefinition()
                 suffix = '%',
             },
             {
+                key = 'hud_oxygenDisplayLocation',
+                type = 'select',
+                label = 'Oxygen Display',
+                description = 'Show oxygen as a full status meter or in the top indicator bar',
+                default = config.oxygenDisplayLocation or 'statusCluster',
+                options = OXYGEN_DISPLAY_OPTIONS,
+            },
+            {
+                key = 'hud_cruiseAutoThrottle',
+                type = 'toggle',
+                label = 'Cruise: full control vs speed limiter',
+                description = 'On: full cruise control—auto-throttle to hold the set speed. Off: speed limiter only—caps your top speed; you keep pressing the accelerator (no auto throttle).',
+                default = cruiseModeFullDefault(),
+            },
+            {
                 key = 'hud_color_health',
                 type = 'select',
                 label = 'Health Bar Color',
-                description = 'Change the color of your health bar',
-                default = config.StatusIcons.colors.health,
+                description = 'Choose the health bar color',
+                default = defaultHealthColor,
                 options = COLOR_OPTIONS,
             },
             {
                 key = 'hud_color_armor',
                 type = 'select',
                 label = 'Armor Bar Color',
-                description = 'Change the color of your armor bar',
-                default = config.StatusIcons.colors.armor,
+                description = 'Choose the armor bar color',
+                default = defaultArmorColor,
                 options = COLOR_OPTIONS,
             },
             {
                 key = 'hud_color_hunger',
                 type = 'select',
                 label = 'Hunger Bar Color',
-                description = 'Change the color of your hunger bar',
-                default = config.StatusIcons.colors.hunger,
+                description = 'Choose the hunger bar color',
+                default = defaultHungerColor,
                 options = COLOR_OPTIONS,
             },
             {
                 key = 'hud_color_thirst',
                 type = 'select',
                 label = 'Thirst Bar Color',
-                description = 'Change the color of your thirst bar',
-                default = config.StatusIcons.colors.thirst,
+                description = 'Choose the thirst bar color',
+                default = defaultThirstColor,
                 options = COLOR_OPTIONS,
             },
             {
                 key = 'hud_color_stress',
                 type = 'select',
                 label = 'Stress Bar Color',
-                description = 'Change the color of your stress bar',
-                default = config.StatusIcons.colors.stress,
+                description = 'Choose the stress bar color',
+                default = defaultStressColor,
                 options = COLOR_OPTIONS,
             },
             {
                 key = 'hud_color_oxygen',
                 type = 'select',
                 label = 'Oxygen Bar Color',
-                description = 'Change the color of your oxygen bar',
-                default = config.StatusIcons.colors.oxygen,
+                description = 'Choose the oxygen bar color',
+                default = defaultOxygenColor,
+                options = COLOR_OPTIONS,
+            },
+            {
+                key = 'hud_color_ammo',
+                type = 'select',
+                label = 'Ammo Counter Color',
+                description = 'Choose the ammo counter color',
+                default = defaultAmmoColor,
                 options = COLOR_OPTIONS,
             },
             {
@@ -208,14 +557,14 @@ local function getSettingsDefinition()
                 description = 'Key to toggle cinematic mode',
                 default = config.cinematicKey or 'F7',
                 options = {
-                    { value = '',       label = 'None' },
-                    { value = 'F7',     label = 'F7' },
-                    { value = 'F8',     label = 'F8' },
-                    { value = 'F9',     label = 'F9' },
-                    { value = 'F10',    label = 'F10' },
-                    { value = 'F11',    label = 'F11' },
-                    { value = 'HOME',   label = 'HOME' },
-                    { value = 'END',    label = 'END' },
+                    { value = '', label = 'None' },
+                    { value = 'F7', label = 'F7' },
+                    { value = 'F8', label = 'F8' },
+                    { value = 'F9', label = 'F9' },
+                    { value = 'F10', label = 'F10' },
+                    { value = 'F11', label = 'F11' },
+                    { value = 'HOME', label = 'HOME' },
+                    { value = 'END', label = 'END' },
                     { value = 'DELETE', label = 'DEL' },
                     { value = 'INSERT', label = 'INS' },
                 },
@@ -256,6 +605,7 @@ local function getSettingsDefinition()
                 default = 0,
                 min = 0,
                 max = 10000,
+                hidden = true,
             },
             {
                 key = 'hud_speedometerPosY',
@@ -265,31 +615,23 @@ local function getSettingsDefinition()
                 default = 0,
                 min = 0,
                 max = 10000,
+                hidden = true,
             },
             {
                 key = 'hud_fuelDisplayStyle',
                 type = 'select',
                 label = 'Fuel Display Style',
                 description = 'Show fuel as a bar below the speedo or as a radial arc',
-                default = config.fuelDisplayStyle or 'bar',
-                options = {
-                    { value = 'bar', label = 'Bar' },
-                    { value = 'radial', label = 'Radial' },
-                },
+                default = defaultFuelDisplayStyle,
+                options = FUEL_DISPLAY_OPTIONS,
             },
             {
                 key = 'hud_ammoPositionPreset',
                 type = 'select',
-                label = 'Ammo Position Preset',
-                description = 'Quick presets for the ammo display location',
-                default = 'bottom-right',
-                options = {
-                    { value = 'custom',         label = 'Custom (Drag)' },
-                    { value = 'bottom-right',  label = 'Bottom Right' },
-                    { value = 'top-right',     label = 'Top Right' },
-                    { value = 'top-left',      label = 'Top Left' },
-                    { value = 'bottom-center', label = 'Bottom Middle' },
-                },
+                label = 'Ammo Position',
+                description = 'Choose an anchor or use manual drag placement',
+                default = defaultAmmoPosition,
+                options = AMMO_POSITION_OPTIONS,
             },
             {
                 key = 'hud_speedometerActions',
@@ -301,127 +643,268 @@ local function getSettingsDefinition()
                     { action = 'speedometer_reset', label = 'Reset' },
                 },
             },
+            {
+                key = 'hud_ammoActions',
+                type = 'action',
+                label = 'Ammo Position',
+                description = 'Move or reset ammo placement',
+                actions = {
+                    { action = 'ammo_move', label = 'Move' },
+                    { action = 'ammo_reset', label = 'Reset' },
+                },
+            },
         },
         sections = {
-            { label = 'Speedometer',    keys = { 'hud_speedUnit', 'hud_fuelDisplayStyle', 'hud_disableSpeedometer', 'hud_speedometerActions' } },
-            { label = 'Postal',         keys = { 'hud_showPostal', 'hud_showPostalDistance' } },
-            { label = 'Status Icons',   keys = { 'hud_hungerThreshold', 'hud_thirstThreshold', 'hud_stressThreshold', 'hud_oxygenThreshold' } },
-            { label = 'Colors',         keys = { 'hud_color_health', 'hud_color_armor', 'hud_color_hunger', 'hud_color_thirst', 'hud_color_stress', 'hud_color_oxygen' } },
-            { label = 'Minimap',        keys = { 'hud_minimapOnlyInVehicle' } },
-            { label = 'Notifications',  keys = { 'hud_mapNotifications', 'hud_lowFuelAlert', 'hud_cinematicNotifications' } },
+            { label = 'Appearance', keys = { 'hud_backdropBlur', 'hud_panelOpacity' } },
+            { label = 'Speedometer', keys = { 'hud_speedUnit', 'hud_fuelDisplayStyle', 'hud_disableSpeedometer', 'hud_cruiseAutoThrottle', 'hud_speedometerActions' } },
+            { label = 'Postal', keys = { 'hud_showPostal', 'hud_showPostalDistance' } },
+            { label = 'Status Icons', keys = { 'hud_statusIconShape', 'hud_sectionedBars', 'hud_sectionedIndicator', 'hud_hungerThreshold', 'hud_thirstThreshold', 'hud_stressThreshold', 'hud_oxygenThreshold', 'hud_oxygenDisplayLocation' } },
+            { label = 'Colors', keys = { 'hud_colorPreset', 'hud_color_health', 'hud_color_armor', 'hud_color_hunger', 'hud_color_thirst', 'hud_color_stress', 'hud_color_oxygen', 'hud_color_ammo' } },
+            { label = 'Minimap', keys = { 'hud_minimapOnlyInVehicle' } },
+            { label = 'Notifications', keys = { 'hud_mapNotifications', 'hud_lowFuelAlert', 'hud_cinematicNotifications' } },
             { label = 'Cinematic Mode', keys = { 'hud_cinematicKey' } },
-            { label = 'Ammo',           keys = { 'hud_ammoPositionPreset' } },
+            { label = 'Ammo', keys = { 'hud_ammoPositionPreset', 'hud_ammoActions' } },
         },
     }
 end
 
 exports('getSettingsDefinition', getSettingsDefinition)
 
--- ============================================================================
--- CORE APPLY LOGIC (unchanged from original)
--- ============================================================================
+local function getColorFallback(key)
+    if config.StatusIcons and config.StatusIcons.colors and config.StatusIcons.colors[key] then
+        return config.StatusIcons.colors[key]
+    end
+
+    return DEFAULT_STATUS_COLORS[key]
+end
+
+local function resolveColor(rawValue, presetTheme, key)
+    if rawValue and rawValue ~= '' and rawValue ~= 'preset' then
+        return rawValue
+    end
+
+    if presetTheme and presetTheme[key] then
+        return presetTheme[key]
+    end
+
+    return getColorFallback(key)
+end
+
+local function buildResolvedSpeedometerPos(data)
+    local posX = tonumber(data.speedometerPosX) or 0
+    local posY = tonumber(data.speedometerPosY) or 0
+    if data.speedometerPositionMode == 'custom' and posX > 0 and posY > 0 then
+        return { left = posX, top = posY }
+    end
+
+    return false
+end
+
+local function buildResolvedAmmoPos(data, resolvedAmmoPositionPreset)
+    local posX = tonumber(data.ammoPosX) or 0
+    local posY = tonumber(data.ammoPosY) or 0
+    if resolvedAmmoPositionPreset == 'custom' and posX > 0 and posY > 0 then
+        return { left = posX, top = posY }
+    end
+
+    return false
+end
+
+local function resolveHudPresentation(data)
+    local layoutPresetName, layoutPreset = getPresetByName(data.layoutPreset)
+    local colorPresetName, colorPreset = getPresetByName(data.colorPreset, layoutPresetName)
+    local presetLayout = copyTable(layoutPreset.layout or {})
+    local presetDefaults = layoutPreset.defaults or {}
+    local presetTheme = mergeTable(layoutPreset.theme or {}, colorPreset.theme or {})
+
+    local resolvedStatusIconShape = data.statusIconShape
+    if not resolvedStatusIconShape or resolvedStatusIconShape == '' or resolvedStatusIconShape == 'preset' then
+        resolvedStatusIconShape = presetDefaults.statusIconShape or config.StatusIcons.iconShape or 'hexagon'
+    end
+
+    local resolvedFuelDisplayStyle = data.fuelDisplayStyle
+    if not resolvedFuelDisplayStyle or resolvedFuelDisplayStyle == '' or resolvedFuelDisplayStyle == 'preset' then
+        resolvedFuelDisplayStyle = presetDefaults.fuelDisplayStyle or config.fuelDisplayStyle or 'bar'
+    end
+
+    local resolvedAmmoPositionPreset = data.ammoPositionPreset
+    if not resolvedAmmoPositionPreset or resolvedAmmoPositionPreset == '' or resolvedAmmoPositionPreset == 'preset' then
+        resolvedAmmoPositionPreset = presetDefaults.ammoPositionPreset or config.ammoPositionPreset or 'bottom-right'
+    end
+
+    if not resolvedAmmoPositionPreset or resolvedAmmoPositionPreset == '' or resolvedAmmoPositionPreset == 'preset' then
+        resolvedAmmoPositionPreset = 'bottom-right'
+    end
+
+    local colors = {
+        health = resolveColor(data.colorHealth, presetTheme, 'health'),
+        armor = resolveColor(data.colorArmor, presetTheme, 'armor'),
+        hunger = resolveColor(data.colorHunger, presetTheme, 'hunger'),
+        thirst = resolveColor(data.colorThirst, presetTheme, 'thirst'),
+        stress = resolveColor(data.colorStress, presetTheme, 'stress'),
+        oxygen = resolveColor(data.colorOxygen, presetTheme, 'oxygen'),
+    }
+
+    local resolvedAmmoColor = data.colorAmmo
+    if not resolvedAmmoColor or resolvedAmmoColor == '' or resolvedAmmoColor == 'preset' then
+        resolvedAmmoColor = presetTheme.ammo or config.ammoColor or '#10b981'
+    end
+
+    local theme = copyTable(presetTheme)
+    theme.surface = theme.surface or 'rgba(10, 14, 20, 0.48)'
+    theme.surfaceBorder = theme.surfaceBorder or 'rgba(255, 255, 255, 0.12)'
+    theme.text = theme.text or '#f8fafc'
+    theme.mutedText = theme.mutedText or 'rgba(226, 232, 240, 0.68)'
+    theme.indicatorAccent = theme.indicatorAccent or colors.health
+    theme.speedometerAccent = theme.speedometerAccent or colors.health
+    theme.voipAccent = theme.voipAccent or '#10b981'
+    theme.ammo = resolvedAmmoColor
+    theme.health = colors.health
+    theme.armor = colors.armor
+    theme.hunger = colors.hunger
+    theme.thirst = colors.thirst
+    theme.stress = colors.stress
+    theme.oxygen = colors.oxygen
+    theme.backdropBlur = normalizeBackdropBlur(data.backdropBlur) or normalizeBackdropBlur(config.backdropBlur) or 1.0
+    theme.panelOpacity = normalizePanelOpacity(data.panelOpacity) or normalizePanelOpacity(config.panelOpacity) or 1.0
+
+    return {
+        layoutPreset = layoutPresetName,
+        colorPreset = colorPresetName,
+        layout = presetLayout,
+        theme = theme,
+        colors = colors,
+        resolvedStatusIconShape = resolvedStatusIconShape,
+        resolvedFuelDisplayStyle = resolvedFuelDisplayStyle,
+        resolvedAmmoPositionPreset = resolvedAmmoPositionPreset,
+        speedometerPos = buildResolvedSpeedometerPos(data),
+        ammoPos = buildResolvedAmmoPos(data, resolvedAmmoPositionPreset),
+        ammoColor = resolvedAmmoColor,
+    }
+end
+
+local function pushResolvedHud(data)
+    local presentation = resolveHudPresentation(data)
+
+    SendNUIMessage({
+        action = 'updateStatusConfig',
+        layoutPreset = presentation.layoutPreset,
+        colorPreset = presentation.colorPreset,
+        layout = presentation.layout,
+        theme = presentation.theme,
+        statusIconShape = presentation.resolvedStatusIconShape,
+        resolvedStatusIconShape = presentation.resolvedStatusIconShape,
+        hungerThreshold = config.StatusIcons.hungerThreshold,
+        thirstThreshold = config.StatusIcons.thirstThreshold,
+        stressThreshold = config.StatusIcons.stressThreshold,
+        oxygenThreshold = config.StatusIcons.oxygenThreshold,
+        statusRingWidth = config.StatusIcons.ringWidth or 42,
+        statusRingHeight = config.StatusIcons.ringHeight or 48,
+        showVoip = config.StatusIcons.showVoip ~= false,
+        standaloneVoipHudEnabled = config.standaloneVoipHudEnabled == true,
+        framework = config.framework or 'standalone',
+        colors = presentation.colors,
+        speedometerPos = presentation.speedometerPos,
+        fuelDisplayStyle = presentation.resolvedFuelDisplayStyle,
+        resolvedFuelDisplayStyle = presentation.resolvedFuelDisplayStyle,
+        ammoColor = presentation.ammoColor,
+        ammoPositionPreset = presentation.resolvedAmmoPositionPreset,
+        resolvedAmmoPositionPreset = presentation.resolvedAmmoPositionPreset,
+        ammoPos = presentation.ammoPos,
+        showCrosshair = config.showCrosshair,
+        sectionedBars = data.sectionedBars == true,
+        sectionedIndicator = data.sectionedIndicator == true,
+        oxygenDisplayLocation = data.oxygenDisplayLocation or config.oxygenDisplayLocation or 'statusCluster',
+    })
+end
 
 function Settings.apply(data, options)
-    if not data then return end
+    if not data then
+        return
+    end
+
     options = options or {}
     local refreshMinimap = options.refreshMinimap
     if refreshMinimap == nil then
         refreshMinimap = true
     end
 
+    local presentation = resolveHudPresentation(data)
+
+    config.layoutPreset = presentation.layoutPreset
+    config.colorPreset = presentation.colorPreset
     config.speedUnit = data.speedUnit or config.speedUnit
-    config.disableSpeedometer = (data.disableSpeedometer == true) or (data.disableSpeedometer == 1) or (data.disableSpeedometer == '1') or (data.disableSpeedometer == 'true')
-    config.EnablePostal = data.showPostal ~= false
-    config.ShowPostalDistance = data.showPostalDistance == true
+    config.disableSpeedometer = toBoolean(data.disableSpeedometer, config.disableSpeedometer == true)
+    config.EnablePostal = toBoolean(data.showPostal, config.EnablePostal ~= false)
+    config.ShowPostalDistance = toBoolean(data.showPostalDistance, config.ShowPostalDistance == true)
+    config.StatusIcons.iconShape = presentation.resolvedStatusIconShape
     config.StatusIcons.hungerThreshold = tonumber(data.hungerThreshold) or config.StatusIcons.hungerThreshold
     config.StatusIcons.thirstThreshold = tonumber(data.thirstThreshold) or config.StatusIcons.thirstThreshold
     config.StatusIcons.stressThreshold = tonumber(data.stressThreshold) or config.StatusIcons.stressThreshold
     config.StatusIcons.oxygenThreshold = tonumber(data.oxygenThreshold) or config.StatusIcons.oxygenThreshold
-    config.showCrosshair = data.showCrosshair == true
-
-    if not config.StatusIcons.colors then
-        config.StatusIcons.colors = {
-            health = '#10b981',
-            armor = '#5eb2ff',
-            hunger = '#f59e0b',
-            thirst = '#ffffff',
-            stress = '#ef4444',
-            oxygen = '#06b6d4',
-        }
-    end
-    
-    config.StatusIcons.colors.health = data.colorHealth or config.StatusIcons.colors.health
-    config.StatusIcons.colors.armor = data.colorArmor or config.StatusIcons.colors.armor
-    config.StatusIcons.colors.hunger = data.colorHunger or config.StatusIcons.colors.hunger
-    config.StatusIcons.colors.thirst = data.colorThirst or config.StatusIcons.colors.thirst
-    config.StatusIcons.colors.stress = data.colorStress or config.StatusIcons.colors.stress
-    config.StatusIcons.colors.oxygen = data.colorOxygen or config.StatusIcons.colors.oxygen
-
-    config.mapNotifications = data.mapNotifications ~= false
-    config.lowFuelAlert = data.lowFuelAlert ~= false
-    config.cinematicNotifications = data.cinematicNotifications ~= false
+    config.StatusIcons.colors = copyTable(presentation.colors)
+    config.showCrosshair = toBoolean(data.showCrosshair, config.showCrosshair == true)
+    config.sectionedBars = toBoolean(data.sectionedBars, config.sectionedBars == true)
+    config.sectionedIndicator = toBoolean(data.sectionedIndicator, config.sectionedIndicator == true)
+    config.oxygenDisplayLocation = data.oxygenDisplayLocation or config.oxygenDisplayLocation or 'statusCluster'
+    config.cruiseControl = config.cruiseControl or {}
+    config.cruiseControl.autoThrottle = toBoolean(data.cruiseAutoThrottle, cruiseModeFullDefault())
+    config.mapNotifications = toBoolean(data.mapNotifications, config.mapNotifications ~= false)
+    config.lowFuelAlert = toBoolean(data.lowFuelAlert, config.lowFuelAlert ~= false)
+    config.cinematicNotifications = toBoolean(data.cinematicNotifications, config.cinematicNotifications ~= false)
     config.cinematicKey = data.cinematicKey or config.cinematicKey
-    config.minimapOnlyInVehicle = data.minimapOnlyInVehicle == true
-    config.fuelDisplayStyle = data.fuelDisplayStyle or config.fuelDisplayStyle or 'bar'
+    config.minimapOnlyInVehicle = toBoolean(data.minimapOnlyInVehicle, config.minimapOnlyInVehicle == true)
+    config.backdropBlur = normalizeBackdropBlur(data.backdropBlur) or normalizeBackdropBlur(config.backdropBlur) or 1.0
+    config.panelOpacity = normalizePanelOpacity(data.panelOpacity) or normalizePanelOpacity(config.panelOpacity) or 1.0
+    config.fuelDisplayStyle = presentation.resolvedFuelDisplayStyle
+    config.ammoColor = presentation.ammoColor
+    config.ammoPositionPreset = presentation.resolvedAmmoPositionPreset
+    config.speedometerPositionMode = data.speedometerPositionMode or config.speedometerPositionMode or 'preset'
 
-    local posX = tonumber(data.speedometerPosX)
-    local posY = tonumber(data.speedometerPosY)
-    local speedometerPos = nil
-    if posX and posX > 0 and posY and posY > 0 then
-        speedometerPos = { left = posX, top = posY }
-    end
-
-
-    if refreshMinimap then
-        minimap.apply(config)
-    end
-
-    SendNUIMessage({
-        action = 'updateStatusConfig',
-        hungerThreshold = config.StatusIcons.hungerThreshold,
-        thirstThreshold = config.StatusIcons.thirstThreshold,
-        stressThreshold = config.StatusIcons.stressThreshold,
-        oxygenThreshold = config.StatusIcons.oxygenThreshold,
-        colors = config.StatusIcons.colors,
-        speedometerPos = speedometerPos,
-        fuelDisplayStyle = config.fuelDisplayStyle or 'bar',
-        ammoColor = data.colorAmmo or config.ammoColor or '#10b981',
-        ammoPositionPreset = data.ammoPositionPreset or config.ammoPositionPreset or 'bottom-right',
-        showCrosshair = config.showCrosshair,
-    })
-
-    -- Ammo position
-    local ammoPosX = tonumber(data.ammoPosX)
-    local ammoPosY = tonumber(data.ammoPosY)
-    if ammoPosX and ammoPosX > 0 and ammoPosY and ammoPosY > 0 then
-        SendNUIMessage({
-            action = 'updateStatusConfig',
-            ammoPos = { left = ammoPosX, top = ammoPosY },
-        })
-    end
-
-    config.ammoColor = data.colorAmmo or config.ammoColor or '#10b981'
-    config.ammoPositionPreset = data.ammoPositionPreset or config.ammoPositionPreset or 'bottom-right'
-
+    pushResolvedHud(data)
     Settings.registerCinematicKey(config.cinematicKey)
+    TriggerEvent('es_hud:client:syncMinimap', 'settings_apply', refreshMinimap == true)
 end
 
--- Helper to read saved speedometer position from es_lib (returns posX, posY)
-local function getSavedSpeedometerPos()
-    local posX, posY = 0, 0
+local function setEsLibSetting(key, value)
     pcall(function()
-        posX = tonumber(exports['es_lib']:getSetting('hud_speedometerPosX')) or 0
-        posY = tonumber(exports['es_lib']:getSetting('hud_speedometerPosY')) or 0
+        exports['es_lib']:setSetting(key, value)
     end)
-    return posX, posY
 end
 
-local function normalizeSpeedometerPos(left, top)
-    local posX = math.floor((tonumber(left) or 0) + 0.5)
-    local posY = math.floor((tonumber(top) or 0) + 0.5)
+local function persistSettingsData(data)
+    if type(data) ~= 'table' then
+        return
+    end
 
-    if posX < 0 then posX = 0 end
-    if posY < 0 then posY = 0 end
+    for hudKey, esKey in pairs(HUD_TO_ES_KEY) do
+        local v = data[hudKey]
+        if v == nil then
+            v = data[esKey]
+        end
+        if v ~= nil then
+            if esKey == 'hud_backdropBlur' and type(v) == 'number' and v <= 3 then
+                v = math_floor(v * 100 + 0.5)
+            end
+            if esKey == 'hud_panelOpacity' and type(v) == 'number' and v <= 1 then
+                v = math_floor(v * 100 + 0.5)
+            end
+            setEsLibSetting(esKey, v)
+        end
+    end
+end
+
+local function normalizePosition(left, top)
+    local posX = math_floor((tonumber(left) or 0) + 0.5)
+    local posY = math_floor((tonumber(top) or 0) + 0.5)
+
+    if posX < 0 then
+        posX = 0
+    end
+
+    if posY < 0 then
+        posY = 0
+    end
 
     if posX == 0 or posY == 0 then
         return 0, 0
@@ -430,111 +913,71 @@ local function normalizeSpeedometerPos(left, top)
     return posX, posY
 end
 
-local function applySpeedometerPos(posX, posY)
-    local speedometerPos = nil
+local function persistSpeedometerState(posX, posY)
+    setEsLibSetting('hud_speedometerPosX', posX)
+    setEsLibSetting('hud_speedometerPosY', posY)
     if posX > 0 and posY > 0 then
-        speedometerPos = { left = posX, top = posY }
+        setEsLibSetting('hud_speedometerPositionMode', 'custom')
+    else
+        setEsLibSetting('hud_speedometerPositionMode', 'preset')
     end
-
-    SendNUIMessage({
-        action = 'updateStatusConfig',
-        speedometerPos = speedometerPos,
-    })
 end
 
-local function persistSpeedometerPos(posX, posY)
-    pcall(function()
-        exports['es_lib']:setSetting('hud_speedometerPosX', posX)
-        exports['es_lib']:setSetting('hud_speedometerPosY', posY)
-    end)
-end
-
--- Ammo position helpers
-local function getSavedAmmoPos()
-    local posX, posY = 0, 0
-    pcall(function()
-        posX = tonumber(exports['es_lib']:getSetting('hud_ammoPosX')) or 0
-        posY = tonumber(exports['es_lib']:getSetting('hud_ammoPosY')) or 0
-    end)
-    return posX, posY
-end
-
-local function normalizeAmmoPos(left, top)
-    local posX = math.floor((tonumber(left) or 0) + 0.5)
-    local posY = math.floor((tonumber(top) or 0) + 0.5)
-    if posX < 0 then posX = 0 end
-    if posY < 0 then posY = 0 end
-    if posX == 0 or posY == 0 then return 0, 0 end
-    return posX, posY
-end
-
-local function applyAmmoPos(posX, posY)
-    local ammoPos = nil
-    if posX > 0 and posY > 0 then
-        ammoPos = { left = posX, top = posY }
-    end
-    SendNUIMessage({
-        action = 'updateStatusConfig',
-        ammoPos = ammoPos,
-        ammoPositionPreset = config.ammoPositionPreset or 'bottom-right',
-    })
-end
-
-local function persistAmmoPos(posX, posY)
-    pcall(function()
-        exports['es_lib']:setSetting('hud_ammoPosX', posX)
-        exports['es_lib']:setSetting('hud_ammoPosY', posY)
-    end)
+local function persistAmmoState(posX, posY, positionPreset)
+    setEsLibSetting('hud_ammoPosX', posX)
+    setEsLibSetting('hud_ammoPosY', posY)
+    setEsLibSetting('hud_ammoPositionPreset', positionPreset)
 end
 
 function Settings.get()
-    -- Build the settings table from es_lib stored values (or config defaults)
-    local data = {}
-    local ok, _ = pcall(function()
+    local data = buildDefaultSettings()
+
+    pcall(function()
         for esKey, hudKey in pairs(KEY_MAP) do
-            local val = exports['es_lib']:getSetting(esKey)
-            if val ~= nil then
-                data[hudKey] = val
+            local value = exports['es_lib']:getSetting(esKey)
+            if value ~= nil then
+                data[hudKey] = value
             end
         end
     end)
-    if not ok or not next(data) then
-        -- Fallback to config defaults, but still try to read saved speedo pos
-        local posX, posY = getSavedSpeedometerPos()
-        return {
-            speedUnit = config.speedUnit,
-            disableSpeedometer = config.disableSpeedometer == true,
-            showPostal = config.EnablePostal,
-            showPostalDistance = config.ShowPostalDistance,
-            hungerThreshold = config.StatusIcons.hungerThreshold,
-            thirstThreshold = config.StatusIcons.thirstThreshold,
-            stressThreshold = config.StatusIcons.stressThreshold,
-            oxygenThreshold = config.StatusIcons.oxygenThreshold,
-            colorHealth = config.StatusIcons.colors.health,
-            colorArmor = config.StatusIcons.colors.armor,
-            colorHunger = config.StatusIcons.colors.hunger,
-            colorThirst = config.StatusIcons.colors.thirst,
-            colorStress = config.StatusIcons.colors.stress,
-            colorOxygen = config.StatusIcons.colors.oxygen,
-            mapNotifications = config.mapNotifications,
-            lowFuelAlert = config.lowFuelAlert,
-            cinematicNotifications = config.cinematicNotifications,
-            cinematicKey = config.cinematicKey,
-            minimapOnlyInVehicle = config.minimapOnlyInVehicle,
-            speedometerPosX = posX,
-            speedometerPosY = posY,
-            fuelDisplayStyle = config.fuelDisplayStyle or 'bar',
-            colorAmmo = config.ammoColor or '#10b981',
-            ammoPositionPreset = config.ammoPositionPreset or 'bottom-right',
-            showCrosshair = config.showCrosshair == true,
-        }
+
+    data.backdropBlur = normalizeBackdropBlur(data.backdropBlur) or 1.0
+    data.panelOpacity = normalizePanelOpacity(data.panelOpacity) or 1.0
+
+    local speedometerPosX = tonumber(data.speedometerPosX) or 0
+    local speedometerPosY = tonumber(data.speedometerPosY) or 0
+    if not data.layoutPreset or data.layoutPreset == '' then
+        data.layoutPreset = getDefaultPresetName()
     end
+
+    if not data.colorPreset or data.colorPreset == '' then
+        data.colorPreset = data.layoutPreset
+    end
+
+    if not data.speedometerPositionMode or data.speedometerPositionMode == '' then
+        data.speedometerPositionMode = (speedometerPosX > 0 and speedometerPosY > 0) and 'custom' or 'preset'
+    end
+
+    local ammoPosX = tonumber(data.ammoPosX) or 0
+    local ammoPosY = tonumber(data.ammoPosY) or 0
+    if not data.ammoPositionPreset or data.ammoPositionPreset == '' then
+        data.ammoPositionPreset = (ammoPosX > 0 and ammoPosY > 0) and 'custom' or 'preset'
+    end
+
+    local presentation = resolveHudPresentation(data)
+    data.statusIconShape = presentation.resolvedStatusIconShape
+    data.colorHealth = presentation.colors.health
+    data.colorArmor = presentation.colors.armor
+    data.colorHunger = presentation.colors.hunger
+    data.colorThirst = presentation.colors.thirst
+    data.colorStress = presentation.colors.stress
+    data.colorOxygen = presentation.colors.oxygen
+    data.fuelDisplayStyle = presentation.resolvedFuelDisplayStyle
+    data.colorAmmo = presentation.ammoColor
+    data.ammoPositionPreset = presentation.resolvedAmmoPositionPreset
+
     return data
 end
-
--- ============================================================================
--- CINEMATIC MODE (unchanged)
--- ============================================================================
 
 function Settings.isCinematicMode()
     return cinematicMode
@@ -559,7 +1002,9 @@ function Settings.toggleCinematic()
 end
 
 function Settings.registerCinematicKey(key)
-    if not key or key == '' then return end
+    if not key or key == '' then
+        return
+    end
 
     if not cinematicCommandRegistered then
         RegisterCommand('cinematicmode', function()
@@ -574,10 +1019,6 @@ function Settings.registerCinematicKey(key)
     end
 end
 
--- ============================================================================
--- NATIVE SETTINGS MODAL DISABLED — redirect to es_lib central settings
--- ============================================================================
-
 function Settings.open()
     pcall(function()
         exports['es_lib']:openSettingsMenu()
@@ -585,21 +1026,27 @@ function Settings.open()
 end
 
 function Settings.close()
-    -- No-op: es_lib handles its own close
 end
 
 function Settings.isOpen()
     return false
 end
 
--- Keep NUI callbacks registered so the built React app doesn't error,
--- but they are effectively no-ops now.
 RegisterNUICallback('settings:save', function(data, cb)
-    local pos = data and data.speedometerPos
-    local posX, posY = normalizeSpeedometerPos(pos and pos.left, pos and pos.top)
-    persistSpeedometerPos(posX, posY)
-    applySpeedometerPos(posX, posY)
+    persistSettingsData(data)
 
+    if data and type(data.speedometerPos) == 'table' then
+        local speedometerPosX, speedometerPosY = normalizePosition(data.speedometerPos.left, data.speedometerPos.top)
+        persistSpeedometerState(speedometerPosX, speedometerPosY)
+    end
+
+    if data and type(data.ammoPos) == 'table' then
+        local ammoPosX, ammoPosY = normalizePosition(data.ammoPos.left, data.ammoPos.top)
+        local ammoPreset = (ammoPosX > 0 and ammoPosY > 0) and 'custom' or 'preset'
+        persistAmmoState(ammoPosX, ammoPosY, ammoPreset)
+    end
+
+    Settings.apply(Settings.get(), { refreshMinimap = false })
     cb('ok')
 end)
 
@@ -607,61 +1054,29 @@ RegisterNUICallback('settings:close', function(_, cb)
     cb('ok')
 end)
 
--- Redirect /hudsettings to es_lib settings
 RegisterCommand('hudsettings', function()
     Settings.open()
 end, false)
 
 RegisterKeyMapping('hudsettings', 'Open HUD Settings', 'keyboard', 'I')
 
--- ============================================================================
--- ES_LIB SETTING CHANGE LISTENER
--- ============================================================================
-
 AddEventHandler('es_lib:settingChanged', function(key, value)
     local hudKey = KEY_MAP[key]
-    if not hudKey then return end
+    if not hudKey then
+        return
+    end
 
-    -- Read the saved speedometer position so we don't reset it
-    local posX, posY = getSavedSpeedometerPos()
-
-    -- Build a full settings table from current config + the changed value
-    local current = {
-        speedUnit = config.speedUnit,
-        disableSpeedometer = config.disableSpeedometer == true,
-        showPostal = config.EnablePostal,
-        showPostalDistance = config.ShowPostalDistance,
-        hungerThreshold = config.StatusIcons.hungerThreshold,
-        thirstThreshold = config.StatusIcons.thirstThreshold,
-        stressThreshold = config.StatusIcons.stressThreshold,
-        oxygenThreshold = config.StatusIcons.oxygenThreshold,
-        colorHealth = config.StatusIcons.colors.health,
-        colorArmor = config.StatusIcons.colors.armor,
-        colorHunger = config.StatusIcons.colors.hunger,
-        colorThirst = config.StatusIcons.colors.thirst,
-        colorStress = config.StatusIcons.colors.stress,
-        colorOxygen = config.StatusIcons.colors.oxygen,
-        mapNotifications = config.mapNotifications,
-        lowFuelAlert = config.lowFuelAlert,
-        cinematicNotifications = config.cinematicNotifications,
-        cinematicKey = config.cinematicKey,
-        minimapOnlyInVehicle = config.minimapOnlyInVehicle,
-        useSkewedStyle = config.useSkewedStyle,
-        skewAmount = config.skewAmount,
-        speedometerPosX = posX,
-        speedometerPosY = posY,
-        fuelDisplayStyle = config.fuelDisplayStyle or 'bar',
-    }
+    local current = Settings.get()
     current[hudKey] = value
-    local shouldRefreshMinimap = false
-    Settings.apply(current, { refreshMinimap = shouldRefreshMinimap })
+    Settings.apply(current, { refreshMinimap = false })
 end)
 
--- Handle es_lib settings action buttons
 AddEventHandler('es_lib:settingsAction', function(scriptId, action)
-    if scriptId ~= 'es_hud' then return end
+    if scriptId ~= 'es_hud' then
+        return
+    end
 
-    if action == 'speedometer_move' then
+    if action == 'speedometer_move' or action == 'ammo_move' then
         SendNUIMessage({ action = 'closeSettings' })
         SendNUIMessage({ action = 'settingsClose' })
         SetNuiFocus(false, false)
@@ -671,96 +1086,60 @@ AddEventHandler('es_lib:settingsAction', function(scriptId, action)
         Wait(200)
         SetNuiFocus(true, true)
         SetNuiFocusKeepInput(false)
-        SendNUIMessage({ action = 'startSpeedometerMove' })
-    elseif action == 'speedometer_reset' then
-        persistSpeedometerPos(0, 0)
-        applySpeedometerPos(0, 0)
-    elseif action == 'ammo_move' then
-        SendNUIMessage({ action = 'closeSettings' })
-        SendNUIMessage({ action = 'settingsClose' })
-        SetNuiFocus(false, false)
-        pcall(function()
-            exports['es_lib']:closeSettingsMenu()
-        end)
-        Wait(200)
-        SetNuiFocus(true, true)
-        SetNuiFocusKeepInput(false)
-        SendNUIMessage({ action = 'startAmmoMove' })
-    elseif action == 'ammo_reset' then
-        persistAmmoPos(0, 0)
-        pcall(function()
-            exports['es_lib']:setSetting('hud_ammoPositionPreset', 'bottom-right')
-        end)
-        config.ammoPositionPreset = 'bottom-right'
-        applyAmmoPos(0, 0)
+        if action == 'speedometer_move' then
+            SendNUIMessage({ action = 'startSpeedometerMove' })
+        else
+            SendNUIMessage({ action = 'startAmmoMove' })
+        end
+        return
+    end
+
+    if action == 'speedometer_reset' then
+        persistSpeedometerState(0, 0)
+        Settings.apply(Settings.get(), { refreshMinimap = false })
+        return
+    end
+
+    if action == 'ammo_reset' then
+        persistAmmoState(0, 0, 'preset')
+        Settings.apply(Settings.get(), { refreshMinimap = false })
     end
 end)
 
--- NUI callback to start speedometer editing (repositioning)
 RegisterNUICallback('speedometer:startEdit', function(_, cb)
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
     cb('ok')
 end)
 
--- NUI callback for when speedometer edit mode ends (save or cancel)
 RegisterNUICallback('speedometer:endEdit', function(data, cb)
     SetNuiFocus(false, false)
 
     if data and data.saved then
-        local posX, posY = normalizeSpeedometerPos(data.left, data.top)
-        persistSpeedometerPos(posX, posY)
-        applySpeedometerPos(posX, posY)
+        local posX, posY = normalizePosition(data.left, data.top)
+        persistSpeedometerState(posX, posY)
+        Settings.apply(Settings.get(), { refreshMinimap = false })
     end
 
     cb('ok')
 end)
 
--- NUI callback for ammo edit mode
 RegisterNUICallback('ammo:endEdit', function(data, cb)
     SetNuiFocus(false, false)
 
     if data and data.saved then
-        local posX, posY = normalizeAmmoPos(data.left, data.top)
-        persistAmmoPos(posX, posY)
-        
-        -- Force switch to custom preset when dragging
-        pcall(function()
-            exports['es_lib']:setSetting('hud_ammoPositionPreset', 'custom')
-        end)
-        config.ammoPositionPreset = 'custom'
-        
-        applyAmmoPos(posX, posY)
+        local posX, posY = normalizePosition(data.left, data.top)
+        local preset = (posX > 0 and posY > 0) and 'custom' or 'preset'
+        persistAmmoState(posX, posY, preset)
+        Settings.apply(Settings.get(), { refreshMinimap = false })
     end
 
     cb('ok')
 end)
 
--- ============================================================================
--- MINIMAP ONLY IN VEHICLE THREAD (unchanged)
--- ============================================================================
-
-CreateThread(function()
-    while true do
-        if config.minimapOnlyInVehicle then
-            local ped = PlayerPedId()
-            local inVehicle = IsPedInAnyVehicle(ped, false)
-            if not cinematicMode then
-                DisplayRadar(inVehicle)
-            end
-        end
-        Wait(200)
-    end
-end)
-
--- ============================================================================
--- STARTUP: Load saved es_lib settings and apply
--- ============================================================================
-
 CreateThread(function()
     Wait(2000)
-    local data = Settings.get()
-    Settings.apply(data)
+    Settings.apply(Settings.get())
 end)
 
 return Settings

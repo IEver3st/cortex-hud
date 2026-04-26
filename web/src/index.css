@@ -6,6 +6,10 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  --hud-minimap-left: 1.3vw;
+  --hud-minimap-width: 16.38vw;
+  --hud-minimap-height: 18.3vh;
+  --hud-safezone-bottom: 2vh;
 }
 
 * {

@@ -3,10 +3,13 @@ import HUD from './components/HUD'
 import AircraftHUD from './components/AircraftHUD'
 import Indicator from './components/Indicator'
 import SettingsModal from './components/SettingsModal'
-import AmmoIcon from './assets/machine-gun-magazine.svg'
-
 
 function App() {
+  const getParentResourceName = useCallback(
+    () => (typeof window.GetParentResourceName === 'function' ? window.GetParentResourceName() : 'es_hud'),
+    [],
+  )
+
   const [hudData, setHudData] = useState({
     health: 100,
     armor: 50,
@@ -26,6 +29,8 @@ function App() {
     hasFuelProvider: false,
     engineHealth: 100,
     engineState: false,
+    cruiseActive: false,
+    cruiseSpeed: 0,
     headlights: 0,
     belt: false,
     harness: false,
@@ -43,8 +48,11 @@ function App() {
     aircraftHasFixedGear: false,
     aircraftTailRotorHealth: 1000,
     aircraftMainRotorHealth: 1000,
+    aircraftGearHealth: 1000,
     aircraftIsHelicopter: false,
     aircraftStalled: false,
+    aircraftHydraulicsHudEnabled: false,
+    aircraftHydraulicsHealth: 1000,
     forceAircraftHud: false,
     useSeatbelt: true,
     nosVisible: false,
@@ -54,6 +62,7 @@ function App() {
     thirst: 100,
     stress: 0,
     oxygen: 100,
+    underwater: false,
     voipTalking: false,
     voipRange: 'normal',
     voipConnected: false,
@@ -63,25 +72,53 @@ function App() {
     thirstThreshold: 100,
     stressThreshold: 100,
     oxygenThreshold: 100,
+    statusIconShape: 'bar',
+    resolvedStatusIconShape: 'bar',
+    statusRingWidth: 42,
+    statusRingHeight: 48,
     showVoip: true,
+    framework: 'standalone',
+    standaloneVoipHudEnabled: false,
+    layoutPreset: 'classic',
+    colorPreset: 'classic',
+    layout: {},
+    theme: {
+      surface: 'rgba(10, 14, 20, 0.48)',
+      surfaceBorder: 'rgba(255, 255, 255, 0.12)',
+      text: '#f8fafc',
+      mutedText: 'rgba(226, 232, 240, 0.68)',
+      indicatorAccent: '#60a5fa',
+      speedometerAccent: '#22c55e',
+      voipAccent: '#22c55e',
+      ammo: '#a3e635',
+      backdropBlur: 1,
+      panelOpacity: 1,
+    },
     colors: {
       health: '#10b981',
       armor: '#5eb2ff',
       hunger: '#f59e0b',
-      thirst: '#ffffff',
+      thirst: '#38bdf8',
       stress: '#ef4444',
       oxygen: '#06b6d4',
     },
     fuelDisplayStyle: 'bar',
-    ammoPositionPreset: 'bottom-right',
+    resolvedFuelDisplayStyle: 'bar',
+    ammoPositionPreset: 'preset',
+    resolvedAmmoPositionPreset: 'preset',
     waypointDist: -1,
     waypointUnit: '',
     ammoClip: -1,
     ammoReserve: -1,
     ammoPos: null,
     ammoColor: '#10b981',
+    speedometerPos: null,
     showCrosshair: false,
+    sectionedBars: false,
+    sectionedIndicator: false,
+    oxygenDisplayLocation: 'statusCluster',
     isArmed: false,
+    radarVisible: true,
   })
 
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -104,84 +141,121 @@ function App() {
     hudDataRef.current = hudData
   }, [hudData])
 
+  useEffect(() => {
+    const raw = Number(hudData.theme?.backdropBlur)
+    const blur = Number.isFinite(raw) ? Math.min(3, Math.max(0.25, raw)) : 1
+    document.documentElement.style.setProperty('--es-backdrop-blur', String(blur))
+    const norm = (blur - 0.25) / 2.75
+    document.documentElement.style.setProperty('--es-backdrop-norm', String(norm))
+
+    let op = Number(hudData.theme?.panelOpacity)
+    if (Number.isFinite(op) && op >= 15 && op <= 100) op = op / 100
+    if (!Number.isFinite(op)) op = 1
+    op = Math.min(1, Math.max(0.15, op))
+    document.documentElement.style.setProperty('--es-panel-opacity', String(op))
+    // CEF: no real backdrop-filter — frost slider scales rim (--es-backdrop-norm) + fill density.
+    const normAtDefaultBlur = (1 - 0.25) / 2.75
+    const frostMult = Math.min(1.15, Math.max(0.82, 1 + 0.4 * (norm - normAtDefaultBlur)))
+    const fillAlpha = Math.min(1, Math.max(0.15, op * frostMult))
+    document.documentElement.style.setProperty('--es-glass-fill-alpha', String(fillAlpha))
+  }, [hudData.theme?.backdropBlur, hudData.theme?.panelOpacity])
+
   const handleMessage = useCallback((event) => {
     const data = event.data
 
     switch (data.action) {
       case 'nos:update':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           nosVisible: data.data?.visible ?? prev.nosVisible,
           nosAmount: data.data?.amount ?? prev.nosAmount,
-          nosActive: data.data?.active ?? prev.nosActive
+          nosActive: data.data?.active ?? prev.nosActive,
         }))
         break
       case 'updateStatus':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           hunger: data.hunger ?? prev.hunger,
           thirst: data.thirst ?? prev.thirst,
           stress: data.stress ?? prev.stress,
-          oxygen: data.oxygen ?? prev.oxygen
+          oxygen: data.oxygen ?? prev.oxygen,
+          underwater: data.underwater ?? prev.underwater,
         }))
         break
       case 'updateVoip':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           voipTalking: data.talking ?? prev.voipTalking,
           voipRange: data.range ?? prev.voipRange,
           voipConnected: data.connected ?? prev.voipConnected,
           radioChannel: data.radioChannel ?? prev.radioChannel,
-          radioTalking: data.radioTalking ?? prev.radioTalking
+          radioTalking: data.radioTalking ?? prev.radioTalking,
         }))
         break
       case 'updateStatusConfig':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           hungerThreshold: data.hungerThreshold ?? prev.hungerThreshold,
           thirstThreshold: data.thirstThreshold ?? prev.thirstThreshold,
           stressThreshold: data.stressThreshold ?? prev.stressThreshold,
           oxygenThreshold: data.oxygenThreshold ?? prev.oxygenThreshold,
+          statusIconShape: data.statusIconShape ?? prev.statusIconShape,
+          resolvedStatusIconShape:
+            data.resolvedStatusIconShape ?? data.statusIconShape ?? prev.resolvedStatusIconShape,
+          statusRingWidth: data.statusRingWidth ?? prev.statusRingWidth,
+          statusRingHeight: data.statusRingHeight ?? prev.statusRingHeight,
           showVoip: data.showVoip ?? prev.showVoip,
+          framework: data.framework ?? prev.framework,
+          standaloneVoipHudEnabled:
+            data.standaloneVoipHudEnabled ?? prev.standaloneVoipHudEnabled,
+          layoutPreset: data.layoutPreset ?? prev.layoutPreset,
+          colorPreset: data.colorPreset ?? prev.colorPreset,
+          layout: data.layout ?? prev.layout,
+          theme: data.theme ?? prev.theme,
           colors: data.colors ?? prev.colors,
-          ammoPos: editModeRef.current
-            ? prev.ammoPos
-            : (Object.prototype.hasOwnProperty.call(data, 'ammoPos') ? data.ammoPos : prev.ammoPos),
+          ammoPos:
+            ammoEditMode
+              ? prev.ammoPos
+              : (Object.prototype.hasOwnProperty.call(data, 'ammoPos') ? data.ammoPos : prev.ammoPos),
           ammoColor: data.ammoColor ?? prev.ammoColor,
-          speedometerPos: editModeRef.current
-            ? prev.speedometerPos
-            : (Object.prototype.hasOwnProperty.call(data, 'speedometerPos') ? data.speedometerPos : prev.speedometerPos),
+          speedometerPos:
+            editModeRef.current
+              ? prev.speedometerPos
+              : (Object.prototype.hasOwnProperty.call(data, 'speedometerPos') ? data.speedometerPos : prev.speedometerPos),
           fuelDisplayStyle: data.fuelDisplayStyle ?? prev.fuelDisplayStyle,
+          resolvedFuelDisplayStyle:
+            data.resolvedFuelDisplayStyle ?? data.fuelDisplayStyle ?? prev.resolvedFuelDisplayStyle,
           ammoPositionPreset: data.ammoPositionPreset ?? prev.ammoPositionPreset,
+          resolvedAmmoPositionPreset:
+            data.resolvedAmmoPositionPreset ?? data.ammoPositionPreset ?? prev.resolvedAmmoPositionPreset,
           showCrosshair: data.showCrosshair ?? prev.showCrosshair,
+          sectionedBars: data.sectionedBars ?? prev.sectionedBars,
+          sectionedIndicator: data.sectionedIndicator ?? prev.sectionedIndicator,
+          oxygenDisplayLocation: data.oxygenDisplayLocation ?? prev.oxygenDisplayLocation,
         }))
         break
       case 'updateHud':
-        setHudData(prev => ({
-          ...prev,
-          health: data.health,
-          armor: data.armor
-        }))
+        setHudData((prev) => ({ ...prev, health: data.health, armor: data.armor }))
         break
       case 'updateLocation':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           heading: data.heading,
           street: data.street,
           zone: data.zone,
           postal: data.postal,
-          postalDist: data.postalDist
+          postalDist: data.postalDist,
         }))
         break
       case 'updateWaypoint':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           waypointDist: data.waypointDist,
-          waypointUnit: data.waypointUnit
+          waypointUnit: data.waypointUnit,
         }))
         break
       case 'updateAmmo':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           ammoClip: data.ammoClip,
           ammoReserve: data.ammoReserve,
@@ -189,20 +263,17 @@ function App() {
         }))
         break
       case 'toggleVisibility':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           visible: data.visible,
-          forceAircraftHud: data.forceAircraftHud ?? prev.forceAircraftHud
+          forceAircraftHud: data.forceAircraftHud ?? prev.forceAircraftHud,
         }))
         break
       case 'setForceAircraftHud':
-        setHudData(prev => ({
-          ...prev,
-          forceAircraftHud: data.forced ?? false
-        }))
+        setHudData((prev) => ({ ...prev, forceAircraftHud: data.forced ?? false }))
         break
       case 'updateVehicle':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           vehicleVisible: data.visible,
           aircraftVisible: false,
@@ -218,11 +289,13 @@ function App() {
           headlights: data.headlights ?? prev.headlights,
           belt: data.belt ?? prev.belt,
           harness: data.harness ?? prev.harness,
-          useSeatbelt: data.useSeatbelt ?? prev.useSeatbelt
+          useSeatbelt: data.useSeatbelt ?? prev.useSeatbelt,
+          cruiseActive: data.visible ? (data.cruiseActive ?? false) : false,
+          cruiseSpeed: data.visible ? (data.cruiseSpeed ?? 0) : 0,
         }))
         break
       case 'updateAircraft':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
           aircraftVisible: data.visible,
           vehicleVisible: false,
@@ -239,18 +312,25 @@ function App() {
           aircraftHasFixedGear: data.hasFixedGear ?? prev.aircraftHasFixedGear,
           aircraftTailRotorHealth: data.tailRotorHealth ?? prev.aircraftTailRotorHealth,
           aircraftMainRotorHealth: data.mainRotorHealth ?? prev.aircraftMainRotorHealth,
+          aircraftGearHealth: data.gearHealth ?? prev.aircraftGearHealth,
           aircraftIsHelicopter: data.isHelicopter ?? prev.aircraftIsHelicopter,
-          aircraftStalled: data.isStalled ?? prev.aircraftStalled
+          aircraftStalled: data.isStalled ?? prev.aircraftStalled,
+          aircraftHydraulicsHudEnabled: data.hydraulicsHudEnabled ?? prev.aircraftHydraulicsHudEnabled,
+          aircraftHydraulicsHealth: data.hydraulicsHealth ?? prev.aircraftHydraulicsHealth,
         }))
         break
       case 'init':
-        setHudData(prev => ({
+        setHudData((prev) => ({
           ...prev,
-          visible: data.visible
+          visible: data.visible,
+          radarVisible: data.radarVisible ?? prev.radarVisible,
         }))
         break
+      case 'setRadarVisible':
+        setHudData((prev) => ({ ...prev, radarVisible: data.visible === true }))
+        break
       case 'setCinematicMode':
-        setCinematicMode(!!data.enabled)
+        setCinematicMode(Boolean(data.enabled))
         break
       case 'openSettings':
         setSettingsData(data.settings || {})
@@ -260,19 +340,26 @@ function App() {
       case 'settingsClose':
         setSettingsOpen(false)
         break
-      case 'startSpeedometerMove':
+      case 'startSpeedometerMove': {
         setSettingsOpen(false)
-        {
-          const startPos = hudDataRef.current.speedometerPos || null
-          dragPosRef.current = startPos
-          setDragPos(startPos)
-        }
+        const startPos = hudDataRef.current.speedometerPos || null
+        dragPosRef.current = startPos
+        setDragPos(startPos)
         setEditMode(true)
         break
+      }
+      case 'startAmmoMove': {
+        setSettingsOpen(false)
+        const startPos = hudDataRef.current.ammoPos || null
+        ammoDragPosRef.current = startPos
+        setAmmoDragPos(startPos)
+        setAmmoEditMode(true)
+        break
+      }
       default:
         break
     }
-  }, [])
+  }, [ammoEditMode])
 
   useEffect(() => {
     window.addEventListener('message', handleMessage)
@@ -280,36 +367,35 @@ function App() {
   }, [handleMessage])
 
   const handleSettingsSave = useCallback((values) => {
-    fetch(`https://${GetParentResourceName()}/settings:save`, {
+    fetch(`https://${getParentResourceName()}/settings:save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values)
+      body: JSON.stringify(values),
     })
     setSettingsOpen(false)
-  }, [])
+  }, [getParentResourceName])
 
   const handleSettingsClose = useCallback(() => {
-    fetch(`https://${GetParentResourceName()}/settings:close`, {
+    fetch(`https://${getParentResourceName()}/settings:close`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({}),
     })
     setSettingsOpen(false)
-  }, [])
+  }, [getParentResourceName])
 
   const handleStartMoveSpeedometer = useCallback(() => {
-    // Notify Lua to ensure NUI focus is active for dragging
-    fetch(`https://${GetParentResourceName()}/speedometer:startEdit`, {
+    fetch(`https://${getParentResourceName()}/speedometer:startEdit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({}),
     })
     setSettingsOpen(false)
     setEditMode(true)
     const startPos = hudData.speedometerPos || null
     dragPosRef.current = startPos
     setDragPos(startPos)
-  }, [hudData.speedometerPos])
+  }, [getParentResourceName, hudData.speedometerPos])
 
   const handleDrag = useCallback((nextPos) => {
     dragPosRef.current = nextPos
@@ -317,196 +403,166 @@ function App() {
   }, [])
 
   const handleResetSpeedometer = useCallback(() => {
-    const newSettings = { ...settingsData, speedometerPos: null }
+    const newSettings = {
+      ...settingsData,
+      speedometerPos: null,
+      speedometerPosX: 0,
+      speedometerPosY: 0,
+      speedometerPositionMode: 'preset',
+    }
+    setSettingsData(newSettings)
     handleSettingsSave(newSettings)
-    setHudData(prev => ({ ...prev, speedometerPos: null }))
-  }, [settingsData, handleSettingsSave])
+    setHudData((prev) => ({ ...prev, speedometerPos: null }))
+  }, [handleSettingsSave, settingsData])
 
-  // Ammo position handlers
   const handleStartMoveAmmo = useCallback(() => {
-    fetch(`https://${GetParentResourceName()}/speedometer:startEdit`, {
+    fetch(`https://${getParentResourceName()}/speedometer:startEdit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({}),
     })
     setSettingsOpen(false)
     setAmmoEditMode(true)
     const startPos = hudData.ammoPos || null
     ammoDragPosRef.current = startPos
     setAmmoDragPos(startPos)
-  }, [hudData.ammoPos])
+  }, [getParentResourceName, hudData.ammoPos])
 
-  const handleAmmoDrag = useCallback((e) => {
-    if (!ammoEditMode) return
-    const nextPos = { left: e.clientX - 30, top: e.clientY - 30 }
-    ammoDragPosRef.current = nextPos
-    setAmmoDragPos(nextPos)
-  }, [ammoEditMode])
+  const handleAmmoDrag = useCallback((pos) => {
+    ammoDragPosRef.current = pos
+    setAmmoDragPos(pos)
+  }, [])
 
   const handleAmmoSaveEdit = useCallback(() => {
     const posToSave = ammoDragPosRef.current || null
-    fetch(`https://${GetParentResourceName()}/ammo:endEdit`, {
+    fetch(`https://${getParentResourceName()}/ammo:endEdit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         saved: true,
         left: posToSave?.left ?? 0,
-        top: posToSave?.top ?? 0
-      })
+        top: posToSave?.top ?? 0,
+      }),
     })
-    setHudData(prev => ({ ...prev, ammoPos: posToSave }))
+    setHudData((prev) => ({ ...prev, ammoPos: posToSave, ammoPositionPreset: 'custom' }))
     setAmmoEditMode(false)
-  }, [])
+  }, [getParentResourceName])
 
   const handleAmmoCancelEdit = useCallback(() => {
-    fetch(`https://${GetParentResourceName()}/ammo:endEdit`, {
+    fetch(`https://${getParentResourceName()}/ammo:endEdit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ saved: false })
+      body: JSON.stringify({ saved: false }),
     })
     setAmmoEditMode(false)
-  }, [])
+  }, [getParentResourceName])
 
   const handleResetAmmo = useCallback(() => {
-    const newSettings = { ...settingsData, ammoPos: null }
+    const newSettings = {
+      ...settingsData,
+      ammoPos: null,
+      ammoPosX: 0,
+      ammoPosY: 0,
+      ammoPositionPreset: 'preset',
+    }
+    setSettingsData(newSettings)
     handleSettingsSave(newSettings)
-    setHudData(prev => ({ ...prev, ammoPos: null }))
-  }, [settingsData, handleSettingsSave])
+    setHudData((prev) => ({ ...prev, ammoPos: null, ammoPositionPreset: 'preset' }))
+  }, [handleSettingsSave, settingsData])
 
   const handleSaveEdit = useCallback(() => {
     const posToSave = dragPosRef.current || null
-    // Notify Lua to release NUI focus and persist the position
-    fetch(`https://${GetParentResourceName()}/speedometer:endEdit`, {
+    fetch(`https://${getParentResourceName()}/speedometer:endEdit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         saved: true,
         left: posToSave?.left ?? 0,
-        top: posToSave?.top ?? 0
-      })
+        top: posToSave?.top ?? 0,
+      }),
     })
-    setHudData(prev => ({ ...prev, speedometerPos: posToSave }))
+    setHudData((prev) => ({ ...prev, speedometerPos: posToSave }))
     setEditMode(false)
-  }, [])
+  }, [getParentResourceName])
 
   const handleCancelEdit = useCallback(() => {
-    // Notify Lua to release NUI focus without saving
-    fetch(`https://${GetParentResourceName()}/speedometer:endEdit`, {
+    fetch(`https://${getParentResourceName()}/speedometer:endEdit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ saved: false })
+      body: JSON.stringify({ saved: false }),
     })
     setEditMode(false)
     dragPosRef.current = null
     setDragPos(null)
-  }, [])
+  }, [getParentResourceName])
 
   const handleResetEdit = useCallback(() => {
-    // Reset position to default during edit
     dragPosRef.current = null
     setDragPos(null)
   }, [])
 
   useEffect(() => {
-    if (!editMode) return
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
+    if (!editMode) {
+      return undefined
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
         handleCancelEdit()
       }
     }
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [editMode, handleCancelEdit])
 
   useEffect(() => {
-    if (!ammoEditMode) return
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
+    if (!ammoEditMode) {
+      return undefined
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
         handleAmmoCancelEdit()
       }
     }
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [ammoEditMode, handleAmmoCancelEdit])
 
-  if (!hudData.visible && !hudData.forceAircraftHud && !settingsOpen && !cinematicMode && !editMode && !ammoEditMode) return null
+  if (!hudData.visible && !hudData.forceAircraftHud && !settingsOpen && !cinematicMode && !editMode && !ammoEditMode) {
+    return null
+  }
 
-  const showMainHud = hudData.visible || editMode
+  const showMainHud = hudData.visible || editMode || ammoEditMode
   const showAircraftHud = hudData.aircraftVisible && (hudData.visible || hudData.forceAircraftHud) && !editMode
 
   return (
     <div className="app">
-      {hudData.showCrosshair && hudData.isArmed && (
-        <div className="crosshair-dot" />
-      )}
+      {hudData.showCrosshair && hudData.isArmed && <div className="crosshair-dot" />}
       {editMode && (
         <div className="edit-mode-overlay">
           <div className="edit-mode-header">
             <span className="edit-mode-title">Reposition Mode</span>
-            <span className="edit-mode-subtitle">Drag the speedometer • Snaps to edges & center</span>
+            <span className="edit-mode-subtitle">Drag the speedometer. Snap zones stay active.</span>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                onClick={handleSaveEdit}
-                className="edit-button save"
-              >
-                Save
-              </button>
-              <button 
-                onClick={handleResetEdit}
-                className="edit-button reset"
-              >
-                Reset
-              </button>
-              <button 
-                onClick={handleCancelEdit}
-                className="edit-button cancel"
-              >
-                Cancel
-              </button>
+            <button onClick={handleSaveEdit} className="edit-button save">Save</button>
+            <button onClick={handleResetEdit} className="edit-button reset">Reset</button>
+            <button onClick={handleCancelEdit} className="edit-button cancel">Cancel</button>
           </div>
         </div>
       )}
       {ammoEditMode && (
-        <div className="edit-mode-overlay" onMouseMove={handleAmmoDrag} onClick={handleAmmoDrag}>
+        <div className="edit-mode-overlay">
           <div className="edit-mode-header">
             <span className="edit-mode-title">Ammo Reposition</span>
-            <span className="edit-mode-subtitle">Click anywhere to place the ammo display</span>
+            <span className="edit-mode-subtitle">Drag the ammo counter. Snap zones stay active.</span>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                onClick={(e) => { e.stopPropagation(); handleAmmoSaveEdit(); }}
-                className="edit-button save"
-              >
-                Save
-              </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); handleAmmoCancelEdit(); }}
-                className="edit-button cancel"
-              >
-                Cancel
-              </button>
-          </div>
-          <div
-            className="ammo-display"
-            style={{
-              position: 'fixed',
-              left: `${(ammoDragPos?.left ?? window.innerWidth / 2 - 30)}px`,
-              top: `${(ammoDragPos?.top ?? window.innerHeight / 2 - 30)}px`,
-              right: 'auto',
-              bottom: 'auto',
-              pointerEvents: 'none',
-            }}
-          >
-            <div className="ammo-icon-box">
-              <img src={AmmoIcon} className="ammo-main-icon" alt="ammo" />
-            </div>
-            <div className="ammo-divider" />
-            <div className="ammo-info-stack">
-              <div className="ammo-clip" style={{ color: hudData.ammoColor || '#10b981' }}>12</div>
-              <div className="ammo-reserve">85</div>
-            </div>
-
+            <button type="button" onClick={handleAmmoSaveEdit} className="edit-button save">Save</button>
+            <button type="button" onClick={handleAmmoCancelEdit} className="edit-button cancel">Cancel</button>
           </div>
         </div>
       )}
@@ -518,15 +574,22 @@ function App() {
       )}
       {showMainHud && (
         <>
-          <Indicator 
-            heading={hudData.heading} 
-            street={hudData.street} 
-            zone={hudData.zone} 
+          <Indicator
+            heading={hudData.heading}
+            street={hudData.street}
+            zone={hudData.zone}
             postal={hudData.postal}
             postalDist={hudData.postalDist}
+            layout={hudData.layout?.indicator}
+            theme={hudData.theme}
+            sectionedIndicator={hudData.sectionedIndicator}
+            oxygen={hudData.oxygen}
+            underwater={hudData.underwater}
+            oxygenDisplayLocation={hudData.oxygenDisplayLocation}
+            oxygenColor={hudData.colors?.oxygen}
           />
-          <HUD 
-            health={hudData.health} 
+          <HUD
+            health={hudData.health}
             armor={hudData.armor}
             vehicleVisible={hudData.vehicleVisible || editMode}
             speedUnit={hudData.speedUnit}
@@ -538,6 +601,8 @@ function App() {
             hasFuelProvider={hudData.hasFuelProvider}
             engineHealth={hudData.engineHealth}
             engineState={hudData.engineState}
+            cruiseActive={hudData.cruiseActive}
+            cruiseSpeed={hudData.cruiseSpeed}
             headlights={hudData.headlights}
             belt={hudData.belt}
             harness={hudData.harness}
@@ -549,6 +614,7 @@ function App() {
             thirst={hudData.thirst}
             stress={hudData.stress}
             oxygen={hudData.oxygen}
+            underwater={hudData.underwater}
             voipTalking={hudData.voipTalking}
             voipRange={hudData.voipRange}
             voipConnected={hudData.voipConnected}
@@ -558,12 +624,19 @@ function App() {
             thirstThreshold={hudData.thirstThreshold}
             stressThreshold={hudData.stressThreshold}
             oxygenThreshold={hudData.oxygenThreshold}
+            statusIconShape={hudData.statusIconShape}
+            resolvedStatusIconShape={hudData.resolvedStatusIconShape}
+            statusRingWidth={hudData.statusRingWidth}
+            statusRingHeight={hudData.statusRingHeight}
             showVoip={hudData.showVoip}
+            framework={hudData.framework}
+            standaloneVoipHudEnabled={hudData.standaloneVoipHudEnabled}
             speedometerPos={editMode ? dragPos : hudData.speedometerPos}
             editMode={editMode}
             onDrag={handleDrag}
             colors={hudData.colors}
             fuelDisplayStyle={hudData.fuelDisplayStyle}
+            resolvedFuelDisplayStyle={hudData.resolvedFuelDisplayStyle}
             waypointDist={hudData.waypointDist}
             waypointUnit={hudData.waypointUnit}
             ammoClip={hudData.ammoClip}
@@ -571,6 +644,13 @@ function App() {
             ammoPos={ammoEditMode ? ammoDragPos : hudData.ammoPos}
             ammoColor={hudData.ammoColor}
             ammoPositionPreset={hudData.ammoPositionPreset}
+            resolvedAmmoPositionPreset={hudData.resolvedAmmoPositionPreset}
+            ammoEditMode={ammoEditMode}
+            onAmmoDrag={handleAmmoDrag}
+            layout={hudData.layout}
+            theme={hudData.theme}
+            sectionedBars={hudData.sectionedBars}
+            oxygenDisplayLocation={hudData.oxygenDisplayLocation}
           />
         </>
       )}
@@ -584,16 +664,17 @@ function App() {
           hasFuelProvider={hudData.aircraftHasFuelProvider}
           engineHealth={hudData.aircraftEngineHealth}
           engines={hudData.engines}
-          lightsOn={hudData.aircraftLightsOn}
           gearDown={hudData.aircraftGearDown}
           hasFixedGear={hudData.aircraftHasFixedGear}
           tailRotorHealth={hudData.aircraftTailRotorHealth}
-          mainRotorHealth={hudData.aircraftMainRotorHealth}
           isHelicopter={hudData.aircraftIsHelicopter}
           isStalled={hudData.aircraftStalled}
+          hydraulicsHudEnabled={hudData.aircraftHydraulicsHudEnabled}
+          hydraulicsHealth={hudData.aircraftHydraulicsHealth}
         />
       )}
       <SettingsModal
+        key={JSON.stringify(settingsData)}
         visible={settingsOpen && !editMode && !ammoEditMode}
         settings={settingsData}
         onSave={handleSettingsSave}

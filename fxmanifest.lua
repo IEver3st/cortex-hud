@@ -7,8 +7,6 @@ version '1.0.0'
 
 dependency 'es_lib'
 
-this_is_a_map 'yes'
-
 files {
     'web/dist/index.html',
     'web/dist/assets/index.js',
@@ -30,8 +28,10 @@ client_scripts {
 exports {
     'toggleHud',
     'toggleMap',
+    'refreshMinimap',
     'isHarnessOn',
     'toggleHarness',
+    'isCruiseControlActive',
     'getSettingsDefinition',
     'setCharacterSelectionActive',
     'setSpawnSelectorActive',

@@ -6,6 +6,62 @@ const SPEED_UNIT_OPTIONS = [
     { value: 'kph', label: 'KPH' },
 ]
 
+const HUD_PRESET_OPTIONS = [
+    { value: 'classic', label: 'Classic' },
+    { value: 'street', label: 'Street Racer' },
+    { value: 'dispatch', label: 'Dispatch' },
+    { value: 'ghost', label: 'Ghost' },
+]
+
+const HUD_PRESET_COLORS = {
+    classic: {
+        colorHealth: '#22c55e',
+        colorArmor: '#60a5fa',
+        colorHunger: '#f59e0b',
+        colorThirst: '#38bdf8',
+        colorStress: '#ef4444',
+        colorOxygen: '#06b6d4',
+        colorAmmo: '#a3e635',
+    },
+    street: {
+        colorHealth: '#34d399',
+        colorArmor: '#38bdf8',
+        colorHunger: '#f97316',
+        colorThirst: '#22d3ee',
+        colorStress: '#fb7185',
+        colorOxygen: '#818cf8',
+        colorAmmo: '#fb7185',
+    },
+    dispatch: {
+        colorHealth: '#10b981',
+        colorArmor: '#60a5fa',
+        colorHunger: '#fbbf24',
+        colorThirst: '#38bdf8',
+        colorStress: '#ef4444',
+        colorOxygen: '#06b6d4',
+        colorAmmo: '#f59e0b',
+    },
+    ghost: {
+        colorHealth: '#4ade80',
+        colorArmor: '#93c5fd',
+        colorHunger: '#fbbf24',
+        colorThirst: '#67e8f9',
+        colorStress: '#fb7185',
+        colorOxygen: '#7dd3fc',
+        colorAmmo: '#e2e8f0',
+    },
+}
+
+const COLOR_KEYS = [
+    'colorHealth',
+    'colorArmor',
+    'colorHunger',
+    'colorThirst',
+    'colorStress',
+    'colorOxygen',
+    'colorAmmo',
+]
+
 const CustomDropdown = ({ value, options, onChange }) => {
     const [open, setOpen] = useState(false)
     const ref = useRef(null)
@@ -67,7 +123,14 @@ const AMMO_POSITION_OPTIONS = [
     { value: 'bottom-center', label: 'Bottom Middle' },
 ]
 
+const OXYGEN_DISPLAY_OPTIONS = [
+    { value: 'statusCluster', label: 'Status Cluster' },
+    { value: 'indicator', label: 'Indicator Bar' },
+]
+
 const DEFAULTS = {
+    layoutPreset: 'classic',
+    colorPreset: 'classic',
     speedUnit: 'mph',
     disableSpeedometer: false,
     showPostal: true,
@@ -88,29 +151,75 @@ const DEFAULTS = {
     cinematicNotifications: true,
     cinematicKey: 'F7',
     minimapOnlyInVehicle: false,
-    ammoPositionPreset: 'bottom-right',
+    ammoPositionPreset: 'preset',
     showCrosshair: false,
+    sectionedBars: false,
+    sectionedIndicator: false,
+    oxygenDisplayLocation: 'statusCluster',
+    backdropBlur: 1,
+    panelOpacity: 1,
+}
+
+const getPresetColor = (presetName, colorKey) => {
+    const presetColors = HUD_PRESET_COLORS[presetName] || HUD_PRESET_COLORS[DEFAULTS.colorPreset]
+    return presetColors[colorKey] || DEFAULTS[colorKey]
+}
+
+const buildInitialState = (settings = {}) => {
+    const layoutPreset = settings.layoutPreset || DEFAULTS.layoutPreset
+    const colorPreset = settings.colorPreset || layoutPreset
+    const initialState = {
+        ...DEFAULTS,
+        ...settings,
+        layoutPreset,
+        colorPreset,
+    }
+
+    for (const colorKey of COLOR_KEYS) {
+        if (!initialState[colorKey] || initialState[colorKey] === 'preset') {
+            initialState[colorKey] = getPresetColor(colorPreset, colorKey)
+        }
+    }
+
+    const b = Number(initialState.backdropBlur)
+    initialState.backdropBlur = Number.isFinite(b) ? Math.min(3, Math.max(0.25, b)) : 1
+
+    let po = Number(initialState.panelOpacity)
+    if (Number.isFinite(po) && po >= 15 && po <= 100) po = po / 100
+    initialState.panelOpacity = Number.isFinite(po) ? Math.min(1, Math.max(0.15, po)) : 1
+
+    return initialState
 }
 
 const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedometer, onResetSpeedometer, onStartMoveAmmo, onResetAmmo }) => {
-    const [local, setLocal] = useState({ ...DEFAULTS })
-
-    useEffect(() => {
-        if (visible && settings) {
-            setLocal(prev => ({ ...DEFAULTS, ...settings }))
-        }
-    }, [visible, settings])
+    const [local, setLocal] = useState(() => buildInitialState(settings))
+    const initialState = buildInitialState(settings)
+    const selectedAmmoPosition = local.ammoPositionPreset && local.ammoPositionPreset !== 'preset'
+        ? local.ammoPositionPreset
+        : (settings?.resolvedAmmoPositionPreset && settings.resolvedAmmoPositionPreset !== 'preset'
+            ? settings.resolvedAmmoPositionPreset
+            : 'bottom-right')
 
     const set = useCallback((key, value) => {
         setLocal(prev => ({ ...prev, [key]: value }))
     }, [])
 
     const handleSave = useCallback(() => {
-        onSave(local)
-    }, [local, onSave])
+        const payload = { ...local }
+
+        if (local.colorPreset !== initialState.colorPreset) {
+            for (const colorKey of COLOR_KEYS) {
+                if (local[colorKey] === initialState[colorKey]) {
+                    payload[colorKey] = 'preset'
+                }
+            }
+        }
+
+        onSave(payload)
+    }, [initialState, local, onSave])
 
     const handleReset = useCallback(() => {
-        setLocal({ ...DEFAULTS })
+        setLocal(buildInitialState())
     }, [])
 
     const handleOverlayClick = useCallback((e) => {
@@ -136,11 +245,67 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
         <div className="settings-overlay" onClick={handleOverlayClick}>
             <div className="settings-modal">
                 <div className="settings-header">
-                    <div className="settings-title">HUD Settings</div>
+                    <div className="settings-title">Cortex Settings</div>
                     <button className="settings-close" onClick={onClose}>✕</button>
                 </div>
 
                 <div className="settings-body">
+                    <div className="settings-section">
+                        <div className="settings-section-title">Appearance</div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Color Preset</div>
+                                <div className="settings-row-desc">Apply a unified color and accent theme without changing layout</div>
+                            </div>
+                            <CustomDropdown
+                                value={local.colorPreset}
+                                options={HUD_PRESET_OPTIONS}
+                                onChange={(val) => set('colorPreset', val)}
+                            />
+                        </div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Glass blur</div>
+                                <div className="settings-row-desc">Frost strength: panel tint + rim. FiveM CEF cannot do real backdrop blur (black rects); this simulates glass without backdrop-filter.</div>
+                            </div>
+                            <div className="settings-slider-wrap">
+                                <input
+                                    type="range"
+                                    className="settings-slider"
+                                    min="25"
+                                    max="300"
+                                    step="5"
+                                    value={Math.min(300, Math.max(25, Math.round(Number(local.backdropBlur) * 100)))}
+                                    onChange={(e) => set('backdropBlur', Number(e.target.value) / 100)}
+                                />
+                                <span className="settings-slider-value">{Math.round(Number(local.backdropBlur) * 100)}%</span>
+                            </div>
+                        </div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Panel opacity</div>
+                                <div className="settings-row-desc">Glass fill strength. 15% minimum so HUD never fully disappears.</div>
+                            </div>
+                            <div className="settings-slider-wrap">
+                                <input
+                                    type="range"
+                                    className="settings-slider"
+                                    min="15"
+                                    max="100"
+                                    step="5"
+                                    value={Math.min(100, Math.max(15, Math.round(Number(local.panelOpacity) * 100)))}
+                                    onChange={(e) => set('panelOpacity', Number(e.target.value) / 100)}
+                                />
+                                <span className="settings-slider-value">{Math.round(Number(local.panelOpacity) * 100)}%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="settings-divider" />
+
                     {/* Display Section */}
                     <div className="settings-section">
                         <div className="settings-section-title">Display</div>
@@ -208,6 +373,32 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
                                 <div className="settings-toggle-knob" />
                             </div>
                         </div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Sectioned Bars</div>
+                                <div className="settings-row-desc">Four 25% capsules for health &amp; armor (bar status layout)</div>
+                            </div>
+                            <div
+                                className={`settings-toggle ${local.sectionedBars ? 'active' : ''}`}
+                                onClick={() => set('sectionedBars', !local.sectionedBars)}
+                            >
+                                <div className="settings-toggle-knob" />
+                            </div>
+                        </div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Segmented top bar</div>
+                                <div className="settings-row-desc">Gapped capsules for compass / street / zone strip</div>
+                            </div>
+                            <div
+                                className={`settings-toggle ${local.sectionedIndicator ? 'active' : ''}`}
+                                onClick={() => set('sectionedIndicator', !local.sectionedIndicator)}
+                            >
+                                <div className="settings-toggle-knob" />
+                            </div>
+                        </div>
                     </div>
 
                     <div className="settings-divider" />
@@ -237,11 +428,11 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
 
                         <div className="settings-row">
                             <div>
-                                <div className="settings-row-label">Ammo Display Preset</div>
-                                <div className="settings-row-desc">Quick presets for ammo position</div>
+                                <div className="settings-row-label">Ammo Display Position</div>
+                                <div className="settings-row-desc">Choose an anchor or use manual drag placement</div>
                             </div>
                             <CustomDropdown
-                                value={local.ammoPositionPreset || 'bottom-right'}
+                                value={selectedAmmoPosition}
                                 options={AMMO_POSITION_OPTIONS}
                                 onChange={(val) => set('ammoPositionPreset', val)}
                             />
@@ -345,6 +536,18 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
                                 />
                                 <span className="settings-slider-value">{local.oxygenThreshold}%</span>
                             </div>
+                        </div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Oxygen Display</div>
+                                <div className="settings-row-desc">Show oxygen as a full status meter or in the top indicator bar</div>
+                            </div>
+                            <CustomDropdown
+                                value={local.oxygenDisplayLocation}
+                                options={OXYGEN_DISPLAY_OPTIONS}
+                                onChange={(val) => set('oxygenDisplayLocation', val)}
+                            />
                         </div>
                     </div>
 
@@ -516,3 +719,4 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
 }
 
 export default SettingsModal
+

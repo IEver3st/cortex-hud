@@ -1,49 +1,187 @@
+/* Flex center: no translateX(-50%) on same layer as glass (CEF glitch). */
+.indicator-anchor-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1001;
+}
+
+.indicator-anchor-wrap.indicator-anchor-top {
+  align-items: flex-start;
+}
+
+.indicator-anchor-wrap.indicator-anchor-bottom {
+  align-items: flex-end;
+}
+
+/* CEF: backdrop-filter blur → black backing under layer. No blur — transparent + rim only. */
 .indicator-container {
-    position: fixed;
-    top: calc(0.5vh * var(--es-ui-scale));
-    left: 50%;
-    transform: translateX(-50%);
-    display: inline-flex;
-    align-items: center;
-    gap: 0;
-    width: max-content;
-    background: rgba(16, 16, 16, 0.35);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: calc(10px * var(--es-ui-scale));
-    pointer-events: none;
-    z-index: 1000;
-    overflow: hidden;
-    transition: transform 0.4s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  width: max-content;
+  background: var(--es-glass-fill);
+  border: 1px solid rgba(255, 255, 255, calc(0.22 + var(--es-backdrop-norm, 0.27) * 0.28));
+  border-radius: calc(10px * var(--es-ui-scale));
+  pointer-events: none;
+  z-index: 1001;
+  color: var(--hud-text);
+  overflow: hidden;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.indicator-container.indicator-position-relative {
+  position: relative;
 }
 
 .indicator-box {
-    display: flex;
-    align-items: center;
-    padding: calc(8px * var(--es-ui-scale)) calc(16px * var(--es-ui-scale));
-    gap: calc(10px * var(--es-ui-scale));
-    min-width: fit-content;
-}
-
-/* Subtle Vertical Divider */
-.indicator-box + .indicator-box {
-    border-left: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  gap: calc(10px * var(--es-ui-scale));
 }
 
 .indicator-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(14px * var(--es-ui-scale));
-    color: var(--health-color);
-    filter: drop-shadow(0 0 calc(3px * var(--es-ui-scale)) var(--health-glow));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--indicator-accent);
+  filter: drop-shadow(0 calc(1px * var(--es-ui-scale)) calc(6px * var(--es-ui-scale)) rgba(0, 0, 0, 0.85));
 }
 
 .indicator-text {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: calc(13px * var(--es-ui-scale));
-    font-weight: 700;
-    color: var(--hud-color);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: calc(13px * var(--es-ui-scale));
+  font-weight: 700;
+  color: var(--hud-text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  text-shadow:
+    0 0 calc(14px * var(--es-ui-scale)) rgba(0, 0, 0, 0.85),
+    0 calc(1px * var(--es-ui-scale)) calc(3px * var(--es-ui-scale)) rgba(0, 0, 0, 0.95);
+}
+
+.indicator-postal-label {
+  color: var(--indicator-accent);
+  margin-right: calc(5px * var(--es-ui-scale));
+}
+
+.indicator-postal-distance {
+  color: var(--hud-muted-text);
+  margin-left: calc(5px * var(--es-ui-scale));
+  font-size: 0.9em;
+}
+
+.indicator-segmented {
+}
+
+.indicator-segmented .indicator-box {
+  padding: calc(8px * var(--es-ui-scale)) calc(16px * var(--es-ui-scale));
+}
+
+.indicator-segmented .indicator-box + .indicator-box {
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.indicator-glass {
+  gap: calc(8px * var(--es-ui-scale));
+  padding: calc(6px * var(--es-ui-scale));
+  border-radius: calc(999px * var(--es-ui-scale));
+  box-shadow: none;
+}
+
+.indicator-glass .indicator-box {
+  padding: calc(6px * var(--es-ui-scale)) calc(12px * var(--es-ui-scale));
+  border-radius: calc(999px * var(--es-ui-scale));
+}
+
+.indicator-glass .indicator-box + .indicator-box {
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.indicator-slim {
+  gap: calc(14px * var(--es-ui-scale));
+  padding: calc(6px * var(--es-ui-scale)) calc(14px * var(--es-ui-scale));
+  border-radius: calc(999px * var(--es-ui-scale));
+}
+
+.indicator-slim .indicator-box {
+  gap: calc(7px * var(--es-ui-scale));
+}
+
+.indicator-slim .indicator-box + .indicator-box {
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  padding-left: calc(14px * var(--es-ui-scale));
+}
+
+.indicator-slim .indicator-text {
+  font-size: calc(11px * var(--es-ui-scale));
+  letter-spacing: 0.06em;
+}
+
+/* Optional: separate pill segments + gap (same language as bar-chunk / sectioned bars) */
+.indicator-capsules {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  overflow: visible;
+  gap: calc(4px * var(--es-ui-scale));
+}
+
+.indicator-capsules .indicator-box {
+  background: var(--es-glass-fill);
+  border: 1px solid rgba(255, 255, 255, calc(0.22 + var(--es-backdrop-norm, 0.27) * 0.28));
+  border-radius: calc(999px * var(--es-ui-scale));
+  overflow: hidden;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.indicator-capsules .indicator-box + .indicator-box {
+  border-left: none;
+}
+
+.indicator-glass.indicator-capsules {
+  padding: 0;
+  gap: calc(4px * var(--es-ui-scale));
+  box-shadow: none;
+}
+
+.indicator-slim.indicator-capsules {
+  padding: 0;
+  gap: calc(4px * var(--es-ui-scale));
+}
+
+.indicator-slim.indicator-capsules .indicator-box {
+  padding: calc(6px * var(--es-ui-scale)) calc(12px * var(--es-ui-scale));
+  gap: calc(7px * var(--es-ui-scale));
+}
+
+.indicator-slim.indicator-capsules .indicator-box + .indicator-box {
+  border-left: none;
+  padding-left: calc(12px * var(--es-ui-scale));
+}
+
+/* Oxygen (top bar): icon + % like other segments; no hex */
+.indicator-box.oxygen .indicator-text--oxygen {
+  font-size: calc(13px * var(--es-ui-scale));
+  font-weight: 700;
+  color: var(--hud-text);
+}
+
+.indicator-box.oxygen.critical {
+  animation: oxygen-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes oxygen-pulse {
+  0% { opacity: 1; }
+  100% { opacity: 0.45; }
 }
