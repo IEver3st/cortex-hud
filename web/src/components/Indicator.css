@@ -20,7 +20,9 @@
 /* CEF: backdrop-filter blur → black backing under layer. No blur — transparent + rim only. */
 .indicator-container {
   display: inline-flex;
+  /* center: weather Wi must not stretch all segments / grow bar height vs no-weather baseline */
   align-items: center;
+  --indicator-weather-glyph: calc(13px * var(--es-ui-scale));
   gap: 0;
   width: max-content;
   background: var(--es-glass-fill);
@@ -105,6 +107,7 @@
 }
 
 .indicator-slim {
+  --indicator-weather-glyph: calc(11px * var(--es-ui-scale));
   gap: calc(14px * var(--es-ui-scale));
   padding: calc(6px * var(--es-ui-scale)) calc(14px * var(--es-ui-scale));
   border-radius: calc(999px * var(--es-ui-scale));
@@ -120,6 +123,11 @@
 }
 
 .indicator-slim .indicator-text {
+  font-size: calc(11px * var(--es-ui-scale));
+  letter-spacing: 0.06em;
+}
+
+.indicator-slim .indicator-text--weather {
   font-size: calc(11px * var(--es-ui-scale));
   letter-spacing: 0.06em;
 }
@@ -184,4 +192,122 @@
 @keyframes oxygen-pulse {
   0% { opacity: 1; }
   100% { opacity: 0.45; }
+}
+
+/* Icon + one line: inherits .indicator-segmented .indicator-box padding — no extra vertical size */
+.indicator-box--weather {
+  min-width: 0;
+  max-width: min(70vw, calc(420px * var(--es-ui-scale)));
+  flex: 0 1 auto;
+}
+
+.indicator-text--weather {
+  min-width: 0;
+  line-height: 1.15;
+  text-transform: none;
+  letter-spacing: 0.03em;
+}
+
+.indicator-weather-nowline {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--hud-text);
+}
+
+.indicator-weather-arrow {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+  font-size: 0.95em;
+}
+
+.indicator-weather-exportline {
+  color: var(--hud-muted-text);
+  font-weight: 600;
+  text-transform: none;
+}
+
+/* Wi viewBoxes are tall — keep glyph at text scale so bar height matches other segments */
+.indicator-icon--weather {
+  line-height: 0;
+  flex-shrink: 0;
+  min-width: var(--indicator-weather-glyph);
+  min-height: var(--indicator-weather-glyph);
+  max-height: var(--indicator-weather-glyph);
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+}
+
+.indicator-weather-wi {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  color: var(--indicator-accent);
+}
+
+.indicator-icon--weather .indicator-weather-wi svg {
+  width: var(--indicator-weather-glyph) !important;
+  height: var(--indicator-weather-glyph) !important;
+  display: block;
+}
+
+/* Dynamic_weather: isFloodEventActive — segment uses same capsule rim as siblings; icon uses --indicator-weather-glyph */
+.indicator-icon--flood {
+  line-height: 0;
+  flex-shrink: 0;
+  min-width: var(--indicator-weather-glyph);
+  min-height: var(--indicator-weather-glyph);
+  max-height: var(--indicator-weather-glyph);
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  color: #fbbf24;
+  filter: drop-shadow(0 calc(1px * var(--es-ui-scale)) calc(6px * var(--es-ui-scale)) rgba(0, 0, 0, 0.85));
+}
+
+.indicator-icon--flood svg {
+  width: var(--indicator-weather-glyph) !important;
+  height: var(--indicator-weather-glyph) !important;
+  display: block;
+}
+
+.indicator-text--flood {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--hud-text);
+  max-width: min(52vw, calc(280px * var(--es-ui-scale)));
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.indicator-icon--hurricane {
+  line-height: 0;
+  flex-shrink: 0;
+  min-width: var(--indicator-weather-glyph);
+  min-height: var(--indicator-weather-glyph);
+  max-height: var(--indicator-weather-glyph);
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+  filter: drop-shadow(0 calc(1px * var(--es-ui-scale)) calc(6px * var(--es-ui-scale)) rgba(0, 0, 0, 0.85));
+}
+
+.indicator-icon--hurricane svg {
+  width: var(--indicator-weather-glyph) !important;
+  height: var(--indicator-weather-glyph) !important;
+  display: block;
+}
+
+.indicator-text--hurricane {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--hud-text);
+  max-width: min(52vw, calc(280px * var(--es-ui-scale)));
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

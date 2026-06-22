@@ -1,6 +1,6 @@
-import React, { useMemo, useEffect, useCallback } from 'react'
+import React, { useMemo, useEffect, useCallback, useId } from 'react'
 import { IoShieldHalf } from 'react-icons/io5'
-import { FaBurger, FaDroplet, FaWalkieTalkie, FaLocationDot } from 'react-icons/fa6'
+import { FaBurger, FaDroplet, FaWalkieTalkie, FaLocationDot, FaMicrophone } from 'react-icons/fa6'
 import { FaHeart } from 'react-icons/fa'
 import { BsFuelPumpFill, BsLungsFill } from 'react-icons/bs'
 import { LuBrain } from 'react-icons/lu'
@@ -139,6 +139,7 @@ const HUD = React.memo(({
   voipTalking,
   voipRange,
   voipConnected,
+  voipProximity,
   radioChannel,
   radioTalking,
   hungerThreshold,
@@ -146,6 +147,7 @@ const HUD = React.memo(({
   stressThreshold,
   oxygenThreshold,
   statusIconShape,
+  resolvedStatusIconShape,
   statusRingWidth,
   statusRingHeight,
   showVoip,
@@ -303,10 +305,15 @@ const HUD = React.memo(({
     window.addEventListener('mouseup', handleMouseUp)
   }, [ammoEditMode, onAmmoDrag])
 
+  const voipHexClipId = useId().replace(/:/g, '')
+
   const normalizedStatusShape = useMemo(() => {
     const supportedShapes = ['hexagon', 'circle', 'bar']
-    return supportedShapes.includes(statusIconShape) ? statusIconShape : 'hexagon'
-  }, [statusIconShape])
+    const raw = resolvedStatusIconShape || statusIconShape
+    return supportedShapes.includes(raw) ? raw : 'hexagon'
+  }, [resolvedStatusIconShape, statusIconShape])
+
+  const barRailMode = normalizedStatusShape === 'bar'
 
   const normalizedFramework = typeof framework === 'string'
     ? framework.trim().toLowerCase()
@@ -493,6 +500,106 @@ const HUD = React.memo(({
   const voipVariant = layout?.voip?.variant || 'minimal'
   const ammoVariant = layout?.ammo?.variant || 'stacked'
 
+  const voipTrayEligible = showVoip
+    && (!isStandaloneFramework || standaloneVoipHudEnabled)
+    && (normalizedStatusShape === 'hexagon' || normalizedStatusShape === 'circle')
+
+  const renderVoipStatusTraySlot = () => {
+    const rawProx = Number(voipProximity)
+    const proximity01 = Number.isFinite(rawProx) ? clamp(rawProx, 0, 1) : 0.62
+    const displayFill = voipConnected ? Math.max(0.06, proximity01) : 0.1
+    const voiceHot = voipTalking
+    const radioHot = radioTalking
+    const fillColor = radioHot && !voiceHot
+      ? '#fb7185'
+      : voiceHot
+        ? '#facc15'
+        : '#94a3b8'
+    const ghostFill = 'rgba(30, 41, 59, 0.58)'
+    const icon = <FaMicrophone />
+
+    if (normalizedStatusShape === 'hexagon') {
+      return (
+        <div
+          key="voip-tray"
+          className={[
+            'status-tray-item status-voip',
+            voiceHot ? 'status-voip--voice' : '',
+            radioHot ? 'status-voip--radio' : '',
+            voipConnected ? '' : 'status-voip--disconnected',
+          ].filter(Boolean).join(' ')}
+        >
+          <div
+            className="status-icon-shell-hexagon"
+            style={{
+              position: 'relative',
+              width: 'var(--status-ring-width)',
+              height: 'var(--status-ring-height)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg viewBox="0 0 100 100" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '125%', height: '125%', opacity: 0.72, zIndex: 0 }} aria-hidden>
+              <path d="M15 30 L50 10 L85 30 L85 70 L50 90 L15 70 Z" fill={ghostFill} />
+            </svg>
+            <svg viewBox="0 0 100 100" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '100%', height: '100%', zIndex: 1 }} aria-hidden>
+              <clipPath id={voipHexClipId}>
+                <rect x="0" y={`${100 - clamp(displayFill, 0, 1) * 100}`} width="100" height="100" />
+              </clipPath>
+              <path d="M15 30 L50 10 L85 30 L85 70 L50 90 L15 70 Z" fill={fillColor} clipPath={`url(#${voipHexClipId})`} />
+            </svg>
+            <div className="status-meter-icon status-voip-meter-icon" style={{ position: 'relative', zIndex: 2 }}>{icon}</div>
+          </div>
+        </div>
+      )
+    }
+
+    if (normalizedStatusShape === 'circle') {
+      const pct = clamp(displayFill, 0, 1)
+      const r = 44
+      const circumference = 2 * Math.PI * r
+      const dashOffset = circumference * (1 - pct)
+      const ringGlow = radioHot && !voiceHot ? 'rgba(251, 113, 133, 0.5)' : 'rgba(250, 204, 21, 0.45)'
+      return (
+        <div
+          key="voip-tray"
+          className={[
+            'status-tray-item status-voip',
+            voiceHot ? 'status-voip--voice' : '',
+            radioHot ? 'status-voip--radio' : '',
+            voipConnected ? '' : 'status-voip--disconnected',
+          ].filter(Boolean).join(' ')}
+        >
+          <div className="status-circle-wrap status-voip-circle-wrap">
+            <svg className="status-circle-svg" viewBox="0 0 100 100" aria-hidden>
+              <circle className="status-circle-track" cx="50" cy="50" r={r} />
+              <circle
+                className="status-circle-ring status-voip-circle-ring"
+                cx="50"
+                cy="50"
+                r={r}
+                style={{
+                  stroke: fillColor,
+                  strokeDasharray: `${circumference}`,
+                  strokeDashoffset: `${dashOffset}`,
+                  filter: (voiceHot || radioHot)
+                    ? `drop-shadow(0 0 calc(7px * var(--es-ui-scale)) ${ringGlow})`
+                    : 'drop-shadow(0 0 calc(4px * var(--es-ui-scale)) rgba(148, 163, 184, 0.35))',
+                }}
+              />
+            </svg>
+            <div className="status-circle-icon">
+              <div className="status-meter-icon status-voip-meter-icon">{icon}</div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return null
+  }
+
   const renderStatusMeter = (value, icon, type, isReversed = false) => {
     const displayValue = isReversed ? 1 - value / 100 : value / 100
     let state = ''
@@ -545,15 +652,16 @@ const HUD = React.memo(({
           </div>
         )
       }
+      const fillPct = clamp(displayValue, 0, 1) * 100
       return (
         <div key={type} className={`status-tray-item ${state} status-${type}`}>
+          <div className="status-meter-line">
+            <div className="status-meter-line-fill" style={{ height: `${fillPct}%`, width: '100%' }} />
+          </div>
           <div className="status-icon-shell">
             <div className="status-icon-core">
               <div className="status-meter-icon">{icon}</div>
             </div>
-          </div>
-          <div className="status-meter-line">
-            <div className="status-meter-line-fill" style={{ width: `${clamp(displayValue, 0, 1) * 100}%` }} />
           </div>
         </div>
       )
@@ -602,7 +710,7 @@ const HUD = React.memo(({
 
   return (
     <>
-      {showVoip && (!isStandaloneFramework || standaloneVoipHudEnabled) && (
+      {showVoip && (!isStandaloneFramework || standaloneVoipHudEnabled) && !voipTrayEligible && (
         <div className={`voip-container-modern voip-variant-${voipVariant} ${voipConnected ? '' : 'muted'} ${voipTalking ? 'talking' : ''} ${radioTalking ? 'radio-talking' : ''}`} style={voipStyle}>
           <div className="voip-content-modern">
             <div className="voip-indicator-group">
@@ -628,54 +736,65 @@ const HUD = React.memo(({
         </div>
       )}
 
-      <div className={`status-cluster variant-${statusVariant}`} style={statusClusterStyle}>
-        {normalizedStatusShape === 'bar' && (
-          <div className={`hud-container${sectionedBars ? ' hud-container--sectioned-bars' : ''}`}>
-            <div className={`hud-bar health-bar ${healthColorClass}`}>
-              <div className="bar-icon"><FaHeart /></div>
-              <div className="bar-value">{health}</div>
-              <div className={`bar-track${sectionedBars ? ' bar-track--sectioned' : ''}`}>
-                {sectionedBars ? (
-                  healthSectionWidths.map((w, i) => (
-                    <div key={`h-${i}`} className="bar-chunk">
-                      <div className="bar-chunk-fill health-fill" style={{ width: `${w}%` }}>
-                        <div className="bar-glow" />
+      <div className={`status-cluster variant-${statusVariant}${barRailMode ? ' status-cluster--bar-rail' : ''}`} style={statusClusterStyle}>
+        {barRailMode && (
+          <div className="hud-bar-deck">
+            <div className={`hud-container${sectionedBars ? ' hud-container--sectioned-bars' : ''}`}>
+              <div className={`hud-bar armor-bar ${armor > 0 ? '' : 'is-hidden'}`}>
+                <div className="bar-icon"><IoShieldHalf /></div>
+                <div className="bar-value">{Math.max(armor, 0)}</div>
+                <div className={`bar-track${sectionedBars ? ' bar-track--sectioned' : ''}`}>
+                  {sectionedBars ? (
+                    armorSectionWidths.map((w, i) => (
+                      <div key={`a-${i}`} className="bar-chunk">
+                        <div className="bar-chunk-fill armor-fill" style={{ width: `${w}%` }}>
+                          <div className="bar-glow" />
+                        </div>
                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <>
-                    <div className="bar-fill health-fill" style={{ width: `${health}%` }}><div className="bar-glow" /></div>
-                    <div className="bar-segments" />
-                  </>
-                )}
+                    ))
+                  ) : (
+                    <>
+                      <div className="bar-fill armor-fill" style={{ width: `${Math.max(armor, 0)}%` }}><div className="bar-glow" /></div>
+                      <div className="bar-segments" />
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className={`hud-bar health-bar ${healthColorClass}`}>
+                <div className="bar-icon"><FaHeart /></div>
+                <div className="bar-value">{health}</div>
+                <div className={`bar-track${sectionedBars ? ' bar-track--sectioned' : ''}`}>
+                  {sectionedBars ? (
+                    healthSectionWidths.map((w, i) => (
+                      <div key={`h-${i}`} className="bar-chunk">
+                        <div className="bar-chunk-fill health-fill" style={{ width: `${w}%` }}>
+                          <div className="bar-glow" />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="bar-fill health-fill" style={{ width: `${health}%` }}><div className="bar-glow" /></div>
+                      <div className="bar-segments" />
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-            <div className={`hud-bar armor-bar ${armor > 0 ? '' : 'is-hidden'}`}>
-              <div className="bar-icon"><IoShieldHalf /></div>
-              <div className="bar-value">{Math.max(armor, 0)}</div>
-              <div className={`bar-track${sectionedBars ? ' bar-track--sectioned' : ''}`}>
-                {sectionedBars ? (
-                  armorSectionWidths.map((w, i) => (
-                    <div key={`a-${i}`} className="bar-chunk">
-                      <div className="bar-chunk-fill armor-fill" style={{ width: `${w}%` }}>
-                        <div className="bar-glow" />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <>
-                    <div className="bar-fill armor-fill" style={{ width: `${Math.max(armor, 0)}%` }}><div className="bar-glow" /></div>
-                    <div className="bar-segments" />
-                  </>
-                )}
+            {!isStandaloneFramework && (
+              <div className="status-tray shape-bar shape-bar--rail" style={statusTrayStyle}>
+                {(barRailMode || hunger <= hungerThreshold) && renderStatusMeter(hunger, <FaBurger />, 'hunger')}
+                {(barRailMode || thirst <= thirstThreshold) && renderStatusMeter(thirst, <FaDroplet />, 'thirst')}
+                {stressThreshold > 0 && (barRailMode || (stress > 0 && stress >= 100 - stressThreshold)) && renderStatusMeter(stress, <LuBrain />, 'stress', true)}
+                {oxygenDisplayLocation === 'statusCluster' && oxygen <= oxygenThreshold && (underwater || oxygen < 100) && renderStatusMeter(oxygen, <BsLungsFill />, 'oxygen')}
               </div>
-            </div>
+            )}
           </div>
         )}
 
-        {(!isStandaloneFramework || normalizedStatusShape === 'hexagon' || normalizedStatusShape === 'circle') && (
+        {!barRailMode && (!isStandaloneFramework || normalizedStatusShape === 'hexagon' || normalizedStatusShape === 'circle') && (
           <div className={`status-tray shape-${normalizedStatusShape}`} style={statusTrayStyle}>
+            {voipTrayEligible && renderVoipStatusTraySlot()}
             {(normalizedStatusShape === 'hexagon' || normalizedStatusShape === 'circle') && renderStatusMeter(health, <FaHeart />, 'health')}
             {(normalizedStatusShape === 'hexagon' || normalizedStatusShape === 'circle') && armor > 0 && renderStatusMeter(armor, <IoShieldHalf />, 'armor')}
             {!isStandaloneFramework && hunger <= hungerThreshold && renderStatusMeter(hunger, <FaBurger />, 'hunger')}

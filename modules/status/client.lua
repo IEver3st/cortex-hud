@@ -25,6 +25,7 @@ local lastVoipRange = nil
 local lastVoipConnected = nil
 local lastRadioChannel = nil
 local lastRadioTalking = nil
+local lastVoipProximity = nil
 local lastStandaloneVoipHudEnabled = nil
 local nextVoipResourceCheckAt = 0
 
@@ -81,6 +82,37 @@ local function getRangeFromProximityState()
     end
 
     return nil
+end
+
+--- 0–1 for NUI VOIP meter (hex/circle tray). Prefers `LocalPlayer.state.proximity` when numeric; else maps voice range.
+local function getVoipProximityFraction(range)
+    local ok, result = pcall(function()
+        return LocalPlayer.state['proximity']
+    end)
+    if ok and type(result) == 'table' then
+        local index = result.index
+        if type(index) == 'number' then
+            if index <= 1 then
+                return 0.32
+            elseif index >= 3 then
+                return 1.0
+            end
+            return 0.62
+        end
+        local distance = result.distance
+        if type(distance) == 'number' and distance >= 0 then
+            return math_max(0.08, math_min(1, distance / 45.0))
+        end
+    elseif ok and type(result) == 'number' and result >= 0 then
+        return math_max(0.08, math_min(1, result / 45.0))
+    end
+
+    if range == 'whisper' then
+        return 0.32
+    elseif range == 'shout' then
+        return 1.0
+    end
+    return 0.62
 end
 
 local function getRadioChannelFromState()
@@ -285,6 +317,7 @@ local function refreshVoipResource(now)
     lastVoipConnected = nil
     lastRadioChannel = nil
     lastRadioTalking = nil
+    lastVoipProximity = nil
 
     return true
 end
@@ -411,13 +444,15 @@ function Status.start(config, isFullyVisible)
 
             if voipResource and isFullyVisible() then
                 local talking, range, connected, radioChannel, radioTalking = getVoipState()
+                local proximity = getVoipProximityFraction(range)
 
-                if talking ~= lastVoipTalking or range ~= lastVoipRange or connected ~= lastVoipConnected or radioChannel ~= lastRadioChannel or radioTalking ~= lastRadioTalking then
+                if talking ~= lastVoipTalking or range ~= lastVoipRange or connected ~= lastVoipConnected or radioChannel ~= lastRadioChannel or radioTalking ~= lastRadioTalking or proximity ~= lastVoipProximity then
                     lastVoipTalking = talking
                     lastVoipRange = range
                     lastVoipConnected = connected
                     lastRadioChannel = radioChannel
                     lastRadioTalking = radioTalking
+                    lastVoipProximity = proximity
 
                     SendNUIMessage({
                         action = 'updateVoip',
@@ -425,7 +460,8 @@ function Status.start(config, isFullyVisible)
                         range = range,
                         connected = connected,
                         radioChannel = radioChannel,
-                        radioTalking = radioTalking
+                        radioTalking = radioTalking,
+                        proximity = proximity
                     })
                 end
             else

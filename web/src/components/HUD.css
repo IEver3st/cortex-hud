@@ -119,6 +119,145 @@
   width: calc(180px * var(--es-ui-scale));
 }
 
+/* Bar shape: one horizontal strip — primary rows + vertical need meters (no backdrop-filter). */
+.status-cluster--bar-rail {
+  gap: 0;
+}
+
+.hud-bar-deck {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: calc(14px * var(--es-ui-scale));
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.hud-bar-deck .hud-container {
+  gap: calc(5px * var(--es-ui-scale));
+  width: max(calc(148px * var(--es-ui-scale)), min(var(--hud-minimap-width), calc(220px * var(--es-ui-scale))));
+}
+
+.hud-bar-deck .bar-track {
+  transform: none;
+  height: calc(9px * var(--es-ui-scale));
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: calc(2px * var(--es-ui-scale));
+}
+
+.hud-bar-deck .bar-icon {
+  width: calc(16px * var(--es-ui-scale));
+  height: calc(16px * var(--es-ui-scale));
+  color: rgba(248, 250, 252, 0.95);
+  filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(255, 255, 255, 0.25));
+}
+
+.hud-bar-deck .bar-value {
+  font-size: calc(13px * var(--es-ui-scale));
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-bar-deck .armor-bar .bar-value {
+  color: var(--armor-color);
+  text-shadow:
+    0 0 calc(10px * var(--es-ui-scale)) var(--armor-glow),
+    0 0 calc(16px * var(--es-ui-scale)) var(--armor-color);
+}
+
+.hud-bar-deck .health-bar .bar-value {
+  color: var(--health-color);
+  text-shadow:
+    0 0 calc(10px * var(--es-ui-scale)) var(--health-glow),
+    0 0 calc(16px * var(--es-ui-scale)) var(--health-color);
+}
+
+.hud-bar-deck .health-fill {
+  box-shadow:
+    0 0 calc(12px * var(--es-ui-scale)) var(--health-glow),
+    inset 0 0 calc(8px * var(--es-ui-scale)) rgba(255, 255, 255, 0.12);
+}
+
+.hud-bar-deck .armor-fill {
+  box-shadow:
+    0 0 calc(12px * var(--es-ui-scale)) var(--armor-glow),
+    inset 0 0 calc(8px * var(--es-ui-scale)) rgba(255, 255, 255, 0.12);
+}
+
+.hud-bar-deck .bar-chunk {
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-tray.shape-bar.shape-bar--rail {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  flex-wrap: nowrap;
+  gap: calc(10px * var(--es-ui-scale));
+  min-width: 0;
+}
+
+.status-tray.shape-bar.shape-bar--rail .status-tray-item {
+  flex-direction: row;
+  align-items: center;
+  gap: calc(6px * var(--es-ui-scale));
+}
+
+.status-tray.shape-bar.shape-bar--rail .status-tray-item--oxygen-only {
+  align-items: center;
+  min-height: calc(34px * var(--es-ui-scale));
+}
+
+.status-tray.shape-bar.shape-bar--rail .status-meter-line {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: calc(4px * var(--es-ui-scale));
+  height: calc(34px * var(--es-ui-scale));
+  min-width: calc(4px * var(--es-ui-scale));
+  flex: 0 0 auto;
+  border-radius: calc(2px * var(--es-ui-scale));
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.status-tray.shape-bar.shape-bar--rail .status-meter-line-fill {
+  width: 100%;
+  margin-top: auto;
+  height: 0;
+  min-height: 0;
+  border-radius: calc(1px * var(--es-ui-scale));
+  transition: height 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 calc(10px * var(--es-ui-scale)) var(--status-glow, rgba(16, 185, 129, 0.4));
+}
+
+.status-tray.shape-bar.shape-bar--rail .status-icon-shell {
+  width: calc(24px * var(--es-ui-scale));
+  height: calc(24px * var(--es-ui-scale));
+  background: transparent;
+  border: none;
+}
+
+.status-tray.shape-bar.shape-bar--rail .status-meter-icon svg {
+  width: calc(15px * var(--es-ui-scale));
+  height: calc(15px * var(--es-ui-scale));
+}
+
+.status-tray.shape-bar.shape-bar--rail .status-meter-icon {
+  color: rgba(248, 250, 252, 0.95);
+  filter: drop-shadow(0 0 calc(5px * var(--es-ui-scale)) rgba(255, 255, 255, 0.35));
+}
+
 .hud-bar {
   display: flex;
   align-items: center;
@@ -531,6 +670,27 @@
 .status-health { --status-color: var(--health-color); --status-glow: var(--health-glow); }
 .status-armor { --status-color: var(--armor-color); --status-glow: var(--armor-glow); }
 
+/* VOIP slot in hex/circle status tray (proximity fill; yellow when speaking) */
+.status-tray-item.status-voip .status-voip-meter-icon svg {
+  color: rgba(248, 250, 252, 0.96);
+}
+
+.status-tray-item.status-voip.status-voip--voice .status-voip-meter-icon {
+  filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(250, 204, 21, 0.55));
+}
+
+.status-tray-item.status-voip.status-voip--radio .status-voip-meter-icon {
+  filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(251, 113, 133, 0.5));
+}
+
+.status-tray-item.status-voip.status-voip--disconnected .status-voip-meter-icon svg {
+  color: rgba(226, 232, 240, 0.55);
+}
+
+.status-voip-circle-ring {
+  transition: stroke-dashoffset 0.28s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.22s ease, filter 0.22s ease;
+}
+
 .status-meter-icon {
   display: flex;
   align-items: center;
@@ -638,47 +798,7 @@
   flex-shrink: 0;
 }
 
-.status-tray.shape-bar .status-tray-item--oxygen-only {
-  gap: 0;
-}
-
-.status-tray.shape-bar {
-  align-items: stretch;
-  flex-direction: column;
-  gap: calc(6px * var(--es-ui-scale));
-}
-
-.status-tray.shape-bar .status-tray-item {
-  flex-direction: row;
-  align-items: center;
-  gap: calc(8px * var(--es-ui-scale));
-}
-
-.status-tray.shape-bar .status-icon-shell {
-  width: calc(28px * var(--es-ui-scale));
-  height: calc(28px * var(--es-ui-scale));
-  background: transparent;
-  border: none;
-}
-
-.status-tray.shape-bar .status-icon-fill {
-  display: none;
-}
-
-.status-tray.shape-bar .status-meter-icon {
-  color: var(--status-color, var(--es-success));
-  filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) var(--status-glow, rgba(16, 185, 129, 0.35)));
-}
-
-.status-tray.shape-bar .status-meter-line {
-  display: block;
-  flex: 1;
-  height: calc(6px * var(--es-ui-scale));
-  min-width: calc(60px * var(--es-ui-scale));
-  border-radius: calc(3px * var(--es-ui-scale));
-  background: rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-}
+/* Legacy shape-bar column layout unused — rail variant above is the bar HUD tray. */
 
 @keyframes status-ring-alert {
   0%, 100% { transform: scale(1); opacity: 1; }

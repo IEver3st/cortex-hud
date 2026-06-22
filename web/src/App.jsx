@@ -3,8 +3,21 @@ import HUD from './components/HUD'
 import AircraftHUD from './components/AircraftHUD'
 import Indicator from './components/Indicator'
 import SettingsModal from './components/SettingsModal'
+import HudDevPanel from './components/HudDevPanel'
+import { isHudDevBrowser, loadDevPlayfieldColor, saveDevPlayfieldColor } from './hudDevEnv'
+import { applyDevSettingsSave } from './hudDevApply'
 
 function App() {
+  const [devPlayfieldColor, setDevPlayfieldColor] = useState(() =>
+    isHudDevBrowser ? loadDevPlayfieldColor() : null,
+  )
+
+  useEffect(() => {
+    if (isHudDevBrowser && devPlayfieldColor) {
+      saveDevPlayfieldColor(devPlayfieldColor)
+    }
+  }, [devPlayfieldColor])
+
   const getParentResourceName = useCallback(
     () => (typeof window.GetParentResourceName === 'function' ? window.GetParentResourceName() : 'es_hud'),
     [],
@@ -66,6 +79,7 @@ function App() {
     voipTalking: false,
     voipRange: 'normal',
     voipConnected: false,
+    voipProximity: 0.62,
     radioChannel: 0,
     radioTalking: false,
     hungerThreshold: 100,
@@ -119,6 +133,23 @@ function App() {
     oxygenDisplayLocation: 'statusCluster',
     isArmed: false,
     radarVisible: true,
+    // Browser dev only: 'esx' | 'qb' | null (null = use hudData.framework)
+    devFrameworkOverride: isHudDevBrowser ? 'esx' : null,
+    dynamicWeatherShow: false,
+    dynamicWeatherResourceAvailable: false,
+    dynamicWeatherDisplay: '',
+    dynamicWeatherSeason: '',
+    dynamicWeatherForecastLine: '',
+    dynamicWeatherWetLabel: '',
+    dynamicWeatherNext: '',
+    dynamicWeatherTempF: null,
+    dynamicWeatherWindMph: null,
+    showDynamicWeather: false,
+    showHurricaneWarning: true,
+    floodWarningActive: false,
+    floodWarningDetail: '',
+    hurricaneWarningActive: false,
+    hurricaneWarningDetail: '',
   })
 
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -188,6 +219,7 @@ function App() {
           voipTalking: data.talking ?? prev.voipTalking,
           voipRange: data.range ?? prev.voipRange,
           voipConnected: data.connected ?? prev.voipConnected,
+          voipProximity: typeof data.proximity === 'number' && Number.isFinite(data.proximity) ? data.proximity : prev.voipProximity,
           radioChannel: data.radioChannel ?? prev.radioChannel,
           radioTalking: data.radioTalking ?? prev.radioTalking,
         }))
@@ -232,6 +264,32 @@ function App() {
           sectionedBars: data.sectionedBars ?? prev.sectionedBars,
           sectionedIndicator: data.sectionedIndicator ?? prev.sectionedIndicator,
           oxygenDisplayLocation: data.oxygenDisplayLocation ?? prev.oxygenDisplayLocation,
+          showDynamicWeather: Object.prototype.hasOwnProperty.call(data, 'showDynamicWeather')
+            ? Boolean(data.showDynamicWeather)
+            : prev.showDynamicWeather,
+          showHurricaneWarning: Object.prototype.hasOwnProperty.call(data, 'showHurricaneWarning')
+            ? Boolean(data.showHurricaneWarning)
+            : prev.showHurricaneWarning,
+          ...(Object.prototype.hasOwnProperty.call(data, 'showHurricaneWarning') && !data.showHurricaneWarning
+            ? { hurricaneWarningActive: false, hurricaneWarningDetail: '' }
+            : {}),
+          ...(Object.prototype.hasOwnProperty.call(data, 'showDynamicWeather') && !data.showDynamicWeather
+            ? {
+                dynamicWeatherShow: false,
+                dynamicWeatherDisplay: '',
+                dynamicWeatherSeason: '',
+                dynamicWeatherForecastLine: '',
+                dynamicWeatherWetLabel: '',
+                dynamicWeatherNext: '',
+                dynamicWeatherTempF: null,
+                dynamicWeatherWindMph: null,
+              }
+            : {}),
+          ...(Object.prototype.hasOwnProperty.call(data, 'showDynamicWeather') &&
+          data.showDynamicWeather &&
+          String(prev.dynamicWeatherDisplay || '').trim() !== ''
+            ? { dynamicWeatherShow: true }
+            : {}),
         }))
         break
       case 'updateHud':
@@ -245,6 +303,58 @@ function App() {
           zone: data.zone,
           postal: data.postal,
           postalDist: data.postalDist,
+        }))
+        break
+      case 'updateDynamicWeather': {
+        if (data.show !== true) {
+          setHudData((prev) => ({
+            ...prev,
+            dynamicWeatherShow: false,
+            dynamicWeatherDisplay: '',
+            dynamicWeatherSeason: '',
+            dynamicWeatherForecastLine: '',
+            dynamicWeatherWetLabel: '',
+            dynamicWeatherNext: '',
+            dynamicWeatherTempF: null,
+            dynamicWeatherWindMph: null,
+          }))
+          break
+        }
+        setHudData((prev) => ({
+          ...prev,
+          // Lua only sends show:true when the feature is enabled; do not gate on prev.showDynamicWeather
+          // (weather can message before updateStatusConfig applies the saved toggle).
+          dynamicWeatherShow: true,
+          dynamicWeatherDisplay: data.clientDisplay ?? prev.dynamicWeatherDisplay,
+          dynamicWeatherSeason: data.season != null && data.season !== '' ? String(data.season) : prev.dynamicWeatherSeason,
+          dynamicWeatherForecastLine:
+            data.forecastLine != null ? String(data.forecastLine) : prev.dynamicWeatherForecastLine,
+          dynamicWeatherWetLabel: data.wetEtaLabel ?? '',
+          dynamicWeatherNext: data.serverNext ?? prev.dynamicWeatherNext,
+          dynamicWeatherTempF: null,
+          dynamicWeatherWindMph: null,
+        }))
+        break
+      }
+      case 'setDynamicWeatherAvailable':
+        setHudData((prev) => ({
+          ...prev,
+          dynamicWeatherResourceAvailable: data.available === true,
+        }))
+        break
+      case 'updateFloodWarning':
+        setHudData((prev) => ({
+          ...prev,
+          floodWarningActive: data.active === true,
+          floodWarningDetail: data.detail != null && String(data.detail).trim() !== '' ? String(data.detail).trim() : '',
+        }))
+        break
+      case 'updateHurricaneWarning':
+        setHudData((prev) => ({
+          ...prev,
+          hurricaneWarningActive: data.active === true,
+          hurricaneWarningDetail:
+            data.detail != null && String(data.detail).trim() !== '' ? String(data.detail).trim() : '',
         }))
         break
       case 'updateWaypoint':
@@ -367,6 +477,12 @@ function App() {
   }, [handleMessage])
 
   const handleSettingsSave = useCallback((values) => {
+    if (isHudDevBrowser) {
+      setSettingsData(values)
+      setHudData((prev) => applyDevSettingsSave(values, prev))
+      setSettingsOpen(false)
+      return
+    }
     fetch(`https://${getParentResourceName()}/settings:save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -376,20 +492,24 @@ function App() {
   }, [getParentResourceName])
 
   const handleSettingsClose = useCallback(() => {
-    fetch(`https://${getParentResourceName()}/settings:close`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
+    if (!isHudDevBrowser) {
+      fetch(`https://${getParentResourceName()}/settings:close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+    }
     setSettingsOpen(false)
   }, [getParentResourceName])
 
   const handleStartMoveSpeedometer = useCallback(() => {
-    fetch(`https://${getParentResourceName()}/speedometer:startEdit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
+    if (!isHudDevBrowser) {
+      fetch(`https://${getParentResourceName()}/speedometer:startEdit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+    }
     setSettingsOpen(false)
     setEditMode(true)
     const startPos = hudData.speedometerPos || null
@@ -416,11 +536,13 @@ function App() {
   }, [handleSettingsSave, settingsData])
 
   const handleStartMoveAmmo = useCallback(() => {
-    fetch(`https://${getParentResourceName()}/speedometer:startEdit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
+    if (!isHudDevBrowser) {
+      fetch(`https://${getParentResourceName()}/speedometer:startEdit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+    }
     setSettingsOpen(false)
     setAmmoEditMode(true)
     const startPos = hudData.ammoPos || null
@@ -435,25 +557,29 @@ function App() {
 
   const handleAmmoSaveEdit = useCallback(() => {
     const posToSave = ammoDragPosRef.current || null
-    fetch(`https://${getParentResourceName()}/ammo:endEdit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        saved: true,
-        left: posToSave?.left ?? 0,
-        top: posToSave?.top ?? 0,
-      }),
-    })
+    if (!isHudDevBrowser) {
+      fetch(`https://${getParentResourceName()}/ammo:endEdit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          saved: true,
+          left: posToSave?.left ?? 0,
+          top: posToSave?.top ?? 0,
+        }),
+      })
+    }
     setHudData((prev) => ({ ...prev, ammoPos: posToSave, ammoPositionPreset: 'custom' }))
     setAmmoEditMode(false)
   }, [getParentResourceName])
 
   const handleAmmoCancelEdit = useCallback(() => {
-    fetch(`https://${getParentResourceName()}/ammo:endEdit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ saved: false }),
-    })
+    if (!isHudDevBrowser) {
+      fetch(`https://${getParentResourceName()}/ammo:endEdit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ saved: false }),
+      })
+    }
     setAmmoEditMode(false)
   }, [getParentResourceName])
 
@@ -472,25 +598,29 @@ function App() {
 
   const handleSaveEdit = useCallback(() => {
     const posToSave = dragPosRef.current || null
-    fetch(`https://${getParentResourceName()}/speedometer:endEdit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        saved: true,
-        left: posToSave?.left ?? 0,
-        top: posToSave?.top ?? 0,
-      }),
-    })
+    if (!isHudDevBrowser) {
+      fetch(`https://${getParentResourceName()}/speedometer:endEdit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          saved: true,
+          left: posToSave?.left ?? 0,
+          top: posToSave?.top ?? 0,
+        }),
+      })
+    }
     setHudData((prev) => ({ ...prev, speedometerPos: posToSave }))
     setEditMode(false)
   }, [getParentResourceName])
 
   const handleCancelEdit = useCallback(() => {
-    fetch(`https://${getParentResourceName()}/speedometer:endEdit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ saved: false }),
-    })
+    if (!isHudDevBrowser) {
+      fetch(`https://${getParentResourceName()}/speedometer:endEdit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ saved: false }),
+      })
+    }
     setEditMode(false)
     dragPosRef.current = null
     setDragPos(null)
@@ -499,6 +629,15 @@ function App() {
   const handleResetEdit = useCallback(() => {
     dragPosRef.current = null
     setDragPos(null)
+  }, [])
+
+  const handleOpenDevSettingsModal = useCallback((seed) => {
+    setSettingsData(seed && typeof seed === 'object' ? seed : {})
+    setSettingsOpen(true)
+  }, [])
+
+  const handleDevCinematic = useCallback((enabled) => {
+    setCinematicMode(Boolean(enabled))
   }, [])
 
   useEffect(() => {
@@ -531,7 +670,15 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [ammoEditMode, handleAmmoCancelEdit])
 
-  if (!hudData.visible && !hudData.forceAircraftHud && !settingsOpen && !cinematicMode && !editMode && !ammoEditMode) {
+  const appUiEmpty =
+    !hudData.visible &&
+    !hudData.forceAircraftHud &&
+    !settingsOpen &&
+    !cinematicMode &&
+    !editMode &&
+    !ammoEditMode
+
+  if (appUiEmpty && !isHudDevBrowser) {
     return null
   }
 
@@ -539,7 +686,14 @@ function App() {
   const showAircraftHud = hudData.aircraftVisible && (hudData.visible || hudData.forceAircraftHud) && !editMode
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      style={
+        isHudDevBrowser && devPlayfieldColor
+          ? { background: devPlayfieldColor }
+          : undefined
+      }
+    >
       {hudData.showCrosshair && hudData.isArmed && <div className="crosshair-dot" />}
       {editMode && (
         <div className="edit-mode-overlay">
@@ -587,6 +741,16 @@ function App() {
             underwater={hudData.underwater}
             oxygenDisplayLocation={hudData.oxygenDisplayLocation}
             oxygenColor={hudData.colors?.oxygen}
+            dynamicWeatherShow={hudData.dynamicWeatherShow && Boolean(hudData.showDynamicWeather)}
+            dynamicWeatherDisplay={hudData.dynamicWeatherDisplay}
+            dynamicWeatherSeason={hudData.dynamicWeatherSeason}
+            dynamicWeatherWetLabel={hudData.dynamicWeatherWetLabel}
+            dynamicWeatherNext={hudData.dynamicWeatherNext}
+            dynamicWeatherForecastLine={hudData.dynamicWeatherForecastLine}
+            floodWarningActive={hudData.floodWarningActive}
+            floodWarningDetail={hudData.floodWarningDetail}
+            hurricaneWarningActive={hudData.hurricaneWarningActive && Boolean(hudData.showHurricaneWarning)}
+            hurricaneWarningDetail={hudData.hurricaneWarningDetail}
           />
           <HUD
             health={hudData.health}
@@ -618,6 +782,7 @@ function App() {
             voipTalking={hudData.voipTalking}
             voipRange={hudData.voipRange}
             voipConnected={hudData.voipConnected}
+            voipProximity={hudData.voipProximity}
             radioChannel={hudData.radioChannel}
             radioTalking={hudData.radioTalking}
             hungerThreshold={hudData.hungerThreshold}
@@ -629,7 +794,11 @@ function App() {
             statusRingWidth={hudData.statusRingWidth}
             statusRingHeight={hudData.statusRingHeight}
             showVoip={hudData.showVoip}
-            framework={hudData.framework}
+            framework={
+              isHudDevBrowser && hudData.devFrameworkOverride
+                ? hudData.devFrameworkOverride
+                : hudData.framework
+            }
             standaloneVoipHudEnabled={hudData.standaloneVoipHudEnabled}
             speedometerPos={editMode ? dragPos : hudData.speedometerPos}
             editMode={editMode}
@@ -676,6 +845,7 @@ function App() {
       <SettingsModal
         key={JSON.stringify(settingsData)}
         visible={settingsOpen && !editMode && !ammoEditMode}
+        showDynamicWeatherSetting={hudData.dynamicWeatherResourceAvailable || isHudDevBrowser}
         settings={settingsData}
         onSave={handleSettingsSave}
         onClose={handleSettingsClose}
@@ -684,6 +854,17 @@ function App() {
         onStartMoveAmmo={handleStartMoveAmmo}
         onResetAmmo={handleResetAmmo}
       />
+      {isHudDevBrowser && (
+        <HudDevPanel
+          hudData={hudData}
+          setHudData={setHudData}
+          cinematicMode={cinematicMode}
+          onToggleCinematic={handleDevCinematic}
+          onOpenSettingsModal={handleOpenDevSettingsModal}
+          playfieldColor={devPlayfieldColor}
+          onPlayfieldColorChange={setDevPlayfieldColor}
+        />
+      )}
     </div>
   )
 }

@@ -132,6 +132,12 @@ Config.cinematicNotifications = true
 Config.minimapOnlyInVehicle = false
 Config.fuelDisplayStyle = 'bar'
 Config.showCrosshair = false
+-- Indicator strip: forecast from Dynamic_weather (requires resource + HUD setting).
+Config.showDynamicWeather = false
+-- Flash flood segment when Dynamic_weather reports active flood (requires HUD setting in es_lib Weather).
+Config.showFlashFloodWarning = true
+-- Hurricane segment when Dynamic_weather reports active hurricane (HUD setting).
+Config.showHurricaneWarning = true
 Config.sectionedBars = false
 -- Location strip (compass / street / zone): gapped capsule segments like sectioned health/armor bars.
 Config.sectionedIndicator = false

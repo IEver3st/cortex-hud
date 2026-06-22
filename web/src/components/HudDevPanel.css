@@ -1,0 +1,225 @@
+.hud-dev-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  /* .app uses pointer-events: none for FiveM pass-through; dev UI must opt in */
+  pointer-events: auto;
+  z-index: 2147483000;
+  max-height: 100vh;
+  overflow: auto;
+  width: min(360px, 100vw);
+  box-sizing: border-box;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #e2e8f0;
+  background: #0f1419;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: none;
+  border-top: none;
+  border-radius: 0 0 0 8px;
+  box-shadow: -4px 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.hud-dev-panel--collapsed {
+  width: auto;
+  overflow: visible;
+  max-height: none;
+}
+
+.hud-dev-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  user-select: none;
+}
+
+.hud-dev-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #94a3b8;
+}
+
+.hud-dev-hint {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.hud-dev-body {
+  padding: 10px 12px 14px;
+}
+
+.hud-dev-section {
+  margin-bottom: 12px;
+}
+
+.hud-dev-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.hud-dev-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.hud-dev-row label {
+  flex: 0 0 38%;
+  color: #94a3b8;
+}
+
+.hud-dev-row input[type='text'],
+.hud-dev-row input[type='number'],
+.hud-dev-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0b0f14;
+  color: #f1f5f9;
+  font-size: 12px;
+}
+
+.hud-dev-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.hud-dev-color {
+  width: 44px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: #0b0f14;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.hud-dev-color::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.hud-dev-color::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.hud-dev-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -2px 0 10px;
+  padding-left: 38%;
+}
+
+.hud-dev-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 0;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.hud-dev-swatch:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.hud-dev-swatch.hud-dev-swatch--active {
+  box-shadow: 0 0 0 2px #2563eb;
+}
+
+.hud-dev-value {
+  flex: 0 0 2.2rem;
+  text-align: right;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-dev-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-dev-actions button {
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.hud-dev-actions button:hover {
+  background: #334155;
+}
+
+.hud-dev-actions .hud-dev-btn-primary {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #fff;
+  text-align: center;
+}
+
+.hud-dev-actions .hud-dev-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.hud-dev-toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #0b0f14;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.hud-dev-toggle.hud-dev-toggle--on {
+  background: #2563eb;
+  border-color: #1d4ed8;
+}
+
+.hud-dev-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  transition: transform 0.15s ease;
+}
+
+.hud-dev-toggle.hud-dev-toggle--on::after {
+  transform: translateX(16px);
+}
+
+.hud-dev-note {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}

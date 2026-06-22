@@ -16,3 +16,6 @@ hud.start(config)
 Status.start(config, function()
     return exports.es_hud:isHudVisible()
 end)
+
+local dynamicWeatherHud = lib.require('modules.integrations.client.dynamic_weather')
+dynamicWeatherHud.start(config)

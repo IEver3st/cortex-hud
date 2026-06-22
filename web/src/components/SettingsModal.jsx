@@ -153,6 +153,9 @@ const DEFAULTS = {
     minimapOnlyInVehicle: false,
     ammoPositionPreset: 'preset',
     showCrosshair: false,
+    showDynamicWeather: false,
+    showFlashFloodWarning: true,
+    showHurricaneWarning: true,
     sectionedBars: false,
     sectionedIndicator: false,
     oxygenDisplayLocation: 'statusCluster',
@@ -191,7 +194,17 @@ const buildInitialState = (settings = {}) => {
     return initialState
 }
 
-const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedometer, onResetSpeedometer, onStartMoveAmmo, onResetAmmo }) => {
+const SettingsModal = ({
+  visible,
+  settings,
+  onSave,
+  onClose,
+  onStartMoveSpeedometer,
+  onResetSpeedometer,
+  onStartMoveAmmo,
+  onResetAmmo,
+  showDynamicWeatherSetting = true,
+}) => {
     const [local, setLocal] = useState(() => buildInitialState(settings))
     const initialState = buildInitialState(settings)
     const selectedAmmoPosition = local.ammoPositionPreset && local.ammoPositionPreset !== 'preset'
@@ -373,6 +386,47 @@ const SettingsModal = ({ visible, settings, onSave, onClose, onStartMoveSpeedome
                                 <div className="settings-toggle-knob" />
                             </div>
                         </div>
+
+                        {showDynamicWeatherSetting && (
+                        <>
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Dynamic Weather (indicator)</div>
+                                <div className="settings-row-desc">Forecast icons and rain ETA when Dynamic_weather is running and detected</div>
+                            </div>
+                            <div
+                                className={`settings-toggle ${local.showDynamicWeather ? 'active' : ''}`}
+                                onClick={() => set('showDynamicWeather', !local.showDynamicWeather)}
+                            >
+                                <div className="settings-toggle-knob" />
+                            </div>
+                        </div>
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Flash flood warning (indicator)</div>
+                                <div className="settings-row-desc">Top bar flash flood segment when Dynamic_weather reports an active flood</div>
+                            </div>
+                            <div
+                                className={`settings-toggle ${local.showFlashFloodWarning ? 'active' : ''}`}
+                                onClick={() => set('showFlashFloodWarning', !local.showFlashFloodWarning)}
+                            >
+                                <div className="settings-toggle-knob" />
+                            </div>
+                        </div>
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Hurricane warning (indicator)</div>
+                                <div className="settings-row-desc">Top bar hurricane segment when Dynamic_weather reports an active hurricane</div>
+                            </div>
+                            <div
+                                className={`settings-toggle ${local.showHurricaneWarning ? 'active' : ''}`}
+                                onClick={() => set('showHurricaneWarning', !local.showHurricaneWarning)}
+                            >
+                                <div className="settings-toggle-knob" />
+                            </div>
+                        </div>
+                        </>
+                        )}
 
                         <div className="settings-row">
                             <div>

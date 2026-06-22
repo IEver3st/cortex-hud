@@ -60,6 +60,9 @@ local KEY_MAP = {
     hud_panelOpacity = 'panelOpacity',
     hud_oxygenDisplayLocation = 'oxygenDisplayLocation',
     hud_cruiseAutoThrottle = 'cruiseAutoThrottle',
+    hud_showDynamicWeather = 'showDynamicWeather',
+    hud_showFlashFloodWarning = 'showFlashFloodWarning',
+    hud_showHurricaneWarning = 'showHurricaneWarning',
 }
 
 local HUD_TO_ES_KEY = {}
@@ -274,6 +277,9 @@ local function buildDefaultSettings()
         ammoPosY = 0,
         ammoPositionPreset = 'preset',
         showCrosshair = config.showCrosshair == true,
+        showDynamicWeather = config.showDynamicWeather == true,
+        showFlashFloodWarning = config.showFlashFloodWarning ~= false,
+        showHurricaneWarning = config.showHurricaneWarning ~= false,
         sectionedBars = config.sectionedBars == true,
         sectionedIndicator = config.sectionedIndicator == true,
         backdropBlur = normalizeBackdropBlur(config.backdropBlur) or 1.0,
@@ -317,6 +323,27 @@ local AMMO_POSITION_OPTIONS = {
     { value = 'bottom-center', label = 'Bottom Middle' },
 }
 
+--- Dynamic_weather (or dynamic_weather) is running and exposes a snapshot or public weather exports.
+local function isDynamicWeatherResourceReady()
+    for _, resName in ipairs({ 'Dynamic_weather', 'dynamic_weather' }) do
+        if GetResourceState(resName) == 'started' then
+            local ex = nil
+            pcall(function()
+                ex = exports[resName]
+            end)
+            if type(ex) == 'table' then
+                if type(ex.getHudWeatherSnapshot) == 'function' then
+                    return true
+                end
+                if type(ex.getPlayerWeather) == 'function' or type(ex.getCurrentWeather) == 'function' then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function getSettingsDefinition()
     local defaultShape = config.StatusIcons.iconShape
     if not defaultShape or defaultShape == '' or defaultShape == 'preset' then
@@ -345,7 +372,8 @@ local function getSettingsDefinition()
         defaultAmmoPosition = 'bottom-right'
     end
 
-    return {
+    local isDyn = isDynamicWeatherResourceReady()
+    local res = {
         label = 'HUD',
         settings = {
             {
@@ -658,6 +686,7 @@ local function getSettingsDefinition()
             { label = 'Appearance', keys = { 'hud_backdropBlur', 'hud_panelOpacity' } },
             { label = 'Speedometer', keys = { 'hud_speedUnit', 'hud_fuelDisplayStyle', 'hud_disableSpeedometer', 'hud_cruiseAutoThrottle', 'hud_speedometerActions' } },
             { label = 'Postal', keys = { 'hud_showPostal', 'hud_showPostalDistance' } },
+            { label = 'Weather', keys = { 'hud_showDynamicWeather', 'hud_showFlashFloodWarning', 'hud_showHurricaneWarning' } },
             { label = 'Status Icons', keys = { 'hud_statusIconShape', 'hud_sectionedBars', 'hud_sectionedIndicator', 'hud_hungerThreshold', 'hud_thirstThreshold', 'hud_stressThreshold', 'hud_oxygenThreshold', 'hud_oxygenDisplayLocation' } },
             { label = 'Colors', keys = { 'hud_colorPreset', 'hud_color_health', 'hud_color_armor', 'hud_color_hunger', 'hud_color_thirst', 'hud_color_stress', 'hud_color_oxygen', 'hud_color_ammo' } },
             { label = 'Minimap', keys = { 'hud_minimapOnlyInVehicle' } },
@@ -666,6 +695,44 @@ local function getSettingsDefinition()
             { label = 'Ammo', keys = { 'hud_ammoPositionPreset', 'hud_ammoActions' } },
         },
     }
+
+    if isDyn then
+        for i, e in ipairs(res.settings) do
+            if e.key == 'hud_statusIconShape' then
+                table.insert(res.settings, i, {
+                    key = 'hud_showDynamicWeather',
+                    type = 'toggle',
+                    label = 'Dynamic Weather (indicator)',
+                    description = 'Forecast icons and rain ETA in the top bar when Dynamic_weather is running',
+                    default = config.showDynamicWeather == true,
+                })
+                table.insert(res.settings, i + 1, {
+                    key = 'hud_showFlashFloodWarning',
+                    type = 'toggle',
+                    label = 'Flash flood warning (indicator)',
+                    description = 'Shows the flash flood segment in the location bar when Dynamic_weather reports an active flood',
+                    default = config.showFlashFloodWarning ~= false,
+                })
+                table.insert(res.settings, i + 2, {
+                    key = 'hud_showHurricaneWarning',
+                    type = 'toggle',
+                    label = 'Hurricane warning (indicator)',
+                    description = 'Shows the hurricane segment when Dynamic_weather reports an active hurricane',
+                    default = config.showHurricaneWarning ~= false,
+                })
+                break
+            end
+        end
+    else
+        for i, sec in ipairs(res.sections) do
+            if sec.label == 'Weather' then
+                table.remove(res.sections, i)
+                break
+            end
+        end
+    end
+
+    return res
 end
 
 exports('getSettingsDefinition', getSettingsDefinition)
@@ -815,6 +882,9 @@ local function pushResolvedHud(data)
         sectionedBars = data.sectionedBars == true,
         sectionedIndicator = data.sectionedIndicator == true,
         oxygenDisplayLocation = data.oxygenDisplayLocation or config.oxygenDisplayLocation or 'statusCluster',
+        showDynamicWeather = config.showDynamicWeather == true,
+        showFlashFloodWarning = config.showFlashFloodWarning ~= false,
+        showHurricaneWarning = config.showHurricaneWarning ~= false,
     })
 end
 
@@ -844,6 +914,29 @@ function Settings.apply(data, options)
     config.StatusIcons.oxygenThreshold = tonumber(data.oxygenThreshold) or config.StatusIcons.oxygenThreshold
     config.StatusIcons.colors = copyTable(presentation.colors)
     config.showCrosshair = toBoolean(data.showCrosshair, config.showCrosshair == true)
+    config.showDynamicWeather = toBoolean(data.showDynamicWeather, config.showDynamicWeather == true)
+    if not config.showDynamicWeather then
+        SendNUIMessage({
+            action = 'updateDynamicWeather',
+            show = false,
+        })
+    end
+    config.showFlashFloodWarning = toBoolean(data.showFlashFloodWarning, config.showFlashFloodWarning ~= false)
+    if not config.showFlashFloodWarning then
+        SendNUIMessage({
+            action = 'updateFloodWarning',
+            active = false,
+            detail = nil,
+        })
+    end
+    config.showHurricaneWarning = toBoolean(data.showHurricaneWarning, config.showHurricaneWarning ~= false)
+    if not config.showHurricaneWarning then
+        SendNUIMessage({
+            action = 'updateHurricaneWarning',
+            active = false,
+            detail = nil,
+        })
+    end
     config.sectionedBars = toBoolean(data.sectionedBars, config.sectionedBars == true)
     config.sectionedIndicator = toBoolean(data.sectionedIndicator, config.sectionedIndicator == true)
     config.oxygenDisplayLocation = data.oxygenDisplayLocation or config.oxygenDisplayLocation or 'statusCluster'
@@ -1035,6 +1128,15 @@ end
 RegisterNUICallback('settings:save', function(data, cb)
     persistSettingsData(data)
 
+    -- Merge NUI payload: getSetting may still return nil for keys es_lib does not know yet,
+    -- which would otherwise leave buildDefaultSettings() values and drop toggles like showDynamicWeather.
+    local merged = Settings.get()
+    if type(data) == 'table' then
+        for k, v in pairs(data) do
+            merged[k] = v
+        end
+    end
+
     if data and type(data.speedometerPos) == 'table' then
         local speedometerPosX, speedometerPosY = normalizePosition(data.speedometerPos.left, data.speedometerPos.top)
         persistSpeedometerState(speedometerPosX, speedometerPosY)
@@ -1046,7 +1148,7 @@ RegisterNUICallback('settings:save', function(data, cb)
         persistAmmoState(ammoPosX, ammoPosY, ammoPreset)
     end
 
-    Settings.apply(Settings.get(), { refreshMinimap = false })
+    Settings.apply(merged, { refreshMinimap = false })
     cb('ok')
 end)
 
