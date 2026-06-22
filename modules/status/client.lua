@@ -26,6 +26,7 @@ local lastVoipConnected = nil
 local lastRadioChannel = nil
 local lastRadioTalking = nil
 local lastStandaloneVoipHudEnabled = nil
+local nextVoipResourceCheckAt = 0
 
 local voipResource = nil
 local cachedRadioChannel = 0
@@ -265,6 +266,29 @@ local function getVoipState()
     return talking, range, connected, radioChannel, radioTalking
 end
 
+local function refreshVoipResource(now)
+    if now < nextVoipResourceCheckAt then
+        return false
+    end
+
+    nextVoipResourceCheckAt = now + (voipResource and 5000 or 2000)
+
+    local detectedVoipResource = detectVoipResource()
+    if detectedVoipResource == voipResource then
+        return false
+    end
+
+    voipResource = detectedVoipResource
+    pushVoipDisplayConfig()
+    lastVoipTalking = nil
+    lastVoipRange = nil
+    lastVoipConnected = nil
+    lastRadioChannel = nil
+    lastRadioTalking = nil
+
+    return true
+end
+
 local function getPlayerStatus()
     local hunger = 100
     local thirst = 100
@@ -312,6 +336,7 @@ end
 
 function Status.start(config, isFullyVisible)
     voipResource = detectVoipResource()
+    nextVoipResourceCheckAt = 0
 
     -- Status update thread (hunger, thirst, stress — slow)
     CreateThread(function()
@@ -343,15 +368,20 @@ function Status.start(config, isFullyVisible)
         end
     end)
 
-    -- Oxygen update thread (per-frame — native depletes in ~10s, 500ms is too choppy)
+    -- Oxygen update thread (fast while oxygen is changing, slower while player is dry/full)
     CreateThread(function()
         while not Bridge.isPlayerLoaded() do
             Wait(200)
         end
 
         while true do
+            local sleep = 500
+
             if isFullyVisible() then
                 local oxygen, underwater = getOxygenState()
+                local oxygenChanging = underwater or oxygen < 100 or lastUnderwater or lastOxygen < 100
+
+                sleep = oxygenChanging and 150 or 300
 
                 if oxygen ~= lastOxygen or underwater ~= lastUnderwater then
                     lastOxygen = oxygen
@@ -365,7 +395,7 @@ function Status.start(config, isFullyVisible)
                 end
             end
 
-            Wait(0)
+            Wait(sleep)
         end
     end)
 
@@ -376,16 +406,8 @@ function Status.start(config, isFullyVisible)
         end
 
         while true do
-            local detectedVoipResource = detectVoipResource()
-            if detectedVoipResource ~= voipResource then
-                voipResource = detectedVoipResource
-                pushVoipDisplayConfig()
-                lastVoipTalking = nil
-                lastVoipRange = nil
-                lastVoipConnected = nil
-                lastRadioChannel = nil
-                lastRadioTalking = nil
-            end
+            local sleep = config.VoipUpdateInterval or 150
+            refreshVoipResource(GetGameTimer())
 
             if voipResource and isFullyVisible() then
                 local talking, range, connected, radioChannel, radioTalking = getVoipState()
@@ -406,9 +428,11 @@ function Status.start(config, isFullyVisible)
                         radioTalking = radioTalking
                     })
                 end
+            else
+                sleep = 500
             end
 
-            Wait(config.VoipUpdateInterval or 150)
+            Wait(sleep)
         end
     end)
 

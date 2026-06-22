@@ -515,6 +515,8 @@ function hud.start(config)
         Wait(1000)
 
         while true do
+            local sleep = config.UpdateInterval or 200
+
             if isFullyVisible() then
                 local ped = PlayerPedId()
                 local coords = GetEntityCoords(ped)
@@ -564,9 +566,11 @@ function hud.start(config)
                 if inVehicle and not vehicleStatus:isActive() then
                     vehicleStatus:start()
                 end
+            else
+                sleep = 500
             end
 
-            Wait(config.UpdateInterval or 200)
+            Wait(sleep)
         end
     end)
 
@@ -581,7 +585,10 @@ function hud.start(config)
         local IsPedInAnyVehicle = IsPedInAnyVehicle
         local PlayerPedId = PlayerPedId
         while true do
+            local sleep = 1000
+
             if isFullyVisible() and IsPedInAnyVehicle(PlayerPedId(), false) then
+                sleep = 500
                 local wpBlip = GetFirstBlipInfoId(8)
                 if DoesBlipExist(wpBlip) then
                     local wpCoords = GetBlipInfoIdCoord(wpBlip)
@@ -630,7 +637,7 @@ function hud.start(config)
                 end
             end
 
-            Wait(500)
+            Wait(sleep)
         end
     end)
 
@@ -645,12 +652,15 @@ function hud.start(config)
 
     CreateThread(function()
         while true do
+            local sleep = 750
+
             if isFullyVisible() then
                 local ped = PlayerPedId()
                 local weaponHash = GetSelectedPedWeapon(ped)
                 local isArmed = weaponHash ~= UNARMED_HASH
 
                 if isArmed then
+                    sleep = 100
                     local _, clipAmmo = GetAmmoInClip(ped, weaponHash)
                     local totalAmmo = GetAmmoInPedWeapon(ped, weaponHash)
                     local reserveAmmo = totalAmmo - clipAmmo
@@ -667,6 +677,7 @@ function hud.start(config)
                         })
                     end
                 else
+                    sleep = 400
                     if lastIsArmed then
                         lastAmmoClip = -1
                         lastAmmoReserve = -1
@@ -680,7 +691,8 @@ function hud.start(config)
                     end
                 end
             end
-            Wait(100)
+
+            Wait(sleep)
         end
     end)
 
