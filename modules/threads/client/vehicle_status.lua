@@ -22,8 +22,7 @@ local GetHeliTailRotorHealth = GetHeliTailRotorHealth
 local GetHeliMainRotorHealth = GetHeliMainRotorHealth
 local Wait = Wait
 
---- @param a number[]|nil
---- @param b number[]|nil
+
 local function enginesListEqual(a, b)
     if not a or not b or #a ~= #b then
         return false
@@ -36,7 +35,6 @@ local function enginesListEqual(a, b)
     return true
 end
 
---- @return number[] percentages 0-100 per engine column (NUI bars use x10 as 0-1000)
 local function buildAircraftEnginesHudList(vehicle, isHelicopter, engineHealthPct, mainRotorHealth)
     if isHelicopter then
         return { math.floor(mainRotorHealth / 10) }
@@ -52,7 +50,6 @@ local function buildAircraftEnginesHudList(vehicle, isHelicopter, engineHealthPc
     return list
 end
 
---- Elevator-specific health not exposed; use body + broken wing / control-panel flags as hydraulics / flight-control proxy.
 local function computePlaneHydraulicsHealth1000(vehicle)
     local h = math.floor(GetVehicleBodyHealth(vehicle))
     if not ArePlaneWingsIntact(vehicle) then

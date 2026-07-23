@@ -1,167 +1,224 @@
-# es_hud - Minimalist High-Performance HUD
+# es_hud — Minimalist High-Performance HUD
 
-A lightweight FiveM HUD featuring a custom square minimap, player status, vehicle gauges, aircraft instruments, seatbelt logic, and an engine stall system.
+A lightweight, customizable FiveM HUD built with React + Vite on the NUI side and modular Lua on the client. It replaces the default radar/health layout with a modern, reason-based visibility system, a custom square minimap, vehicle gauges, aircraft instruments, seatbelt/harness/cruise logic, engine stalling, and runtime VOIP/fuel integrations.
+
+[![FiveM](https://img.shields.io/badge/FiveM-Resource-orange)](https://fivem.net/)
+[![Lua](https://img.shields.io/badge/Lua-5.4-blue)](https://www.lua.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite)](https://vitejs.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+---
+
+## Features
+
+- **Custom square/round minimap** — texture replacement via `stream/squaremap.ytd`, layout/clip/mask tuning, big-map recovery, and external map resource detection.
+- **Player status cluster** — health, armor, hunger, thirst, stress, oxygen with configurable icon shapes (bar, hexagon, circle, square) and color themes.
+- **VOIP indicator** — auto-detects `pma-voice`, `saltychat`, `mumble-voip`, `tokovoip_script`, and `zerio-radio`; shows talking state, proximity range, and radio channel/talk.
+- **Vehicle HUD** — speedometer (mph/kph), gear, RPM, fuel, engine health, lights; supports disabling the speedometer entirely.
+- **Fuel integration** — auto-detects `ox_fuel`, `ps-fuel`, `cdn-fuel`, `LegacyFuel`, `qb-fuel`, `esx_fuel`, and many others; falls back to native fuel with low-fuel alerts.
+- **Seatbelt & harness** — seatbelt (`B`) with ejection protection, harness (`H`) with timed apply/remove and progress UI.
+- **Cruise control** — toggle with `Y` (configurable), supports both speed-cap and auto-throttle modes.
+- **Engine stall / breakdown** — impact-based stalling with power reduction, smoke damage, and breakdown after too many stalls.
+- **Aircraft HUD** — altitude, airspeed (knots), heading, engine/rotor health, hydraulics proxy, landing gear, and searchlight.
+- **Location strip** — street name, zone, heading compass, and optional `nearest-postal` postal code/distance.
+- **Dynamic weather strip** — integrates `Dynamic_weather` / `dynamic_weather` for current/next weather and ETA, plus flash-flood/hurricane warnings.
+- **Polcam integration** — hides the HUD when polcam is active and optionally forces the aircraft HUD overlay for the pilot.
+- **Cinematic mode** — hides the HUD and radar for clean screenshots/recordings.
+- **Settings UI** — open with `/hudsettings` (`I`) to switch layout/color presets, shape styles, blur/opacity, and move speedometer/ammo via drag.
+- **Visibility reason system** — multiple independent reasons (`user`, `external`, `polcam`, `cinematic`, `framework`, `qbxCharacter`, `qbxSpawn`) all must be true for the HUD to show, making it easy for external scripts to hide/show the HUD safely.
+
+---
 
 ## Dependencies
 
 | Resource | Required | Notes |
 |----------|----------|-------|
-| **es_lib** | **Yes** | Must be started before es_hud. |
-| **nearest-postal** | Optional | Provides postal code data for the location bar. |
-| **polcam** | Optional | Auto-detected. HUD hides automatically when the helicopter camera is active. |
+| **es_lib** | **Yes** | Must start before `es_hud`; provides settings, notifications, and progress bars. |
+| nearest-postal | Optional | Enables postal code/distance in the location strip. |
+| polcam | Optional | Auto-detected; hides HUD when active. |
+| Dynamic_weather / dynamic_weather | Optional | Enables the weather forecast strip and warnings. |
+| ox_fuel / ps-fuel / cdn-fuel / LegacyFuel / qb-fuel / esx_fuel / etc. | Optional | Provides accurate fuel values; falls back to native fuel. |
+| pma-voice / saltychat / mumble-voip / tokovoip_script / zerio-radio | Optional | Enables VOIP/radio status. |
+
+---
 
 ## Installation
 
-1. Place `es_hud` in your resources directory.
-2. Ensure `es_lib` is started before `es_hud` in your `server.cfg`.
-3. Configure settings in `config/shared.lua`.
+1. Make sure `es_lib` is installed and starts before `es_hud`.
+2. Build the NUI:
 
-## Commands
+   ```bash
+   cd web
+   npm install
+   npm run build
+   ```
 
-| Command | Description |
-|---------|-------------|
-| `/togglehud` | Toggle HUD visibility on/off |
+   > If you use Bun, you can run `bun install && bun run build` instead.
 
-## Keybinds
+3. Copy the `es_hud` folder into your FiveM `resources` directory.
+4. Add to `server.cfg`:
 
-| Key | Action |
-|-----|--------|
-| `B` | Toggle seatbelt (while in a vehicle) |
+   ```cfg
+   ensure es_lib
+   ensure es_hud
+   ```
+
+5. Edit `config/shared.lua` to match your server framework and preferences.
+
+---
+
+## Building the UI
+
+The `fxmanifest.lua` expects a built NUI at `web/dist/`:
+
+```bash
+cd web
+npm install
+npm run build
+```
+
+`web/dist` and `web/node_modules` are intentionally ignored by `.gitignore`. Do not commit generated build output.
+
+---
+
+## Commands & Keybinds
+
+| Command / Key | Description |
+|---------------|-------------|
+| `/togglehud` | Toggle the entire HUD on/off (user visibility reason). |
+| `/hudsettings` (`I`) | Open the HUD settings menu. |
+| `/cinematicmode` (`F7` by default) | Toggle cinematic mode (hides HUD + radar). |
+| `/es_hud_cruise` (`Y` by default) | Toggle cruise control while driving. |
+| `B` | Toggle seatbelt (when enabled in config). |
+| `H` | Toggle racing harness (when enabled in config). |
+
+> Keys can be changed in `config/shared.lua` or via FiveM key mapping settings.
+
+---
 
 ## Client Exports
 
-### HUD Visibility
+These exports can be called from other client scripts:
 
 | Export | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `toggleHud(state)` | `boolean?` | — | Toggle or set HUD visibility. `nil` toggles, `true`/`false` sets directly. |
-| `toggleMap(state)` | `boolean?` | — | Toggle or set minimap visibility. `nil` toggles, `true`/`false` sets directly. |
-| `isHudVisible()` | — | `boolean` | Whether the HUD is fully visible (all visibility reasons are true). |
-| `hideHud(reason)` | `string?` | — | Hide the HUD for a given reason (default `'external'`). Multiple reasons can hide the HUD independently. |
-| `showHud(reason)` | `string?` | — | Show the HUD for a given reason (default `'external'`). |
-| `setHudVisible(visible)` | `boolean` | — | Set the `'external'` visibility reason directly. |
-| `setHudVisibleReason(reason, visible)` | `string?, boolean` | — | Set a specific visibility reason. |
-
-### Seatbelt
-
-| Export | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `isSeatbeltOn()` | — | `boolean` | Whether the seatbelt is currently fastened. |
-| `toggleSeatbelt(state)` | `boolean?` | — | Toggle or set seatbelt state. |
-
-### Engine Stall
-
-| Export | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `isEngineStalled()` | — | `boolean` | Whether the engine is currently stalled. |
-| `isEngineBroken()` | — | `boolean` | Whether the engine has broken down from too many stalls. |
+| `toggleHud(state)` | `boolean?` | — | Toggle or set the `external` visibility reason. |
+| `isHudVisible()` | — | `boolean` | Whether the HUD is currently visible. |
+| `hideHud(reason?)` | `string?` | — | Hide the HUD for a custom reason. |
+| `showHud(reason?)` | `string?` | — | Show the HUD for a custom reason. |
+| `setHudVisible(visible)` | `boolean` | — | Set the `external` visibility reason directly. |
+| `setHudVisibleReason(reason, visible)` | `string, boolean` | — | Set a named visibility reason. |
+| `setCharacterSelectionActive(active)` | `boolean` | — | Hides HUD during QBX character selection. |
+| `setSpawnSelectorActive(active)` | `boolean` | — | Hides HUD during QBX spawn selection. |
+| `toggleMap(state?)` | `boolean?` | — | Toggle or set minimap visibility. |
+| `refreshMinimap(reason?)` | `string?` | — | Request a minimap refresh/re-layout. |
+| `isSeatbeltOn()` | — | `boolean` | Whether the seatbelt is fastened. |
+| `toggleSeatbelt(state?)` | `boolean?` | — | Toggle or set seatbelt state. |
+| `isHarnessOn()` | — | `boolean` | Whether the harness is fastened. |
+| `toggleHarness(state?)` | `boolean?` | — | Apply/remove the harness. |
+| `isEngineStalled()` | — | `boolean` | Whether the current vehicle engine is stalled. |
+| `isEngineBroken()` | — | `boolean` | Whether the engine has broken down. |
 | `getStallCount()` | — | `number` | Number of stalls for the current vehicle. |
-| `getEnginePower()` | — | `number` | Current engine power multiplier (1.0 = full power). |
-| `repairEngine(vehicle)` | `entity?` | — | Repair and reset stall state. Uses current vehicle if not specified. |
+| `getEnginePower()` | — | `number` | Current engine power multiplier (`1.0` = full). |
+| `repairEngine(vehicle?)` | `entity?` | — | Repair engine and reset stall state. |
+| `setForceAircraftHud(forced)` | `boolean` | — | Force the aircraft HUD overlay on/off. |
+| `isAircraftHudForced()` | — | `boolean` | Whether the aircraft HUD is being forced. |
+| `isCruiseControlActive()` | — | `boolean` | Whether cruise control is active. |
+| `getSettingsDefinition()` | — | `table` | Returns the settings schema used by the settings UI. |
 
-### Aircraft HUD
-
-| Export | Parameters | Returns | Description |
-|--------|------------|---------|-------------|
-| `setForceAircraftHud(forced)` | `boolean` | — | Force the aircraft HUD overlay on/off. Used by polcam. |
-| `isAircraftHudForced()` | — | `boolean` | Whether the aircraft HUD is currently forced. |
-
-## Visibility Reason System
-
-es_hud uses a reason-based visibility system. The HUD is only visible when **all** reasons are `true`. Built-in reasons:
-
-| Reason | Description |
-|--------|-------------|
-| `user` | Controlled by the `/togglehud` command. |
-| `polcam` | Auto-managed when polcam is active. |
-| `external` | Default reason for external scripts. |
-
-Other resources can register custom reasons via `hideHud('myReason')` / `showHud('myReason')`.
-
-## Events
-
-| Event | Description |
-|-------|-------------|
-| `es_nos:update` | Receives NOS data from es_nos and forwards it to the NUI. |
+---
 
 ## Configuration
 
-All settings are in `config/shared.lua`.
+All tuning is in `config/shared.lua`.
 
-### General
+### Quick options
 
-```lua
-Config.UpdateInterval = 200          -- HUD update rate (ms)
-Config.disableWantedLevel = true     -- Continuously clear wanted level
-```
+| Option | Default | Description |
+|--------|---------|-------------|
+| `Config.framework` | `'standalone'` | `'standalone'` or `'qbx'` for QBX/QBCore player-loaded hooks. |
+| `Config.speedUnit` | `'mph'` | Speed display unit: `'mph'` or `'kph'`. |
+| `Config.disableSpeedometer` | `false` | Disable the vehicle speedometer entirely. |
+| `Config.disableWantedLevel` | `true` | Continuously clear the native wanted level. |
+| `Config.cinematicKey` | `'F7'` | Default key for cinematic mode. |
+| `Config.cruiseControl.enabled` | `true` | Enable cruise control. |
+| `Config.useBuiltInSeatbeltLogic` | `false` | Enable the built-in seatbelt system. |
+| `Config.useHarnessSystem` | `false` | Enable the racing harness system. |
+| `Config.useStallSystem` | `false` | Enable impact-based engine stalling. |
+| `Config.EnablePostal` | `false` | Show postal codes in the location strip. |
+| `Config.voipResource` | `'auto'` | VOIP resource to use, or `'auto'` for detection. |
+| `Config.showDynamicWeather` | `false` | Show the Dynamic_weather forecast strip. |
+| `Config.defaultHudPreset` | `'classic'` | Default layout preset. |
 
-### Postal Codes
+### Layout presets
 
-```lua
-Config.EnablePostal = true           -- Show postal codes in the location bar
-Config.ShowPostalDistance = false     -- Show distance to nearest postal
-Config.PostalUpdateInterval = 400    -- Postal lookup rate (ms)
-Config.PostalFile = "ocrp-postals.json"  -- Postal JSON file from nearest-postal resource
-```
+`Config.HudPresets` ships with four presets:
 
-### Speed and Units
-
-```lua
-Config.speedUnit = "mph"             -- "mph" or "kph"
-```
-
-### Seatbelt
-
-```lua
-Config.useBuiltInSeatbeltLogic = true  -- Enable the built-in seatbelt system
-Config.ejectMinSpeed = 20.0            -- Minimum speed for windshield ejection (in speedUnit)
-```
-
-### Engine Stall
-
-```lua
-Config.useStallSystem = true              -- Enable impact-based engine stalling
-Config.stallImpactThreshold = 35.0        -- Minimum speed drop to trigger a stall (in speedUnit)
-Config.stallDuration = 2000               -- How long the engine stays stalled before auto-restart (ms)
-Config.stallRecoveryKey = 'E'             -- Key to manually restart (reserved)
-Config.stallMaxCount = 6                  -- Max stalls before engine breakdown
-Config.stallPowerReduction = 0.05         -- Power reduction per stall (5% each)
-Config.stallBreakdownDisablesEngine = true -- Fully disable engine on breakdown
-
-Config.stallSound = {                     -- Sound played on stall
-    name = "Engine_fail",
-    set = "DLC_PILOT_ENGINE_FAILURE_SOUNDS"
-}
-
-Config.restartSound = {                   -- Sound played on engine restart
-    name = "CONFIRM_BEEP",
-    set = "HUD_MINI_GAME_SOUNDSET"
-}
-```
-
-### Polcam Integration
-
-```lua
-Config.PolcamForceAircraftHud = false  -- Force aircraft HUD for pilot when polcam is active
-```
+- `classic` — top-center indicator, bottom-left status, bottom-right speedometer.
+- `street` — top-left indicator, bottom-center speedometer, neon accent theme.
+- `dispatch` — utility-heavy, amber accents, right-side speedometer.
+- `ghost` — minimal top-center readouts, soft monochrome, compact right-side driving HUD.
 
 ### Minimap
 
-```lua
-Config.Minimap = {
-    clipType = 0,         -- 0 = square style, 1 = round style
-    sizeX   = 0.1638,    -- Minimap width
-    sizeY   = 0.183,     -- Minimap height
-    maskSizeX = 0.128,   -- Mask width
-    maskSizeY = 0.20,    -- Mask height
-    blurSizeX = 0.262,   -- Blur width
-    blurSizeY = 0.300,   -- Blur height
-    textureReplacement = {
-        enabled = true,                           -- Disable for minimap packs that don't provide squaremap/radarmask textures
-        dict = "squaremap",                       -- Texture dictionary to load from stream/
-        texture = "radarmasksm",                  -- Texture inside that dictionary
-        targets = { "radarmasksm", "radarmask1g" }, -- Vanilla textures to replace
-        loadTimeoutMs = 5000                      -- Prevents infinite wait on bad/missing dicts
-    }
-}
+`Config.Minimap` controls clip type, size, mask, blur, and texture replacement targets. Set `textureReplacement.enabled = false` if you use a minimap pack that does not provide the squaremap textures.
+
+---
+
+## Architecture
+
 ```
+es_hud/
+├── fxmanifest.lua          # Resource manifest (cerulean, lua54, fxv2_oal, strict NUI callbacks)
+├── init.lua                # Client entry point; loads config, settings, HUD threads
+├── server.lua              # Restarts the `maps` resource on server start
+├── config/shared.lua       # All user-facing configuration
+├── modules/
+│   ├── bridge/client.lua       # Framework hooks (standalone / QBX)
+│   ├── cruise/client.lua       # Cruise control logic
+│   ├── fuel/client.lua         # Fuel provider detection and alerts
+│   ├── harness/client.lua      # Racing harness apply/remove
+│   ├── integrations/client/dynamic_weather.lua  # Weather resource integration
+│   ├── seatbelt/client.lua     # Seatbelt logic
+│   ├── settings/client.lua     # Settings UI, persistence, presets
+│   ├── stall/client.lua        # Engine stall/breakdown logic
+│   ├── status/client.lua       # Player status and VOIP state gathering
+│   ├── threads/client/hud.lua  # Main HUD loop, visibility, exports
+│   ├── threads/client/vehicle_status.lua  # Vehicle/aircraft data loop
+│   └── utility/shared/         # Minimap helpers and vehicle math
+└── web/
+    ├── vite.config.js
+    ├── package.json
+    └── src/
+        ├── App.jsx / main.jsx
+        ├── components/            # HUD, AircraftHUD, Indicator, StatusOxygenHex, SettingsModal, etc.
+        ├── hooks/                 # Motion/animation hooks
+        └── hudPresets.js          # Default layout/theme presets
+```
+
+The client Lua threads read game state, then push updates to the React UI through `SendNUIMessage`. Settings changes are persisted through `es_lib` and applied back to both the UI and native game state (minimap clip, radar, colors, etc.).
+
+---
+
+## Limitations
+
+- **Requires `es_lib`** — this resource will not start without it.
+- **Build step required** — `web/dist` is ignored and must be generated with `npm run build` before use.
+- **Server-side behavior** — `server.lua` automatically restarts the `maps` resource when `es_hud` starts; ensure that is compatible with your server setup.
+- **Minimap texture replacement** relies on `stream/squaremap.ytd`; disable it in config if you use a different minimap texture pack.
+- **Aircraft hydraulics** is a proxy computed from body health and wing/control-panel damage because GTA V does not expose a dedicated elevator/hydraulics scalar.
+- **Framework support** currently covers `standalone` and `qbx`; other frameworks may require bridge additions.
+- **Experimental features** — `fxmanifest.lua` enables `lua54`, `use_experimental_fxv2_oal`, and strict NUI callbacks. Test on your target server build.
+
+---
+
+## License
+
+[MIT](LICENSE) © 2026 Ever3st
+
+---
+
+## Disclaimer
+
+`es_hud` is an independent FiveM community resource. It is **not affiliated with, endorsed by, or sponsored by Cfx.re, Rockstar Games, Take-Two Interactive, QBCore, QBX, or any other third-party project** mentioned in the documentation. All product names, trademarks, and registered trademarks are the property of their respective owners.

@@ -3,7 +3,6 @@ local config = lib.require('config.shared')
 local PlayerPedId = PlayerPedId
 local GetEntityCoords = GetEntityCoords
 
---- Optional ETA helpers (if Dynamic_weather exposes them) — your published list has none; we still try common names.
 local WET_ETA_CANDIDATES = {
     'getWetEtaSeconds',
     'getWetWeatherEta',
@@ -41,7 +40,6 @@ local function asWeatherString(v)
     return nil
 end
 
---- One HUD line: resource-provided string, or wet/ETA + next weather, or first `forecast` entry.
 local function buildExportForecastLine(snap, wetLabel)
     for _, key in ipairs({ 'hudForecastLine', 'forecastLine', 'hudForecastText', 'forecastSummary' }) do
         local t = snap[key]
@@ -157,7 +155,6 @@ local function getExport(wres, name)
     return nil
 end
 
---- First matching export name (Lua resources vary: camelCase vs PascalCase).
 local function getExportAny(wres, names)
     for _, name in ipairs(names) do
         local f = getExport(wres, name)
@@ -168,7 +165,6 @@ local function getExportAny(wres, names)
     return nil
 end
 
---- Resource is a usable Dynamic_weather build if snapshot exists OR public weather getters exist.
 local function isWeatherResourceCapable(wres)
     if not wres or GetResourceState(wres) ~= 'started' then
         return false
@@ -179,7 +175,7 @@ local function isWeatherResourceCapable(wres)
     if getExport(wres, 'getPlayerWeather') or getExport(wres, 'getCurrentWeather') then
         return true
     end
-    --- Flood-only builds: still drive HUD integration + NUI flood strip.
+
     if getExport(wres, 'isFloodEventActive') or getExport(wres, 'getFloodEventState') then
         return true
     end
@@ -219,7 +215,6 @@ local function callExportString(wres, name)
     return asWeatherString(a) or (type(a) == 'string' and a) or tostring(a)
 end
 
---- Try pcall(export) — returns first numeric for wet ETA, or (seconds, from optional second return).
 local function tryWetEtaFromExports(wres)
     for _, name in ipairs(WET_ETA_CANDIDATES) do
         local f = getExport(wres, name)
@@ -257,7 +252,6 @@ local function formatWetLabel(wsec)
     end
 end
 
---- Build NUI payload from the resource's public exports (when getHudWeatherSnapshot is missing).
 local function buildSnapshotFromPublicExports(wres)
     local p = callExportString(wres, 'getPlayerWeather')
     local c = callExportString(wres, 'getCurrentWeather')
@@ -380,7 +374,6 @@ local FLOOD_PHASE_IDLE = {
     ['false'] = true,
 }
 
---- Non-idle string phase/state ⇒ treat as active (Dynamic_weather-style tables).
 local function floodPhaseStringActive(s)
     if type(s) ~= 'string' then
         return false
@@ -411,7 +404,6 @@ local function floodActiveFromStateTable(t)
     return false
 end
 
---- Interpret return value of `isFloodEventActive` or `getFloodEventState`.
 local function floodActiveFromReturn(v)
     if v == nil or v == false then
         return false
@@ -441,7 +433,6 @@ local function snapshotTruth(v)
     return false
 end
 
---- Snapshot boolean/string OR table-shaped flood state (many builds put `flashFlood = { phase = ... }`).
 local function snapshotFieldFloodActive(v)
     if snapshotTruth(v) then
         return true
@@ -452,7 +443,6 @@ local function snapshotFieldFloodActive(v)
     return false
 end
 
---- Some builds expose flood only on HUD snapshot (no separate flood exports).
 local function floodFromHudSnapshot(snap)
     if type(snap) ~= 'table' then
         return false, ''
@@ -480,8 +470,7 @@ local function floodFromHudSnapshot(snap)
     return false, ''
 end
 
---- Client exports: `isFloodEventActive`, `getFloodEventState` (see Dynamic_weather).
---- `snap` optional: merge flood flags from `getHudWeatherSnapshot` when exports omit them.
+
 local function readFloodState(wres, snap)
     local activeFn = getExportAny(wres, {
         'isFloodEventActive',
@@ -596,7 +585,6 @@ local function hurricaneFromHudSnapshot(snap)
     return false, ''
 end
 
---- `IsHurricaneActive` / `GetHurricaneState` (Dynamic_weather).
 local function readHurricaneState(wres, snap)
     local activeFn = getExportAny(wres, {
         'IsHurricaneActive',
@@ -690,7 +678,6 @@ local function pushOff()
     SendNUIMessage({ action = 'updateDynamicWeather', show = false })
 end
 
---- Tell NUI whether a Dynamic_weather build is available (drives settings visibility).
 local function sendAvailability(available)
     if lastAvailSent == available then
         return

@@ -319,7 +319,7 @@ const SettingsModal = ({
 
                     <div className="settings-divider" />
 
-                    {/* Display Section */}
+                    {}
                     <div className="settings-section">
                         <div className="settings-section-title">Display</div>
 
@@ -516,7 +516,7 @@ const SettingsModal = ({
 
                     <div className="settings-divider" />
 
-                    {/* Status Icons Section */}
+                    {}
                     <div className="settings-section">
                         <div className="settings-section-title">Status Icons</div>
 
@@ -607,7 +607,7 @@ const SettingsModal = ({
 
                     <div className="settings-divider" />
 
-                    {/* Colors Section */}
+                    {}
                     <div className="settings-section">
                         <div className="settings-section-title">Colors</div>
                         
@@ -684,7 +684,7 @@ const SettingsModal = ({
 
                     <div className="settings-divider" />
 
-                    {/* Minimap Section */}
+                    {}
                     <div className="settings-section">
                         <div className="settings-section-title">Minimap</div>
 
@@ -701,7 +701,7 @@ const SettingsModal = ({
 
                     <div className="settings-divider" />
 
-                    {/* Notifications Section */}
+                    {}
                     <div className="settings-section">
                         <div className="settings-section-title">Notifications</div>
 
@@ -738,7 +738,7 @@ const SettingsModal = ({
 
                     <div className="settings-divider" />
 
-                    {/* Cinematic Mode Section */}
+                    {}
                     <div className="settings-section">
                         <div className="settings-section-title">Cinematic Mode</div>
 

@@ -179,7 +179,7 @@ local function removeHealthArmorBars()
         end
 
         SetRadarBigmapEnabled(false, false)
-        -- Must run every frame: pause/menu/minimap refresh resets scaleform; long gaps let vanilla bars flash.
+
         while true do
             if not HasScaleformMovieLoaded(minimapScaleform) then
                 minimapScaleform = RequestScaleformMovie("minimap")
@@ -253,8 +253,7 @@ function minimap.isRendering()
     return IsMinimapRendering()
 end
 
---- Collapse expanded radar / bigmap without full texture refresh.
---- Call when re-enabling DisplayRadar (e.g. HUD show) so bigmap state from pause/menu/other scripts does not stick.
+
 function minimap.collapseBigmap()
     SetRadarBigmapEnabled(false, false)
     SetBigmapActive(false, false)

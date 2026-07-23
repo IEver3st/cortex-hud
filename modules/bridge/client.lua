@@ -76,7 +76,7 @@ if framework == 'qbx' then
         syncQbxLoadedState(false)
     end)
 else
-    -- Standalone: player is considered loaded as soon as they are playing
+
     CreateThread(function()
         while not IsPlayerPlaying(PlayerId()) do
             Wait(200)

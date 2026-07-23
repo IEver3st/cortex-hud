@@ -31,7 +31,7 @@
   --hud-surface-border: rgba(255, 255, 255, 0.12);
   --hud-text: #f8fafc;
   --hud-muted-text: rgba(226, 232, 240, 0.68);
-  /* --es-glass-fill-alpha from App.jsx = panel opacity (15–100% → 0.15–1) */
+
   --es-glass-fill: rgba(10, 14, 20, var(--es-glass-fill-alpha, 0.35));
   --es-glass-border: rgba(255, 255, 255, calc(0.22 + var(--es-backdrop-norm, 0.27) * 0.14));
   --es-glass-shadow-drop: 0 calc(2px * var(--es-ui-scale)) calc(12px * var(--es-ui-scale)) rgba(0, 0, 0, 0.06);
@@ -49,6 +49,11 @@
   --hud-safezone-bottom: 2vh;
 }
 
+.hud-presence-shell {
+  z-index: 1001;
+  pointer-events: none;
+}
+
 .waypoint-distance {
   display: flex;
   align-items: center;
@@ -58,11 +63,25 @@
   border: 1px solid rgba(255, 255, 255, calc(0.22 + var(--es-backdrop-norm, 0.27) * 0.28));
   border-radius: calc(999px * var(--es-ui-scale));
   z-index: 1001;
-  animation: waypoint-fade-in 0.3s ease;
-  transition: transform 0.4s ease;
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  opacity: 0;
+  transform: translate3d(0, calc(8px * var(--es-ui-scale)), 0) scale(0.96);
+  transition:
+    opacity 0.22s cubic-bezier(0.2, 0, 0, 1),
+    transform 0.28s cubic-bezier(0.2, 0, 0, 1);
+  will-change: opacity, transform;
+}
+
+.waypoint-distance.hud-presence-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.waypoint-distance.hud-presence-out {
+  opacity: 0;
+  transform: translate3d(0, calc(6px * var(--es-ui-scale)), 0) scale(0.97);
 }
 
 .waypoint-icon {
@@ -71,11 +90,23 @@
   filter: drop-shadow(0 0 calc(4px * var(--es-ui-scale)) var(--indicator-accent-soft));
 }
 
+.waypoint-pin-pulse {
+  animation: waypoint-pin-pulse 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.95) 2;
+}
+
 .waypoint-value {
+  display: inline-flex;
+  align-items: baseline;
   color: var(--hud-text);
   font-size: calc(13px * var(--es-ui-scale));
   font-weight: 700;
   font-family: 'Share Tech Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.waypoint-frac {
+  font-variant-numeric: tabular-nums;
 }
 
 .waypoint-unit {
@@ -85,9 +116,14 @@
   text-transform: lowercase;
 }
 
-@keyframes waypoint-fade-in {
-  from { opacity: 0; transform: translateY(calc(6px * var(--es-ui-scale))); }
-  to { opacity: 1; transform: translateY(0); }
+.waypoint-sliding .sliding-digit {
+  width: 0.58em;
+}
+
+@keyframes waypoint-pin-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(1.18); opacity: 0.85; }
+  70% { transform: scale(0.96); opacity: 1; }
 }
 
 .status-cluster {
@@ -112,14 +148,13 @@
   display: flex;
   flex-direction: column;
   gap: calc(4px * var(--es-ui-scale));
-  width: max(calc(160px * var(--es-ui-scale)), var(--hud-minimap-width));
+  width: max(calc(208px * var(--es-ui-scale)), var(--hud-minimap-width));
 }
 
 .status-cluster.variant-compact .hud-container {
-  width: calc(180px * var(--es-ui-scale));
+  width: calc(234px * var(--es-ui-scale));
 }
 
-/* Bar shape: one horizontal strip — primary rows + vertical need meters (no backdrop-filter). */
 .status-cluster--bar-rail {
   gap: 0;
 }
@@ -140,7 +175,7 @@
 
 .hud-bar-deck .hud-container {
   gap: calc(5px * var(--es-ui-scale));
-  width: max(calc(148px * var(--es-ui-scale)), min(var(--hud-minimap-width), calc(220px * var(--es-ui-scale))));
+  width: max(calc(192px * var(--es-ui-scale)), min(var(--hud-minimap-width), calc(286px * var(--es-ui-scale))));
 }
 
 .hud-bar-deck .bar-track {
@@ -149,6 +184,16 @@
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: calc(2px * var(--es-ui-scale));
+}
+
+/* Sectioned mode: no track shell / glass overlay (overrides .hud-bar-deck .bar-track) */
+.hud-bar-deck .bar-track.bar-track--sectioned,
+.bar-track.bar-track--sectioned {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .hud-bar-deck .bar-icon {
@@ -191,9 +236,11 @@
     inset 0 0 calc(8px * var(--es-ui-scale)) rgba(255, 255, 255, 0.12);
 }
 
+/* Empty section shells stay invisible; only filled color shows */
 .hud-bar-deck .bar-chunk {
-  background: rgba(0, 0, 0, 0.32);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .status-tray.shape-bar.shape-bar--rail {
@@ -340,6 +387,7 @@
   overflow: visible;
   transform: none;
   padding: 0;
+  box-shadow: none;
 }
 
 .bar-chunk {
@@ -347,17 +395,19 @@
   min-width: 0;
   position: relative;
   border-radius: calc(999px * var(--es-ui-scale));
-  background: var(--es-glass-fill);
-  border: 1px solid var(--es-glass-border);
+  background: transparent;
+  border: none;
   overflow: hidden;
-  box-shadow: var(--es-glass-shadow-inset);
+  box-shadow: none;
 }
 
+/* Keep the colored fill itself pill-shaped when track shells are gone */
 .bar-chunk-fill {
   position: absolute;
   left: 0;
   top: 0;
   height: 100%;
+  border-radius: inherit;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1;
 }
@@ -374,7 +424,44 @@
 
 .voip-container-modern {
   z-index: 1000;
-  transition: transform 0.4s ease;
+  opacity: 0;
+  transform: translate3d(calc(8px * var(--es-ui-scale)), 0, 0) scale(0.96);
+  transition:
+    opacity 0.22s cubic-bezier(0.2, 0, 0, 1),
+    transform 0.28s cubic-bezier(0.2, 0, 0, 1),
+    filter 0.28s ease;
+  will-change: opacity, transform;
+}
+
+.voip-container-modern.hud-presence-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.voip-container-modern.hud-presence-out {
+  opacity: 0;
+  transform: translate3d(calc(6px * var(--es-ui-scale)), 0, 0) scale(0.97);
+}
+
+.voip-container-modern.voip-talk-ramp {
+  filter: drop-shadow(0 0 calc(10px * var(--es-ui-scale)) var(--voip-accent-soft));
+}
+
+.voip-radio-chip-in {
+  animation: voip-radio-chip-in 0.32s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes voip-radio-chip-in {
+  from {
+    opacity: 0;
+    transform: translate3d(calc(6px * var(--es-ui-scale)), 0, 0) scale(0.25);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
 }
 
 .voip-variant-boxed .voip-content-modern {
@@ -590,6 +677,72 @@
   gap: calc(5px * var(--es-ui-scale));
 }
 
+/* Staggered tray mount — only runs on element mount */
+.status-tray-item.status-item-enter {
+  animation: status-item-in 0.34s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.status-tray > .status-tray-item.status-item-enter:nth-child(1) { animation-delay: 0ms; }
+.status-tray > .status-tray-item.status-item-enter:nth-child(2) { animation-delay: 55ms; }
+.status-tray > .status-tray-item.status-item-enter:nth-child(3) { animation-delay: 100ms; }
+.status-tray > .status-tray-item.status-item-enter:nth-child(4) { animation-delay: 140ms; }
+.status-tray > .status-tray-item.status-item-enter:nth-child(5) { animation-delay: 175ms; }
+.status-tray > .status-tray-item.status-item-enter:nth-child(6) { animation-delay: 205ms; }
+.status-tray > .status-tray-item.status-item-enter:nth-child(7) { animation-delay: 230ms; }
+.status-tray > .status-tray-item.status-item-enter:nth-child(8) { animation-delay: 250ms; }
+
+@keyframes status-item-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, calc(8px * var(--es-ui-scale)), 0) scale(0.25);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.status-tray-item.flash-damage {
+  animation: status-flash-damage 0.42s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.status-tray-item.flash-heal {
+  animation: status-flash-heal 0.42s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.status-tray-item.armor-breaking {
+  animation: armor-break 0.48s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+.status-tray-item.status-oxygen-urgent {
+  animation: oxygen-urgency-pulse var(--oxygen-pulse-ms, 700ms) ease-in-out infinite;
+}
+
+@keyframes status-flash-damage {
+  0% { filter: brightness(1); }
+  30% { filter: brightness(1.35) drop-shadow(0 0 calc(10px * var(--es-ui-scale)) rgba(239, 68, 68, 0.75)); transform: scale(1.04); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+
+@keyframes status-flash-heal {
+  0% { filter: brightness(1); }
+  35% { filter: brightness(1.25) drop-shadow(0 0 calc(10px * var(--es-ui-scale)) rgba(16, 185, 129, 0.65)); transform: scale(1.03); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+
+@keyframes armor-break {
+  0% { opacity: 1; transform: scale(1); filter: brightness(1.2); }
+  40% { opacity: 0.85; transform: scale(1.08); filter: brightness(1.5) saturate(0.4); }
+  100% { opacity: 0; transform: scale(0.7); filter: blur(3px) brightness(1.8); }
+}
+
+@keyframes oxygen-urgency-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.72; transform: scale(0.94); }
+}
+
 .status-icon-shell {
   position: relative;
   width: var(--status-ring-width);
@@ -659,7 +812,6 @@
   fill: #ef4444;
 }
 
-/* Circle oxygen: warn tints (same as bar hex low/critical) */
 .status-tray.shape-circle .status-tray-item.status-oxygen.low .status-circle-ring {
   stroke: #f59e0b;
 }
@@ -670,7 +822,6 @@
 .status-health { --status-color: var(--health-color); --status-glow: var(--health-glow); }
 .status-armor { --status-color: var(--armor-color); --status-glow: var(--armor-glow); }
 
-/* VOIP slot in hex/circle status tray (proximity fill; yellow when speaking) */
 .status-tray-item.status-voip .status-voip-meter-icon svg {
   color: rgba(248, 250, 252, 0.96);
 }
@@ -714,7 +865,6 @@
   animation: status-ring-alert 1s ease-in-out infinite;
 }
 
-/* ── NoPiXel-style circle ring icons ───────────────────────────────────────── */
 
 .status-tray.shape-circle {
   gap: calc(8px * var(--es-ui-scale));
@@ -739,14 +889,12 @@
   overflow: visible;
 }
 
-/* Dark filled circle background */
 .status-circle-track {
   fill: rgba(6, 8, 12, 0.72);
   stroke: var(--status-glow, rgba(255, 255, 255, 0.15));
   stroke-width: 12;
 }
 
-/* Colored progress ring — stroked, no fill */
 .status-circle-ring {
   fill: none;
   stroke: var(--status-color, var(--es-success));
@@ -764,7 +912,6 @@
   justify-content: center;
 }
 
-/* Critical/low alert states for circle */
 .status-tray-item.low .status-circle-wrap .status-circle-ring {
   filter: drop-shadow(0 0 calc(7px * var(--es-ui-scale)) var(--status-glow, rgba(16, 185, 129, 0.65)));
 }
@@ -791,14 +938,12 @@
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Oxygen hex in bar tray row — no horizontal meter (fill is in the glyph). */
 .status-icon-shell-hexagon--bar {
   width: calc(38px * var(--es-ui-scale));
   height: calc(44px * var(--es-ui-scale));
   flex-shrink: 0;
 }
 
-/* Legacy shape-bar column layout unused — rail variant above is the bar HUD tray. */
 
 @keyframes status-ring-alert {
   0%, 100% { transform: scale(1); opacity: 1; }
@@ -811,7 +956,66 @@
   align-items: center;
   gap: calc(4px * var(--es-ui-scale));
   pointer-events: none;
-  transition: transform 0.4s ease;
+  /* Quiet "gauge glass" wake — no scale/slide bounce */
+  opacity: 0;
+  filter: blur(5px) saturate(0.55);
+  transition:
+    opacity 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, filter;
+}
+
+.speedo-container.hud-presence-in {
+  opacity: 1;
+  filter: blur(0) saturate(1);
+}
+
+.speedo-container.hud-presence-out {
+  opacity: 0;
+  filter: blur(3px) saturate(0.7);
+  transition-duration: 0.18s, 0.22s;
+  transition-timing-function: ease, ease;
+}
+
+/* Rim wakes a beat before the face fully clears */
+.speedo-container.hud-presence-in .speedo-ring {
+  animation: speedo-rim-wake 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Center readout settles like a digital cluster powering on */
+.speedo-container.hud-presence-in .speedo-center {
+  animation: speedo-face-settle 0.5s 0.06s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.speedo-container.hud-presence-in .speedo-status {
+  animation: speedo-status-fade 0.42s 0.14s ease both;
+}
+
+@keyframes speedo-rim-wake {
+  from {
+    opacity: 0.35;
+    filter: brightness(1.35);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+@keyframes speedo-face-settle {
+  from {
+    opacity: 0;
+    letter-spacing: 0.22em;
+  }
+  to {
+    opacity: 1;
+    letter-spacing: normal;
+  }
+}
+
+@keyframes speedo-status-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .speedo-ring {
@@ -876,6 +1080,7 @@
   letter-spacing: 1px;
   line-height: 1;
   text-shadow: 0 0 calc(10px * var(--es-ui-scale)) rgba(0, 0, 0, 0.7);
+  font-variant-numeric: tabular-nums;
 }
 
 .speedo-unit {
@@ -893,6 +1098,18 @@
   font-weight: 800;
   letter-spacing: 1px;
   margin-top: calc(4px * var(--es-ui-scale));
+  transform: scale(1);
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.speedo-gear.gear-tick {
+  animation: gear-tick 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes gear-tick {
+  0% { transform: scale(1); filter: brightness(1); }
+  35% { transform: scale(1.18); filter: brightness(1.35); }
+  100% { transform: scale(1); filter: brightness(1); }
 }
 
 .speedo-track-nos {
@@ -941,6 +1158,48 @@
   color: var(--es-error);
   filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(255, 68, 68, 0.6));
   animation: status-icon-pulse 1s infinite;
+}
+
+.speedo-statusIcon.seatbelt-alert .speedo-statusIcon-label {
+  animation: seatbelt-alert 1.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.speedo-statusIcon.engine-critical-blink .speedo-statusIcon-label {
+  animation: engine-critical-blink 1.1s ease-in-out infinite;
+}
+
+.speedo-statusIcon.engine-warning-in {
+  animation: status-item-in 0.32s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.fuel-low-breathe .speedo-statusIcon-label,
+.speedo-fuel-radial-label.fuel-low-breathe,
+.speedo-statusItem-fuel.fuel-low-breathe .speedo-statusIcon-label {
+  animation: fuel-low-breathe 1.5s ease-in-out infinite;
+  color: var(--es-error);
+}
+
+.speedo-statusItem-fuel.fuel-low-breathe .speedo-statusFill {
+  background: var(--es-error);
+  box-shadow: 0 0 calc(6px * var(--es-ui-scale)) rgba(255, 68, 68, 0.5);
+}
+
+@keyframes seatbelt-alert {
+  0%, 100% { transform: translateX(0) scale(1); opacity: 1; }
+  20% { transform: translateX(calc(-1.5px * var(--es-ui-scale))) scale(1.06); opacity: 0.85; }
+  40% { transform: translateX(calc(1.5px * var(--es-ui-scale))) scale(1.06); opacity: 1; }
+  60% { transform: translateX(calc(-1px * var(--es-ui-scale))) scale(1.02); opacity: 0.9; }
+  80% { transform: translateX(0) scale(1); opacity: 1; }
+}
+
+@keyframes engine-critical-blink {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) rgba(255, 68, 68, 0.6)); }
+  50% { opacity: 0.35; filter: drop-shadow(0 0 calc(2px * var(--es-ui-scale)) rgba(255, 68, 68, 0.2)); }
+}
+
+@keyframes fuel-low-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.08); }
 }
 
 .speedo-statusIcon-label svg {
@@ -1038,7 +1297,6 @@
   filter: drop-shadow(0 0 calc(6px * var(--es-ui-scale)) var(--armor-glow));
 }
 
-/* Portrait R2-1–style cruise set-speed (taller than wide); inside ring bottom anchor */
 .speedo-cruise-sign {
   position: absolute;
   left: 50%;
@@ -1061,6 +1319,29 @@
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.85),
     0 0 0 1px rgba(15, 23, 42, 0.35);
+  animation: cruise-in 0.38s cubic-bezier(0.2, 0, 0, 1) both;
+  transform-origin: center bottom;
+}
+
+.speedo-cruise-sign.cruise-pop {
+  animation: cruise-pop 0.42s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes cruise-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(calc(8px * var(--es-ui-scale))) scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes cruise-pop {
+  0% { transform: translateX(-50%) scale(1); }
+  40% { transform: translateX(-50%) scale(1.1); }
+  100% { transform: translateX(-50%) scale(1); }
 }
 
 .speedo-cruise-sign__masthead {
@@ -1103,16 +1384,66 @@
 }
 
 .ammo-display {
-  position: fixed;
+  position: relative;
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: calc(8px * var(--es-ui-scale));
   padding: calc(8px * var(--es-ui-scale)) calc(12px * var(--es-ui-scale));
   z-index: 1001;
-  animation: ammo-fade-in 0.25s ease;
   pointer-events: none;
   background: transparent;
+  opacity: 0;
+  transform: translate3d(calc(10px * var(--es-ui-scale)), 0, 0) scale(0.96);
+  transition:
+    opacity 0.22s cubic-bezier(0.2, 0, 0, 1),
+    transform 0.28s cubic-bezier(0.2, 0, 0, 1),
+    filter 0.22s ease;
+  will-change: opacity, transform;
+}
+
+.ammo-display.hud-presence-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.ammo-display.hud-presence-out {
+  opacity: 0;
+  transform: translate3d(calc(8px * var(--es-ui-scale)), 0, 0) scale(0.97);
+}
+
+.ammo-display.ammo-low .ammo-clip {
+  animation: ammo-low-pulse 1.1s ease-in-out infinite;
+}
+
+.ammo-display.ammo-empty {
+  filter: saturate(0.35);
+}
+
+.ammo-display.ammo-empty .ammo-clip {
+  color: #ef4444 !important;
+  animation: ammo-empty-tick 0.9s ease-in-out infinite;
+  text-shadow: 0 0 calc(10px * var(--es-ui-scale)) rgba(239, 68, 68, 0.65);
+}
+
+.ammo-display.ammo-reload .ammo-info-stack {
+  animation: ammo-reload-bounce 0.36s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes ammo-low-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.25); opacity: 0.82; }
+}
+
+@keyframes ammo-empty-tick {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.96); }
+}
+
+@keyframes ammo-reload-bounce {
+  0% { transform: translateY(0); }
+  35% { transform: translateY(calc(-5px * var(--es-ui-scale))); }
+  100% { transform: translateY(0); }
 }
 
 .ammo-display.ammo-variant-inline {
@@ -1157,7 +1488,7 @@
   font-size: calc(28px * var(--es-ui-scale));
   font-weight: 500;
   font-family: 'Share Tech Mono', monospace;
-  line-height: 0.9;
+  line-height: 1;
   letter-spacing: -0.01em;
   text-shadow: 0 0 calc(8px * var(--es-ui-scale)) currentColor;
 }
@@ -1170,7 +1501,122 @@
   line-height: 1;
 }
 
-@keyframes ammo-fade-in {
-  from { opacity: 0; transform: translateX(calc(10px * var(--es-ui-scale))); }
-  to { opacity: 1; transform: translateX(0); }
+/* Gas-pump / odometer sliding digits */
+.sliding-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  vertical-align: baseline;
+}
+
+.sliding-digit {
+  position: relative;
+  display: inline-block;
+  height: 1em;
+  width: 0.62em;
+  overflow: hidden;
+  vertical-align: top;
+  /* Soft top/bottom fade like a mechanical reel window */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 16%,
+    #000 84%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 16%,
+    #000 84%,
+    transparent 100%
+  );
+}
+
+.sliding-digit-strip {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.22, 1.15, 0.36, 1);
+  transition-duration: 200ms;
+}
+
+.sliding-digit-strip.is-instant {
+  transition-duration: 0ms !important;
+}
+
+.sliding-digit-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1em;
+  height: 1em;
+  width: 100%;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ammo-clip .sliding-digit {
+  width: 0.58em;
+}
+
+.ammo-reserve .sliding-digit {
+  width: 0.55em;
+}
+
+/* Health / armor bar motion (bar-rail mode) */
+.hud-bar.health-bar.flash-damage .bar-track,
+.hud-bar.health-bar.flash-damage .bar-value,
+.hud-bar.health-bar.flash-damage .bar-icon {
+  animation: bar-flash-damage 0.42s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.hud-bar.health-bar.flash-heal .bar-track,
+.hud-bar.health-bar.flash-heal .bar-value,
+.hud-bar.health-bar.flash-heal .bar-icon {
+  animation: bar-flash-heal 0.42s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.hud-bar.health-bar.health-heartbeat .bar-icon,
+.hud-bar.health-bar.health-heartbeat .bar-value {
+  animation: health-heartbeat 1.05s ease-in-out infinite;
+}
+
+.hud-bar.armor-bar.armor-breaking {
+  animation: armor-break 0.48s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+@keyframes bar-flash-damage {
+  0% { filter: brightness(1); }
+  30% { filter: brightness(1.4) drop-shadow(0 0 calc(8px * var(--es-ui-scale)) rgba(239, 68, 68, 0.7)); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes bar-flash-heal {
+  0% { filter: brightness(1); }
+  35% { filter: brightness(1.3) drop-shadow(0 0 calc(8px * var(--es-ui-scale)) rgba(16, 185, 129, 0.55)); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes health-heartbeat {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  15% { transform: scale(1.08); opacity: 0.9; }
+  30% { transform: scale(0.98); opacity: 1; }
+  45% { transform: scale(1.05); opacity: 0.92; }
+  60% { transform: scale(1); opacity: 1; }
+}
+
+/* Status health heartbeat when critical (hex/circle tray) */
+.status-tray-item.status-health.critical .status-meter-icon {
+  animation: health-heartbeat 1.05s ease-in-out infinite;
+}
+
+/* VOIP tray talk ramp */
+.status-tray-item.status-voip.voip-talk-ramp {
+  filter: drop-shadow(0 0 calc(8px * var(--es-ui-scale)) rgba(250, 204, 21, 0.45));
+  transition: filter 0.28s ease;
 }
