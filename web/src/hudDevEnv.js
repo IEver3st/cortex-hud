@@ -2,7 +2,7 @@
 export const isHudDevBrowser =
   typeof window !== 'undefined' && typeof window.GetParentResourceName !== 'function'
 
-const PLAYFIELD_KEY = 'es_hud_dev_playfield'
+const PLAYFIELD_KEY = 'cortex_hud_dev_playfield'
 const HEX6 = /^#[0-9A-Fa-f]{6}$/
 
 

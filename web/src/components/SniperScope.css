@@ -1,0 +1,153 @@
+.sniper-scope {
+  --sniper-scope-size: min(68vw, 68vh);
+  --sniper-crosshair-width: clamp(4px, 0.38vw, 6px);
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    visibility 0s linear 160ms;
+}
+
+.sniper-scope--visible {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.sniper-scope__lens {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--sniper-scope-size);
+  height: var(--sniper-scope-size);
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(0, 0, 0, 0.88);
+  border-radius: 50%;
+  background: transparent;
+  box-shadow:
+    0 0 8px 4px rgba(0, 0, 0, 0.96),
+    0 0 0 100vmax #000;
+}
+
+.sniper-scope__axis,
+.sniper-scope__arm,
+.sniper-scope__tick {
+  position: absolute;
+  background: #050505;
+}
+
+.sniper-scope__axis {
+  z-index: 1;
+}
+
+.sniper-scope__axis--horizontal {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.sniper-scope__axis--vertical {
+  top: 0;
+  left: 50%;
+  width: 1px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.sniper-scope__arm {
+  z-index: 2;
+  width: 35%;
+  height: var(--sniper-crosshair-width);
+  border-radius: 999px;
+}
+
+.sniper-scope__arm--top {
+  top: 0;
+  left: 50%;
+  width: var(--sniper-crosshair-width);
+  height: 35%;
+  transform: translateX(-50%);
+}
+
+.sniper-scope__arm--right {
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+.sniper-scope__arm--bottom {
+  bottom: 0;
+  left: 50%;
+  width: var(--sniper-crosshair-width);
+  height: 35%;
+  transform: translateX(-50%);
+}
+
+.sniper-scope__arm--left {
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+}
+
+.sniper-scope__ticks {
+  z-index: 3;
+}
+
+.sniper-scope__ticks--horizontal {
+  position: absolute;
+  top: 50%;
+  left: 35%;
+  width: 30%;
+  height: 11px;
+  transform: translateY(-50%);
+}
+
+.sniper-scope__ticks--vertical {
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  width: 11px;
+  height: 30%;
+  transform: translateX(-50%);
+}
+
+.sniper-scope__ticks--horizontal .sniper-scope__tick {
+  top: 50%;
+  width: 1px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+}
+
+.sniper-scope__ticks--vertical .sniper-scope__tick {
+  left: 50%;
+  width: 6px;
+  height: 1px;
+  transform: translate(-50%, -50%);
+}
+
+.sniper-scope__tick:nth-child(1),
+.sniper-scope__tick:nth-child(6),
+.sniper-scope__tick:nth-child(11) {
+  height: 9px;
+}
+
+.sniper-scope__ticks--vertical .sniper-scope__tick:nth-child(1),
+.sniper-scope__ticks--vertical .sniper-scope__tick:nth-child(6),
+.sniper-scope__ticks--vertical .sniper-scope__tick:nth-child(11) {
+  width: 9px;
+  height: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sniper-scope {
+    transition-duration: 100ms;
+  }
+}

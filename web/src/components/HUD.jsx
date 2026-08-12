@@ -309,9 +309,6 @@ const HUD = React.memo(({
     const elH = rect.height
     e.preventDefault()
 
-    const SNAP_DIST = 30
-    const MARGIN = 10
-
     const handleMouseMove = (moveEvent) => {
       const dx = moveEvent.clientX - startX
       const dy = moveEvent.clientY - startY
@@ -321,15 +318,8 @@ const HUD = React.memo(({
       const vw = window.innerWidth
       const vh = window.innerHeight
 
-      if (newLeft < SNAP_DIST) newLeft = MARGIN
-      if (newLeft + elW > vw - SNAP_DIST) newLeft = vw - elW - MARGIN
-      if (newTop < SNAP_DIST) newTop = MARGIN
-      if (newTop + elH > vh - SNAP_DIST) newTop = vh - elH - MARGIN
-
-      const centerX = (vw - elW) / 2
-      if (Math.abs(newLeft - centerX) < SNAP_DIST) newLeft = centerX
-      const centerY = (vh - elH) / 2
-      if (Math.abs(newTop - centerY) < SNAP_DIST) newTop = centerY
+      newLeft = clamp(newLeft, 0, Math.max(0, vw - elW))
+      newTop = clamp(newTop, 0, Math.max(0, vh - elH))
 
       onAmmoDrag({ left: newLeft, top: newTop })
     }
@@ -428,10 +418,16 @@ const HUD = React.memo(({
         bottom: 'auto',
         transform: 'none',
       }
-    } else if (ammoPositionPreset && ammoPositionPreset !== 'preset') {
+    } else if (
+      ammoPositionPreset &&
+      ammoPositionPreset !== 'preset' &&
+      ammoPositionPreset !== 'custom'
+    ) {
+      const explicitAnchorStyle = { position: 'fixed' }
       switch (ammoPositionPreset) {
         case 'top-right':
           style = {
+            ...explicitAnchorStyle,
             top: `calc(4vh * var(--es-ui-scale))`,
             right: `calc(4vw * var(--es-ui-scale))`,
             left: 'auto',
@@ -441,6 +437,7 @@ const HUD = React.memo(({
           break
         case 'top-left':
           style = {
+            ...explicitAnchorStyle,
             top: `calc(4vh * var(--es-ui-scale))`,
             left: `calc(4vw * var(--es-ui-scale))`,
             right: 'auto',
@@ -450,6 +447,7 @@ const HUD = React.memo(({
           break
         case 'bottom-center':
           style = {
+            ...explicitAnchorStyle,
             bottom: `calc(1vh * var(--es-ui-scale))`,
             left: '50%',
             right: 'auto',
@@ -460,6 +458,7 @@ const HUD = React.memo(({
         case 'bottom-right':
         default:
           style = {
+            ...explicitAnchorStyle,
             bottom: `calc(1vh * var(--es-ui-scale))`,
             right: `calc(4vw * var(--es-ui-scale))`,
             left: 'auto',
@@ -468,14 +467,11 @@ const HUD = React.memo(({
           }
       }
     } else {
-      style = {
-        ...resolveAnchorStyle(layout?.ammo, {
-          anchor: 'bottom-right',
-          offsetX: 62,
-          offsetY: 132,
-        }),
-        transform: resolveAnchorStyle(layout?.ammo, { anchor: 'bottom-right', offsetX: 62, offsetY: 132 }).transform || 'none',
-      }
+      style = resolveAnchorStyle(layout?.ammo, {
+        anchor: 'bottom-right',
+        offsetX: 62,
+        offsetY: 132,
+      })
     }
 
     if (ammoEditMode) {

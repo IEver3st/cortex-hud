@@ -1,4 +1,4 @@
-# es_hud — Minimalist High-Performance HUD
+# cortex-hud — Minimalist High-Performance HUD
 
 A lightweight, customizable FiveM HUD built with React + Vite on the NUI side and modular Lua on the client. It replaces the default radar/health layout with a modern, reason-based visibility system, a custom square minimap, vehicle gauges, aircraft instruments, seatbelt/harness/cruise logic, engine stalling, and runtime VOIP/fuel integrations.
 
@@ -34,7 +34,7 @@ A lightweight, customizable FiveM HUD built with React + Vite on the NUI side an
 
 | Resource | Required | Notes |
 |----------|----------|-------|
-| **es_lib** | **Yes** | Must start before `es_hud`; provides settings, notifications, and progress bars. |
+| **cortex-lib** | **Yes** | Must start before `cortex-hud`; provides settings, notifications, and progress bars. |
 | nearest-postal | Optional | Enables postal code/distance in the location strip. |
 | polcam | Optional | Auto-detected; hides HUD when active. |
 | Dynamic_weather / dynamic_weather | Optional | Enables the weather forecast strip and warnings. |
@@ -45,23 +45,21 @@ A lightweight, customizable FiveM HUD built with React + Vite on the NUI side an
 
 ## Installation
 
-1. Make sure `es_lib` is installed and starts before `es_hud`.
-2. Build the NUI:
+1. Make sure `cortex-lib` is installed and starts before `cortex-hud`.
+2. Build the NUI with Bun:
 
    ```bash
    cd web
-   npm install
-   npm run build
+   bun install --frozen-lockfile
+   bun run build
    ```
 
-   > If you use Bun, you can run `bun install && bun run build` instead.
-
-3. Copy the `es_hud` folder into your FiveM `resources` directory.
+3. Copy the `cortex-hud` folder into your FiveM `resources` directory.
 4. Add to `server.cfg`:
 
    ```cfg
-   ensure es_lib
-   ensure es_hud
+   ensure cortex-lib
+   ensure cortex-hud
    ```
 
 5. Edit `config/shared.lua` to match your server framework and preferences.
@@ -89,7 +87,7 @@ npm run build
 | `/togglehud` | Toggle the entire HUD on/off (user visibility reason). |
 | `/hudsettings` (`I`) | Open the HUD settings menu. |
 | `/cinematicmode` (`F7` by default) | Toggle cinematic mode (hides HUD + radar). |
-| `/es_hud_cruise` (`Y` by default) | Toggle cruise control while driving. |
+| `/cortex_hud_cruise` (`Y` by default) | Toggle cruise control while driving. |
 | `B` | Toggle seatbelt (when enabled in config). |
 | `H` | Toggle racing harness (when enabled in config). |
 
@@ -169,7 +167,7 @@ All tuning is in `config/shared.lua`.
 ## Architecture
 
 ```
-es_hud/
+cortex-hud/
 ├── fxmanifest.lua          # Resource manifest (cerulean, lua54, fxv2_oal, strict NUI callbacks)
 ├── init.lua                # Client entry point; loads config, settings, HUD threads
 ├── server.lua              # Restarts the `maps` resource on server start
@@ -197,15 +195,14 @@ es_hud/
         └── hudPresets.js          # Default layout/theme presets
 ```
 
-The client Lua threads read game state, then push updates to the React UI through `SendNUIMessage`. Settings changes are persisted through `es_lib` and applied back to both the UI and native game state (minimap clip, radar, colors, etc.).
+The client Lua threads read game state, then push updates to the React UI through `SendNUIMessage`. Settings changes are persisted through `cortex-lib` and applied back to both the UI and native game state (minimap clip, radar, colors, etc.).
 
 ---
 
 ## Limitations
 
-- **Requires `es_lib`** — this resource will not start without it.
-- **Build step required** — `web/dist` is ignored and must be generated with `npm run build` before use.
-- **Server-side behavior** — `server.lua` automatically restarts the `maps` resource when `es_hud` starts; ensure that is compatible with your server setup.
+- **Requires `cortex-lib`** — this resource will not start without it.
+- **Build step required** — source checkouts must generate `web/dist` with `bun run build` before use; release archives include the compiled NUI.
 - **Minimap texture replacement** relies on `stream/squaremap.ytd`; disable it in config if you use a different minimap texture pack.
 - **Aircraft hydraulics** is a proxy computed from body health and wing/control-panel damage because GTA V does not expose a dedicated elevator/hydraulics scalar.
 - **Framework support** currently covers `standalone` and `qbx`; other frameworks may require bridge additions.
@@ -221,4 +218,4 @@ The client Lua threads read game state, then push updates to the React UI throug
 
 ## Disclaimer
 
-`es_hud` is an independent FiveM community resource. It is **not affiliated with, endorsed by, or sponsored by Cfx.re, Rockstar Games, Take-Two Interactive, QBCore, QBX, or any other third-party project** mentioned in the documentation. All product names, trademarks, and registered trademarks are the property of their respective owners.
+`cortex-hud` is an independent FiveM community resource. It is **not affiliated with, endorsed by, or sponsored by Cfx.re, Rockstar Games, Take-Two Interactive, QBCore, QBX, or any other third-party project** mentioned in the documentation. All product names, trademarks, and registered trademarks are the property of their respective owners.

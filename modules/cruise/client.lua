@@ -241,7 +241,7 @@ function Cruise.new()
         applyRunning = false,
     }, Cruise)
 
-    local cmd = (cc and cc.command) or "es_hud_cruise"
+    local cmd = (cc and cc.command) or "cortex_hud_cruise"
     RegisterCommand(cmd, function()
         self:tryToggle()
     end, false)

@@ -9,6 +9,8 @@ const COLOR_KEYS = [
   ['colorOxygen', 'oxygen'],
 ]
 
+const AMMO_POSITION_VALUES = new Set(['preset', 'custom', 'bottom-right', 'top-right', 'top-left', 'bottom-center'])
+
 function pickColor(saved, colorKey, themeKey, colorPreset) {
   const v = saved[colorKey]
   if (v && v !== '' && v !== 'preset') {
@@ -28,6 +30,12 @@ export function applyDevSettingsSave(saved, prev) {
 
   const layoutPreset = HUD_LAYOUT_PRESETS[layoutName]
   const colorPreset = HUD_LAYOUT_PRESETS[colorName]
+  const ammoPositionPreset = AMMO_POSITION_VALUES.has(saved.ammoPositionPreset)
+    ? saved.ammoPositionPreset
+    : (prev.ammoPositionPreset || 'preset')
+  const resolvedAmmoPositionPreset = ammoPositionPreset === 'preset'
+    ? layoutPreset.layout?.ammo?.anchor || 'bottom-right'
+    : ammoPositionPreset
 
   let resolvedShape = saved.statusIconShape
   if (!resolvedShape || resolvedShape === '' || resolvedShape === 'preset') {
@@ -66,6 +74,8 @@ export function applyDevSettingsSave(saved, prev) {
     layoutPreset: layoutName,
     colorPreset: colorName,
     layout: { ...layoutPreset.layout },
+    ammoPositionPreset,
+    resolvedAmmoPositionPreset,
     theme,
     colors,
     ammoColor,

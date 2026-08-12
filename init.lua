@@ -3,7 +3,7 @@ if IsDuplicityVersion() then
 end
 
 if not lib then
-    error("es_lib is not loaded! Ensure es_lib is started before es_hud.", 0)
+    error("cortex-lib is not loaded! Ensure cortex-lib is started before cortex-hud.", 0)
     return
 end
 
@@ -11,10 +11,14 @@ local config = lib.require("config.shared")
 lib.require("modules.settings.client")
 local hud = lib.require("modules.threads.client.hud")
 local Status = lib.require("modules.status.client")
+local SniperScope = lib.require("modules.scope.client")
 
 hud.start(config)
 Status.start(config, function()
-    return exports.es_hud:isHudVisible()
+    return exports['cortex-hud']:isHudVisible()
+end)
+SniperScope.start(function()
+    return exports['cortex-hud']:isHudVisible()
 end)
 
 local dynamicWeatherHud = lib.require('modules.integrations.client.dynamic_weather')

@@ -19,7 +19,7 @@ Config.disableSpeedometer = false
 Config.cruiseControl = {
     enabled = true,
     key = "Y",
-    command = "es_hud_cruise",
+    command = "cortex_hud_cruise",
     minSpeed = 15,
     slowdownTolerance = 2,
     -- true = full cruise (auto-throttle to hold set speed). false = speed cap only, no auto throttle
@@ -134,7 +134,7 @@ Config.fuelDisplayStyle = 'bar'
 Config.showCrosshair = false
 -- Indicator strip: forecast from Dynamic_weather (requires resource + HUD setting).
 Config.showDynamicWeather = false
--- Flash flood segment when Dynamic_weather reports active flood (requires HUD setting in es_lib Weather).
+-- Flash flood segment when Dynamic_weather reports active flood (requires HUD setting in cortex-lib Weather).
 Config.showFlashFloodWarning = true
 -- Hurricane segment when Dynamic_weather reports active hurricane (HUD setting).
 Config.showHurricaneWarning = true
@@ -143,7 +143,7 @@ Config.sectionedBars = false
 Config.sectionedIndicator = false
 -- NUI glass: frost strength multiplier (0.25–3). 1 = default. CEF-safe faux glass.
 Config.backdropBlur = 1.0
--- Panel fill multiplier (0.15–1). Stored in es_lib as 15–100. Prevents fully invisible panels.
+-- Panel fill multiplier (0.15–1). Stored in cortex-lib as 15–100. Prevents fully invisible panels.
 Config.panelOpacity = 1.0
 Config.defaultHudPreset = 'classic'
 Config.oxygenDisplayLocation = 'statusCluster'

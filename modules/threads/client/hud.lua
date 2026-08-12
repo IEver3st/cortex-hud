@@ -15,7 +15,8 @@ local GetLabelText = GetLabelText
 local GetEntityHeading = GetEntityHeading
 local GetSafeZoneSize = GetSafeZoneSize
 local GetActiveScreenResolution = GetActiveScreenResolution
-local SendNUIMessage = SendNUIMessage
+local Nui = lib.require("modules.nui.client")
+local SendNUIMessage = Nui.send
 local IsPedInAnyVehicle = IsPedInAnyVehicle
 local DisplayRadar = DisplayRadar
 local DisplayHud = DisplayHud
@@ -57,7 +58,7 @@ local initialMinimapRecoveryStarted = false
 local function debugMinimap(message, ...)
     local minimapConfig = activeConfig and activeConfig.Minimap or nil
     if not minimapConfig or minimapConfig.debug ~= true then return end
-    print(("[es_hud:minimap] " .. message):format(...))
+    print(("[cortex-hud:minimap] " .. message):format(...))
 end
 
 local function isFullyVisible()
@@ -317,7 +318,7 @@ function hud.start(config)
     minimap.checkExternalMapResource(config, true)
     updateVisibility('hud_start', true)
 
-    AddEventHandler('es_hud:client:syncMinimap', function(reason, refreshLayout)
+    AddEventHandler('cortex-hud:client:syncMinimap', function(reason, refreshLayout)
         syncMinimapState(reason, refreshLayout == true)
     end)
 
@@ -399,20 +400,13 @@ function hud.start(config)
     CreateThread(function()
         local HideHudComponentThisFrame = HideHudComponentThisFrame
         while true do
-
-            DisplayHud(true)
-
             HideHudComponentThisFrame(1)
             HideHudComponentThisFrame(2)
             HideHudComponentThisFrame(3)
             HideHudComponentThisFrame(4)
             HideHudComponentThisFrame(5)
-            HideHudComponentThisFrame(6)
-            HideHudComponentThisFrame(7)
-            HideHudComponentThisFrame(8)
-            HideHudComponentThisFrame(9)
-            HideHudComponentThisFrame(14)
             HideHudComponentThisFrame(13)
+            HideHudComponentThisFrame(14)
             HideHudComponentThisFrame(17)
             HideHudComponentThisFrame(20)
             Wait(0)
@@ -477,41 +471,46 @@ function hud.start(config)
         end
     end)
 
-    CreateThread(function()
-        while true do
-            if config.EnablePostal and postals then
-                local ped = PlayerPedId()
-                local coords = GetEntityCoords(ped)
-                local playerX = coords.x
-                local playerY = coords.y
+    if config.EnablePostal then
+        CreateThread(function()
+            while true do
+                if postals then
+                    local ped = PlayerPedId()
+                    local coords = GetEntityCoords(ped)
+                    local playerX = coords.x
+                    local playerY = coords.y
 
-                local minD2 = nil
-                local minCode = ""
+                    local minD2 = nil
+                    local minCode = ""
 
-                for i = 1, #postals do
-                    local postal = postals[i]
-                    local dx = playerX - postal.x
-                    local dy = playerY - postal.y
-                    local d2 = (dx * dx) + (dy * dy)
-                    if not minD2 or d2 < minD2 then
-                        minD2 = d2
-                        minCode = postal.code
+                    for i = 1, #postals do
+                        local postal = postals[i]
+                        local dx = playerX - postal.x
+                        local dy = playerY - postal.y
+                        local d2 = (dx * dx) + (dy * dy)
+                        if not minD2 or d2 < minD2 then
+                            minD2 = d2
+                            minCode = postal.code
+                        end
+                    end
+
+                    nearestPostalCode = minCode
+                    if config.ShowPostalDistance then
+                        nearestPostalDist = minD2 and math_sqrt(minD2) or -1
+                    else
+                        nearestPostalDist = -1
                     end
                 end
-
-                nearestPostalCode = minCode
-                if config.ShowPostalDistance then
-                    nearestPostalDist = minD2 and math_sqrt(minD2) or -1
-                else
-                    nearestPostalDist = -1
-                end
+                Wait(config.PostalUpdateInterval or 500)
             end
-            Wait(config.PostalUpdateInterval or 500)
-        end
-    end)
+        end)
+    end
 
     CreateThread(function()
         Wait(1000)
+
+        local lastLocationX = nil
+        local lastLocationY = nil
 
         while true do
             local sleep = config.UpdateInterval or 200
@@ -538,9 +537,20 @@ function hud.start(config)
                     })
                 end
 
-                local streetHash, crossingHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
-                local streetName = GetStreetNameFromHashKey(streetHash)
-                local zoneLabel = GetLabelText(GetNameOfZone(coords.x, coords.y, coords.z))
+                local streetName = lastStreet
+                local zoneLabel = lastZone
+                local dx = lastLocationX and (coords.x - lastLocationX) or 0.0
+                local dy = lastLocationY and (coords.y - lastLocationY) or 0.0
+                local locationChanged = not lastLocationX or ((dx * dx) + (dy * dy)) >= 4.0
+
+                if locationChanged then
+                    local streetHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
+                    streetName = GetStreetNameFromHashKey(streetHash)
+                    zoneLabel = GetLabelText(GetNameOfZone(coords.x, coords.y, coords.z))
+                    lastLocationX = coords.x
+                    lastLocationY = coords.y
+                end
+
                 local heading = GetEntityHeading(ped)
 
                 local hasDistanceChanged = config.ShowPostalDistance and math_abs(nearestPostalDist - lastPostalDist) > 2.0
@@ -649,20 +659,60 @@ function hud.start(config)
     local lastAmmoReserve = -1
     local lastIsArmed = false
 
+    local function getCurrentWeaponState()
+        local ped = PlayerPedId()
+        local weaponHash = GetSelectedPedWeapon(ped)
+        local isArmed = weaponHash ~= UNARMED_HASH
+        local clipAmmo = -1
+        local reserveAmmo = -1
+
+        if isArmed then
+            local _, currentClipAmmo = GetAmmoInClip(ped, weaponHash)
+            clipAmmo = tonumber(currentClipAmmo) or 0
+            local totalAmmo = tonumber(GetAmmoInPedWeapon(ped, weaponHash)) or 0
+            reserveAmmo = math_max(0, totalAmmo - clipAmmo)
+        end
+
+        return isArmed, clipAmmo, reserveAmmo
+    end
+
+    local function sendCurrentWeaponState()
+        local isArmed, clipAmmo, reserveAmmo = getCurrentWeaponState()
+
+        lastAmmoClip = clipAmmo
+        lastAmmoReserve = reserveAmmo
+        lastIsArmed = isArmed
+
+        SendNUIMessage({
+            action = 'updateAmmo',
+            ammoClip = clipAmmo,
+            ammoReserve = reserveAmmo,
+            isArmed = isArmed,
+        })
+    end
+
+    Nui.onReady(function()
+        SendNUIMessage({
+            action = 'init',
+            visible = isFullyVisible(),
+            radarVisible = lastRadarState == true,
+        })
+        SendNUIMessage({
+            action = 'setForceAircraftHud',
+            forced = aircraftHudForced,
+        })
+        sendCurrentWeaponState()
+    end)
+
     CreateThread(function()
         while true do
             local sleep = 750
 
             if isFullyVisible() then
-                local ped = PlayerPedId()
-                local weaponHash = GetSelectedPedWeapon(ped)
-                local isArmed = weaponHash ~= UNARMED_HASH
+                local isArmed, clipAmmo, reserveAmmo = getCurrentWeaponState()
 
                 if isArmed then
                     sleep = 100
-                    local _, clipAmmo = GetAmmoInClip(ped, weaponHash)
-                    local totalAmmo = GetAmmoInPedWeapon(ped, weaponHash)
-                    local reserveAmmo = totalAmmo - clipAmmo
 
                     if clipAmmo ~= lastAmmoClip or reserveAmmo ~= lastAmmoReserve or isArmed ~= lastIsArmed then
                         lastAmmoClip = clipAmmo
@@ -825,14 +875,17 @@ function hud.start(config)
         return (type(cruise) == 'table') and cruise:isCruiseOn() or false
     end)
 
-    AddEventHandler('es_nos:update', function(data)
+    local function handleNosUpdate(data)
         if isFullyVisible() then
             SendNUIMessage({
                 action = 'nos:update',
                 data = data
             })
         end
-    end)
+    end
+
+    AddEventHandler('es_nos:update', handleNosUpdate)
+    AddEventHandler('cortex_nos:update', handleNosUpdate)
 end
 
 return hud

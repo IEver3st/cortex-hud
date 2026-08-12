@@ -1,8 +1,10 @@
 local config = lib.require("config.shared")
+local libSettings = lib.settings
+local Nui = lib.require("modules.nui.client")
 
 local Settings = {}
 
-local SendNUIMessage = SendNUIMessage
+local SendNUIMessage = Nui.send
 local TriggerEvent = TriggerEvent
 local Wait = Wait
 local math_floor = math.floor
@@ -65,9 +67,9 @@ local KEY_MAP = {
     hud_showHurricaneWarning = 'showHurricaneWarning',
 }
 
-local HUD_TO_ES_KEY = {}
-for esKey, hudKey in pairs(KEY_MAP) do
-    HUD_TO_ES_KEY[hudKey] = esKey
+local HUD_TO_LIB_KEY = {}
+for libKey, hudKey in pairs(KEY_MAP) do
+    HUD_TO_LIB_KEY[hudKey] = libKey
 end
 
 local function copyTable(value)
@@ -315,6 +317,7 @@ local OXYGEN_DISPLAY_OPTIONS = {
 }
 
 local AMMO_POSITION_OPTIONS = {
+    { value = 'preset', label = 'HUD Preset' },
     { value = 'custom', label = 'Custom (Drag)' },
     { value = 'bottom-right', label = 'Bottom Right' },
     { value = 'top-right', label = 'Top Right' },
@@ -366,8 +369,8 @@ local function getSettingsDefinition()
     end
 
     local defaultAmmoPosition = config.ammoPositionPreset
-    if not defaultAmmoPosition or defaultAmmoPosition == '' or defaultAmmoPosition == 'preset' then
-        defaultAmmoPosition = 'bottom-right'
+    if not defaultAmmoPosition or defaultAmmoPosition == '' then
+        defaultAmmoPosition = 'preset'
     end
 
     local isDyn = isDynamicWeatherResourceReady()
@@ -768,7 +771,7 @@ end
 local function buildResolvedAmmoPos(data, resolvedAmmoPositionPreset)
     local posX = tonumber(data.ammoPosX) or 0
     local posY = tonumber(data.ammoPosY) or 0
-    if resolvedAmmoPositionPreset == 'custom' and posX > 0 and posY > 0 then
+    if resolvedAmmoPositionPreset == 'custom' and posX >= 0 and posY >= 0 then
         return { left = posX, top = posY }
     end
 
@@ -794,7 +797,14 @@ local function resolveHudPresentation(data)
 
     local resolvedAmmoPositionPreset = data.ammoPositionPreset
     if not resolvedAmmoPositionPreset or resolvedAmmoPositionPreset == '' or resolvedAmmoPositionPreset == 'preset' then
-        resolvedAmmoPositionPreset = presetDefaults.ammoPositionPreset or config.ammoPositionPreset or 'bottom-right'
+        local presetAmmoPosition = presetDefaults.ammoPositionPreset
+        local presetAmmoLayout = presetLayout.ammo
+        if not presetAmmoPosition or presetAmmoPosition == '' or presetAmmoPosition == 'preset' then
+            presetAmmoPosition = type(presetAmmoLayout) == 'table' and presetAmmoLayout.anchor
+                or config.ammoPositionPreset
+                or 'bottom-right'
+        end
+        resolvedAmmoPositionPreset = presetAmmoPosition
     end
 
     if not resolvedAmmoPositionPreset or resolvedAmmoPositionPreset == '' or resolvedAmmoPositionPreset == 'preset' then
@@ -873,7 +883,7 @@ local function pushResolvedHud(data)
         fuelDisplayStyle = presentation.resolvedFuelDisplayStyle,
         resolvedFuelDisplayStyle = presentation.resolvedFuelDisplayStyle,
         ammoColor = presentation.ammoColor,
-        ammoPositionPreset = presentation.resolvedAmmoPositionPreset,
+        ammoPositionPreset = data.ammoPositionPreset or 'preset',
         resolvedAmmoPositionPreset = presentation.resolvedAmmoPositionPreset,
         ammoPos = presentation.ammoPos,
         showCrosshair = config.showCrosshair,
@@ -949,17 +959,17 @@ function Settings.apply(data, options)
     config.panelOpacity = normalizePanelOpacity(data.panelOpacity) or normalizePanelOpacity(config.panelOpacity) or 1.0
     config.fuelDisplayStyle = presentation.resolvedFuelDisplayStyle
     config.ammoColor = presentation.ammoColor
-    config.ammoPositionPreset = presentation.resolvedAmmoPositionPreset
+    config.ammoPositionPreset = data.ammoPositionPreset or config.ammoPositionPreset or 'preset'
     config.speedometerPositionMode = data.speedometerPositionMode or config.speedometerPositionMode or 'preset'
 
     pushResolvedHud(data)
     Settings.registerCinematicKey(config.cinematicKey)
-    TriggerEvent('es_hud:client:syncMinimap', 'settings_apply', refreshMinimap == true)
+    TriggerEvent('cortex-hud:client:syncMinimap', 'settings_apply', refreshMinimap == true)
 end
 
-local function setEsLibSetting(key, value)
+local function setLibSetting(key, value)
     pcall(function()
-        exports['es_lib']:setSetting(key, value)
+        libSettings.setSetting(key, value)
     end)
 end
 
@@ -968,19 +978,19 @@ local function persistSettingsData(data)
         return
     end
 
-    for hudKey, esKey in pairs(HUD_TO_ES_KEY) do
+    for hudKey, libKey in pairs(HUD_TO_LIB_KEY) do
         local v = data[hudKey]
         if v == nil then
-            v = data[esKey]
+            v = data[libKey]
         end
         if v ~= nil then
-            if esKey == 'hud_backdropBlur' and type(v) == 'number' and v <= 3 then
+            if libKey == 'hud_backdropBlur' and type(v) == 'number' and v <= 3 then
                 v = math_floor(v * 100 + 0.5)
             end
-            if esKey == 'hud_panelOpacity' and type(v) == 'number' and v <= 1 then
+            if libKey == 'hud_panelOpacity' and type(v) == 'number' and v <= 1 then
                 v = math_floor(v * 100 + 0.5)
             end
-            setEsLibSetting(esKey, v)
+            setLibSetting(libKey, v)
         end
     end
 end
@@ -1004,28 +1014,43 @@ local function normalizePosition(left, top)
     return posX, posY
 end
 
+local function normalizeAmmoPosition(left, top)
+    local posX = math_floor((tonumber(left) or 0) + 0.5)
+    local posY = math_floor((tonumber(top) or 0) + 0.5)
+
+    if posX < 0 then
+        posX = 0
+    end
+
+    if posY < 0 then
+        posY = 0
+    end
+
+    return posX, posY
+end
+
 local function persistSpeedometerState(posX, posY)
-    setEsLibSetting('hud_speedometerPosX', posX)
-    setEsLibSetting('hud_speedometerPosY', posY)
+    setLibSetting('hud_speedometerPosX', posX)
+    setLibSetting('hud_speedometerPosY', posY)
     if posX > 0 and posY > 0 then
-        setEsLibSetting('hud_speedometerPositionMode', 'custom')
+        setLibSetting('hud_speedometerPositionMode', 'custom')
     else
-        setEsLibSetting('hud_speedometerPositionMode', 'preset')
+        setLibSetting('hud_speedometerPositionMode', 'preset')
     end
 end
 
 local function persistAmmoState(posX, posY, positionPreset)
-    setEsLibSetting('hud_ammoPosX', posX)
-    setEsLibSetting('hud_ammoPosY', posY)
-    setEsLibSetting('hud_ammoPositionPreset', positionPreset)
+    setLibSetting('hud_ammoPosX', posX)
+    setLibSetting('hud_ammoPosY', posY)
+    setLibSetting('hud_ammoPositionPreset', positionPreset)
 end
 
 function Settings.get()
     local data = buildDefaultSettings()
 
     pcall(function()
-        for esKey, hudKey in pairs(KEY_MAP) do
-            local value = exports['es_lib']:getSetting(esKey)
+        for libKey, hudKey in pairs(KEY_MAP) do
+            local value = libSettings.getSetting(libKey)
             if value ~= nil then
                 data[hudKey] = value
             end
@@ -1065,7 +1090,7 @@ function Settings.get()
     data.colorOxygen = presentation.colors.oxygen
     data.fuelDisplayStyle = presentation.resolvedFuelDisplayStyle
     data.colorAmmo = presentation.ammoColor
-    data.ammoPositionPreset = presentation.resolvedAmmoPositionPreset
+    data.resolvedAmmoPositionPreset = presentation.resolvedAmmoPositionPreset
 
     return data
 end
@@ -1080,12 +1105,12 @@ function Settings.toggleCinematic()
     SendNUIMessage({ action = 'setCinematicMode', enabled = cinematicMode })
 
     if cinematicMode then
-        exports.es_hud:setHudVisibleReason('cinematic', false)
+        exports['cortex-hud']:setHudVisibleReason('cinematic', false)
         if config.cinematicNotifications then
             lib.notify({ title = 'HUD', description = 'Cinematic mode enabled', type = 'inform', duration = 2000 })
         end
     else
-        exports.es_hud:setHudVisibleReason('cinematic', true)
+        exports['cortex-hud']:setHudVisibleReason('cinematic', true)
         if config.cinematicNotifications then
             lib.notify({ title = 'HUD', description = 'Cinematic mode disabled', type = 'inform', duration = 2000 })
         end
@@ -1110,17 +1135,32 @@ function Settings.registerCinematicKey(key)
     end
 end
 
+local settingsMenuOpen = false
+
 function Settings.open()
-    pcall(function()
-        exports['es_lib']:openSettingsMenu()
-    end)
+    if settingsMenuOpen then
+        return
+    end
+    settingsMenuOpen = true
+    SetNuiFocus(true, true)
+    SetNuiFocusKeepInput(false)
+    SendNUIMessage({
+        action = 'openSettings',
+        settings = Settings.get(),
+    })
 end
 
 function Settings.close()
+    if not settingsMenuOpen then
+        return
+    end
+    settingsMenuOpen = false
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'settingsClose' })
 end
 
 function Settings.isOpen()
-    return false
+    return settingsMenuOpen
 end
 
 RegisterNUICallback('settings:save', function(data, cb)
@@ -1146,10 +1186,12 @@ RegisterNUICallback('settings:save', function(data, cb)
     end
 
     Settings.apply(merged, { refreshMinimap = false })
+    Settings.close()
     cb('ok')
 end)
 
 RegisterNUICallback('settings:close', function(_, cb)
+    Settings.close()
     cb('ok')
 end)
 
@@ -1159,7 +1201,7 @@ end, false)
 
 RegisterKeyMapping('hudsettings', 'Open HUD Settings', 'keyboard', 'I')
 
-AddEventHandler('es_lib:settingChanged', function(key, value)
+AddEventHandler('cortex-lib:settingChanged', function(key, value)
     local hudKey = KEY_MAP[key]
     if not hudKey then
         return
@@ -1170,8 +1212,8 @@ AddEventHandler('es_lib:settingChanged', function(key, value)
     Settings.apply(current, { refreshMinimap = false })
 end)
 
-AddEventHandler('es_lib:settingsAction', function(scriptId, action)
-    if scriptId ~= 'es_hud' then
+AddEventHandler('cortex-lib:settingsAction', function(scriptId, action)
+    if scriptId ~= 'cortex-hud' then
         return
     end
 
@@ -1180,7 +1222,7 @@ AddEventHandler('es_lib:settingsAction', function(scriptId, action)
         SendNUIMessage({ action = 'settingsClose' })
         SetNuiFocus(false, false)
         pcall(function()
-            exports['es_lib']:closeSettingsMenu()
+            exports['cortex-lib']:closeSettingsMenu()
         end)
         Wait(200)
         SetNuiFocus(true, true)
@@ -1205,7 +1247,17 @@ AddEventHandler('es_lib:settingsAction', function(scriptId, action)
     end
 end)
 
+Nui.onReady(function()
+    Settings.apply(Settings.get(), { refreshMinimap = false })
+end)
+
 RegisterNUICallback('speedometer:startEdit', function(_, cb)
+    SetNuiFocus(true, true)
+    SetNuiFocusKeepInput(false)
+    cb('ok')
+end)
+
+RegisterNUICallback('ammo:startEdit', function(_, cb)
     SetNuiFocus(true, true)
     SetNuiFocusKeepInput(false)
     cb('ok')
@@ -1226,9 +1278,9 @@ end)
 RegisterNUICallback('ammo:endEdit', function(data, cb)
     SetNuiFocus(false, false)
 
-    if data and data.saved then
-        local posX, posY = normalizePosition(data.left, data.top)
-        local preset = (posX > 0 and posY > 0) and 'custom' or 'preset'
+    if data and data.saved and data.hasPosition == true then
+        local posX, posY = normalizeAmmoPosition(data.left, data.top)
+        local preset = 'custom'
         persistAmmoState(posX, posY, preset)
         Settings.apply(Settings.get(), { refreshMinimap = false })
     end

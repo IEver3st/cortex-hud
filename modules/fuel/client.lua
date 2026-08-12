@@ -212,7 +212,7 @@ function Fuel.get(vehicle)
         local now = GetGameTimer()
         if not lastDebugPrint or (now - lastDebugPrint > 5000) then
             print(string.format(
-                "[es_hud:fuel] Vehicle: %d | Source: %s | Fuel: %.2f | HasProvider: %s",
+                "[cortex-hud:fuel] Vehicle: %d | Source: %s | Fuel: %.2f | HasProvider: %s",
                 vehicle, source, result, tostring(hasFuelProvider)
             ))
             lastDebugPrint = now

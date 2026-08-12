@@ -1,7 +1,7 @@
 local config = lib.require("config.shared")
 local utility = lib.require("modules.utility.shared.vehicle")
 
-local SendNUIMessage = SendNUIMessage
+local SendNUIMessage = lib.require("modules.nui.client").send
 local PlayerPedId = PlayerPedId
 local IsPedInAnyVehicle = IsPedInAnyVehicle
 local GetVehiclePedIsIn = GetVehiclePedIsIn
@@ -397,7 +397,7 @@ function VehicleStatusThread:start()
         end, debug.traceback)
 
         if not ok then
-            print("^1[es_hud] vehicle_status thread error:^7 " .. tostring(err))
+            print("^1[cortex-hud] vehicle_status thread error:^7 " .. tostring(err))
         end
 
         if self.seatbelt then

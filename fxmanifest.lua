@@ -3,9 +3,9 @@ game 'gta5'
 
 author 'Ever3st'
 description 'Minimalist High-Performance HUD'
-version '1.0.0'
+version '1.0.1'
 
-dependency 'es_lib'
+dependency 'cortex-lib'
 
 files {
     'web/dist/index.html',
@@ -18,7 +18,7 @@ files {
 ui_page 'web/dist/index.html'
 
 shared_scripts {
-    '@es_lib/init.lua'
+    '@cortex-lib/init.lua'
 }
 
 client_scripts {

@@ -25,6 +25,7 @@ local Wait = Wait
 local minimapReady = false
 local zoomDataApplied = false
 local healthArmorHidden = false
+local minimapScaleform = nil
 local lastExternalMapState = nil
 
 local function isDebugEnabled(config)
@@ -34,7 +35,7 @@ end
 
 local function debugLog(config, message, ...)
     if not isDebugEnabled(config) then return end
-    print(("[es_hud:minimap] " .. message):format(...))
+    print(("[cortex-hud:minimap] " .. message):format(...))
 end
 
 local function getExternalMapResourceName(config)
@@ -114,7 +115,7 @@ function minimap.checkExternalMapResource(config, forceLog)
         lastExternalMapState = state
 
         if state ~= "started" then
-            print(("[es_hud] WARN: external minimap resource '%s' is '%s'. That resource should own minimap.gfx and tile streaming."):format(resourceName, state))
+            print(("[cortex-hud] WARN: external minimap resource '%s' is '%s'. That resource should own minimap.gfx and tile streaming."):format(resourceName, state))
         else
             debugLog(config, "External minimap resource '%s' is started.", resourceName)
         end
@@ -155,7 +156,7 @@ local function ensureMinimapTextures(config)
     end
 
     if not HasStreamedTextureDictLoaded(dictName) then
-        print(("[es_hud] WARN: minimap texture dict '%s' failed to load after %dms. Using default radar mask."):format(dictName, loadTimeoutMs))
+        print(("[cortex-hud] WARN: minimap texture dict '%s' failed to load after %dms. Using default radar mask."):format(dictName, loadTimeoutMs))
         return false
     end
 
@@ -173,7 +174,7 @@ local function removeHealthArmorBars()
     healthArmorHidden = true
 
     CreateThread(function()
-        local minimapScaleform = RequestScaleformMovie("minimap")
+        minimapScaleform = RequestScaleformMovie("minimap")
         while not HasScaleformMovieLoaded(minimapScaleform) do
             Wait(100)
         end
@@ -188,7 +189,10 @@ local function removeHealthArmorBars()
                 ScaleformMovieMethodAddParamInt(3)
                 EndScaleformMovieMethod()
             end
-            Wait(0)
+
+            -- The scaleform setting persists. Reapply occasionally so pause-map
+            -- or minimap reloads recover without running four natives every frame.
+            Wait(1000)
         end
     end)
 end

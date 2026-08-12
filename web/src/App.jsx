@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import HUD from './components/HUD'
 import AircraftHUD from './components/AircraftHUD'
 import Indicator from './components/Indicator'
+import SniperScope from './components/SniperScope'
 import SettingsModal from './components/SettingsModal'
 import HudDevPanel from './components/HudDevPanel'
 import { isHudDevBrowser, loadDevPlayfieldColor, saveDevPlayfieldColor } from './hudDevEnv'
 import { applyDevSettingsSave } from './hudDevApply'
+import { postNui } from './nui'
 
 function App() {
   const [devPlayfieldColor, setDevPlayfieldColor] = useState(() =>
@@ -17,11 +19,6 @@ function App() {
       saveDevPlayfieldColor(devPlayfieldColor)
     }
   }, [devPlayfieldColor])
-
-  const getParentResourceName = useCallback(
-    () => (typeof window.GetParentResourceName === 'function' ? window.GetParentResourceName() : 'es_hud'),
-    [],
-  )
 
   const [hudData, setHudData] = useState({
     health: 100,
@@ -128,6 +125,8 @@ function App() {
     ammoColor: '#10b981',
     speedometerPos: null,
     showCrosshair: false,
+    sniperScopeVisible: false,
+    sniperScopeWeapon: 'SNIPER',
     sectionedBars: false,
     sectionedIndicator: false,
     oxygenDisplayLocation: 'statusCluster',
@@ -371,6 +370,13 @@ function App() {
           isArmed: data.isArmed ?? prev.isArmed,
         }))
         break
+      case 'setSniperScope':
+        setHudData((prev) => ({
+          ...prev,
+          sniperScopeVisible: data.visible === true,
+          sniperScopeWeapon: typeof data.weapon === 'string' ? data.weapon : prev.sniperScopeWeapon,
+        }))
+        break
       case 'toggleVisibility':
         setHudData((prev) => ({
           ...prev,
@@ -475,6 +481,14 @@ function App() {
     return () => window.removeEventListener('message', handleMessage)
   }, [handleMessage])
 
+  useEffect(() => {
+    if (isHudDevBrowser) {
+      return
+    }
+
+    postNui('nui:ready').catch(() => {})
+  }, [])
+
   const handleSettingsSave = useCallback((values) => {
     if (isHudDevBrowser) {
       setSettingsData(values)
@@ -482,39 +496,27 @@ function App() {
       setSettingsOpen(false)
       return
     }
-    fetch(`https://${getParentResourceName()}/settings:save`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(values),
-    })
+    postNui('settings:save', values).catch(() => {})
     setSettingsOpen(false)
-  }, [getParentResourceName])
+  }, [])
 
   const handleSettingsClose = useCallback(() => {
     if (!isHudDevBrowser) {
-      fetch(`https://${getParentResourceName()}/settings:close`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
+      postNui('settings:close').catch(() => {})
     }
     setSettingsOpen(false)
-  }, [getParentResourceName])
+  }, [])
 
   const handleStartMoveSpeedometer = useCallback(() => {
     if (!isHudDevBrowser) {
-      fetch(`https://${getParentResourceName()}/speedometer:startEdit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
+      postNui('speedometer:startEdit').catch(() => {})
     }
     setSettingsOpen(false)
     setEditMode(true)
     const startPos = hudData.speedometerPos || null
     dragPosRef.current = startPos
     setDragPos(startPos)
-  }, [getParentResourceName, hudData.speedometerPos])
+  }, [hudData.speedometerPos])
 
   const handleDrag = useCallback((nextPos) => {
     dragPosRef.current = nextPos
@@ -536,18 +538,14 @@ function App() {
 
   const handleStartMoveAmmo = useCallback(() => {
     if (!isHudDevBrowser) {
-      fetch(`https://${getParentResourceName()}/speedometer:startEdit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
+      postNui('ammo:startEdit').catch(() => {})
     }
     setSettingsOpen(false)
     setAmmoEditMode(true)
     const startPos = hudData.ammoPos || null
     ammoDragPosRef.current = startPos
     setAmmoDragPos(startPos)
-  }, [getParentResourceName, hudData.ammoPos])
+  }, [hudData.ammoPos])
 
   const handleAmmoDrag = useCallback((pos) => {
     ammoDragPosRef.current = pos
@@ -556,31 +554,34 @@ function App() {
 
   const handleAmmoSaveEdit = useCallback(() => {
     const posToSave = ammoDragPosRef.current || null
+    const hasPosition = posToSave !== null
     if (!isHudDevBrowser) {
-      fetch(`https://${getParentResourceName()}/ammo:endEdit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          saved: true,
-          left: posToSave?.left ?? 0,
-          top: posToSave?.top ?? 0,
-        }),
-      })
+      postNui('ammo:endEdit', {
+        saved: hasPosition,
+        hasPosition,
+        left: posToSave?.left ?? 0,
+        top: posToSave?.top ?? 0,
+      }).catch(() => {})
     }
-    setHudData((prev) => ({ ...prev, ammoPos: posToSave, ammoPositionPreset: 'custom' }))
+    if (hasPosition) {
+      setHudData((prev) => ({
+        ...prev,
+        ammoPos: posToSave,
+        ammoPositionPreset: 'custom',
+        resolvedAmmoPositionPreset: 'custom',
+      }))
+    }
+    setAmmoDragPos(null)
     setAmmoEditMode(false)
-  }, [getParentResourceName])
+  }, [])
 
   const handleAmmoCancelEdit = useCallback(() => {
     if (!isHudDevBrowser) {
-      fetch(`https://${getParentResourceName()}/ammo:endEdit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ saved: false }),
-      })
+      postNui('ammo:endEdit', { saved: false }).catch(() => {})
     }
+    setAmmoDragPos(null)
     setAmmoEditMode(false)
-  }, [getParentResourceName])
+  }, [])
 
   const handleResetAmmo = useCallback(() => {
     const newSettings = {
@@ -592,38 +593,35 @@ function App() {
     }
     setSettingsData(newSettings)
     handleSettingsSave(newSettings)
-    setHudData((prev) => ({ ...prev, ammoPos: null, ammoPositionPreset: 'preset' }))
+    setHudData((prev) => ({
+      ...prev,
+      ammoPos: null,
+      ammoPositionPreset: 'preset',
+      resolvedAmmoPositionPreset: prev.layout?.ammo?.anchor || 'bottom-right',
+    }))
   }, [handleSettingsSave, settingsData])
 
   const handleSaveEdit = useCallback(() => {
     const posToSave = dragPosRef.current || null
     if (!isHudDevBrowser) {
-      fetch(`https://${getParentResourceName()}/speedometer:endEdit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          saved: true,
-          left: posToSave?.left ?? 0,
-          top: posToSave?.top ?? 0,
-        }),
-      })
+      postNui('speedometer:endEdit', {
+        saved: true,
+        left: posToSave?.left ?? 0,
+        top: posToSave?.top ?? 0,
+      }).catch(() => {})
     }
     setHudData((prev) => ({ ...prev, speedometerPos: posToSave }))
     setEditMode(false)
-  }, [getParentResourceName])
+  }, [])
 
   const handleCancelEdit = useCallback(() => {
     if (!isHudDevBrowser) {
-      fetch(`https://${getParentResourceName()}/speedometer:endEdit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ saved: false }),
-      })
+      postNui('speedometer:endEdit', { saved: false }).catch(() => {})
     }
     setEditMode(false)
     dragPosRef.current = null
     setDragPos(null)
-  }, [getParentResourceName])
+  }, [])
 
   const handleResetEdit = useCallback(() => {
     dragPosRef.current = null
@@ -683,6 +681,7 @@ function App() {
 
   const showMainHud = hudData.visible || editMode || ammoEditMode
   const showAircraftHud = hudData.aircraftVisible && (hudData.visible || hudData.forceAircraftHud) && !editMode
+  const showSniperScope = hudData.sniperScopeVisible && hudData.visible && !cinematicMode && !editMode
 
   return (
     <div
@@ -693,7 +692,8 @@ function App() {
           : undefined
       }
     >
-      {hudData.showCrosshair && hudData.isArmed && <div className="crosshair-dot" />}
+      <SniperScope visible={showSniperScope} weapon={hudData.sniperScopeWeapon} />
+      {hudData.showCrosshair && hudData.isArmed && !showSniperScope && <div className="crosshair-dot" />}
       {editMode && (
         <div className="edit-mode-overlay">
           <div className="edit-mode-header">

@@ -116,6 +116,7 @@ const CINEMATIC_KEY_OPTIONS = [
 ]
 
 const AMMO_POSITION_OPTIONS = [
+    { value: 'preset', label: 'HUD Preset' },
     { value: 'custom', label: 'Custom (Drag)' },
     { value: 'bottom-right', label: 'Bottom Right' },
     { value: 'top-right', label: 'Top Right' },
@@ -126,6 +127,12 @@ const AMMO_POSITION_OPTIONS = [
 const OXYGEN_DISPLAY_OPTIONS = [
     { value: 'statusCluster', label: 'Status Cluster' },
     { value: 'indicator', label: 'Indicator Bar' },
+]
+
+const STATUS_SHAPE_OPTIONS = [
+    { value: 'bar', label: 'Bar' },
+    { value: 'circle', label: 'Circle' },
+    { value: 'hexagon', label: 'Hexagon' },
 ]
 
 const DEFAULTS = {
@@ -158,6 +165,7 @@ const DEFAULTS = {
     showHurricaneWarning: true,
     sectionedBars: false,
     sectionedIndicator: false,
+    statusIconShape: 'bar',
     oxygenDisplayLocation: 'statusCluster',
     backdropBlur: 1,
     panelOpacity: 1,
@@ -207,11 +215,7 @@ const SettingsModal = ({
 }) => {
     const [local, setLocal] = useState(() => buildInitialState(settings))
     const initialState = buildInitialState(settings)
-    const selectedAmmoPosition = local.ammoPositionPreset && local.ammoPositionPreset !== 'preset'
-        ? local.ammoPositionPreset
-        : (settings?.resolvedAmmoPositionPreset && settings.resolvedAmmoPositionPreset !== 'preset'
-            ? settings.resolvedAmmoPositionPreset
-            : 'bottom-right')
+    const selectedAmmoPosition = local.ammoPositionPreset || settings?.resolvedAmmoPositionPreset || 'preset'
 
     const set = useCallback((key, value) => {
         setLocal(prev => ({ ...prev, [key]: value }))
@@ -519,6 +523,18 @@ const SettingsModal = ({
                     {}
                     <div className="settings-section">
                         <div className="settings-section-title">Status Icons</div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Status Icon Shape</div>
+                                <div className="settings-row-desc">Choose the status icon style</div>
+                            </div>
+                            <CustomDropdown
+                                value={local.statusIconShape}
+                                options={STATUS_SHAPE_OPTIONS}
+                                onChange={(val) => set('statusIconShape', val)}
+                            />
+                        </div>
 
                         <div className="settings-row">
                             <div>

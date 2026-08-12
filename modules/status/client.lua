@@ -1,6 +1,6 @@
 local Status = {}
 
-local SendNUIMessage = SendNUIMessage
+local SendNUIMessage = lib.require("modules.nui.client").send
 local PlayerPedId = PlayerPedId
 local PlayerId = PlayerId
 local IsPedSwimmingUnderWater = IsPedSwimmingUnderWater
@@ -409,7 +409,7 @@ function Status.start(config, isFullyVisible)
                 local oxygen, underwater = getOxygenState()
                 local oxygenChanging = underwater or oxygen < 100 or lastUnderwater or lastOxygen < 100
 
-                sleep = oxygenChanging and 150 or 300
+                sleep = oxygenChanging and 150 or 750
 
                 if oxygen ~= lastOxygen or underwater ~= lastUnderwater then
                     lastOxygen = oxygen

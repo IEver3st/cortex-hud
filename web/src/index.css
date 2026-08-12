@@ -1,7 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Roboto+Condensed:wght@400;600;700&display=swap');
-
 :root {
-  font-family: 'Share Tech Mono', 'Roboto Condensed', 'Segoe UI', sans-serif;
+  font-family: 'Segoe UI', 'Arial Narrow', Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -76,7 +74,7 @@ body {
   color: white;
   z-index: 10000;
   pointer-events: auto;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: Consolas, 'Courier New', monospace;
   background: rgba(18, 18, 18, 0.88);
   padding: 16px 32px;
   border-radius: 14px;
@@ -97,7 +95,7 @@ body {
 }
 
 .edit-button {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: Consolas, 'Courier New', monospace;
   padding: 10px 24px;
   border-radius: 8px;
   cursor: pointer;

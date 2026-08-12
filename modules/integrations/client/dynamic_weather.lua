@@ -1,5 +1,7 @@
 local CANDIDATE_WEATHER_RES = { 'Dynamic_weather', 'dynamic_weather' }
 local config = lib.require('config.shared')
+local libSettings = lib.settings
+local SendNUIMessage = lib.require('modules.nui.client').send
 local PlayerPedId = PlayerPedId
 local GetEntityCoords = GetEntityCoords
 
@@ -96,10 +98,10 @@ local function truthySetting(v)
     return false
 end
 
-local function settingFromEsLib(keys)
+local function settingFromLib(keys)
     for _, key in ipairs(keys) do
         local ok, v = pcall(function()
-            return exports.es_lib:getSetting(key)
+            return libSettings.getSetting(key)
         end)
         if ok and v ~= nil then
             return truthySetting(v)
@@ -109,7 +111,7 @@ local function settingFromEsLib(keys)
 end
 
 local function floodSettingEnabled()
-    local fromLib = settingFromEsLib({
+    local fromLib = settingFromLib({
         'hud_showFlashFloodWarning',
         'showFlashFloodWarning',
     })
@@ -120,7 +122,7 @@ local function floodSettingEnabled()
 end
 
 local function hurricaneSettingEnabled()
-    local fromLib = settingFromEsLib({
+    local fromLib = settingFromLib({
         'hud_showHurricaneWarning',
         'showHurricaneWarning',
     })
@@ -131,7 +133,7 @@ local function hurricaneSettingEnabled()
 end
 
 local function settingEnabled()
-    local fromLib = settingFromEsLib({
+    local fromLib = settingFromLib({
         'hud_showDynamicWeather',
         'showDynamicWeather',
         'dynamic_weather_hud_indicator',
@@ -693,7 +695,7 @@ function M.start()
     CreateThread(function()
         while true do
             local sleep = 1000
-            if GetResourceState('es_lib') ~= 'started' then
+            if GetResourceState('cortex-lib') ~= 'started' then
                 sendAvailability(false)
                 pushOff()
                 pushFloodOff()

@@ -1,5 +1,9 @@
 local config = lib.require("config.shared")
 
+-- Pre-load cortex-lib notify module so lib.progress and its export are available.
+local _ = lib.notify
+local progress = lib.progress
+
 local PlayerPedId = PlayerPedId
 local IsPedInAnyVehicle = IsPedInAnyVehicle
 local IsPedOnAnyBike = IsPedOnAnyBike
@@ -61,7 +65,7 @@ function HarnessLogic:apply()
 
     self:disableVehicleExitControlThread()
 
-    local completed = exports.es_lib:progress({
+    local completed = progress({
         label = 'Fastening harness...',
         duration = self.applyDuration,
         position = 'bottom',
@@ -99,7 +103,7 @@ function HarnessLogic:remove()
 
     self:disableVehicleExitControlThread()
 
-    local completed = exports.es_lib:progress({
+    local completed = progress({
         label = 'Removing harness...',
         duration = self.removeDuration,
         position = 'bottom',
@@ -124,7 +128,7 @@ function HarnessLogic:remove()
 
     local seatbeltOn = false
     local ok, result = pcall(function()
-        return exports.es_hud:isSeatbeltOn()
+        return exports['cortex-hud']:isSeatbeltOn()
     end)
     if ok and result then
         seatbeltOn = true
