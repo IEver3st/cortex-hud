@@ -26,6 +26,7 @@ A lightweight, customizable FiveM HUD built with React + Vite on the NUI side an
 - **Polcam integration** — hides the HUD when polcam is active and optionally forces the aircraft HUD overlay for the pilot.
 - **Cinematic mode** — hides the HUD and radar for clean screenshots/recordings.
 - **Settings UI** — open with `/hudsettings` (`I`) to switch layout/color presets, shape styles, blur/opacity, and move speedometer/ammo via drag.
+- **World-space vehicle doors** — the nearest unlocked, intact door presents one grounded `OPEN`/`CLOSE` action at its physical bone while GTA 6 HUD mode is active.
 - **Visibility reason system** — multiple independent reasons (`user`, `external`, `polcam`, `cinematic`, `framework`, `qbxCharacter`, `qbxSpawn`) all must be true for the HUD to show, making it easy for external scripts to hide/show the HUD safely.
 
 ---
@@ -72,8 +73,8 @@ The `fxmanifest.lua` expects a built NUI at `web/dist/`:
 
 ```bash
 cd web
-npm install
-npm run build
+bun install --frozen-lockfile
+bun run build
 ```
 
 `web/dist` and `web/node_modules` are intentionally ignored by `.gitignore`. Do not commit generated build output.
@@ -88,6 +89,7 @@ npm run build
 | `/hudsettings` (`I`) | Open the HUD settings menu. |
 | `/cinematicmode` (`F7` by default) | Toggle cinematic mode (hides HUD + radar). |
 | `/cortex_hud_cruise` (`Y` by default) | Toggle cruise control while driving. |
+| `E` | Open or close the nearest eligible vehicle door while its world prompt is visible. |
 | `B` | Toggle seatbelt (when enabled in config). |
 | `H` | Toggle racing harness (when enabled in config). |
 
@@ -147,6 +149,8 @@ All tuning is in `config/shared.lua`.
 | `Config.EnablePostal` | `false` | Show postal codes in the location strip. |
 | `Config.voipResource` | `'auto'` | VOIP resource to use, or `'auto'` for detection. |
 | `Config.showDynamicWeather` | `false` | Show the Dynamic_weather forecast strip. |
+| `Config.VehicleDoorInteractions.enabled` | `true` | Enable the validated world-space vehicle door action. |
+| `Config.VehicleDoorInteractions.panelOffsets` | See config | Fine-tune front door, rear door, hood, and trunk prompts in vehicle-local metres. Positive Y is forward and negative Y is rearward. |
 | `Config.defaultHudPreset` | `'classic'` | Default layout preset. |
 
 ### Layout presets
@@ -178,6 +182,7 @@ cortex-hud/
 │   ├── fuel/client.lua         # Fuel provider detection and alerts
 │   ├── harness/client.lua      # Racing harness apply/remove
 │   ├── integrations/client/dynamic_weather.lua  # Weather resource integration
+│   ├── interactions/             # Interaction projection plus vehicle-door client/server checks
 │   ├── seatbelt/client.lua     # Seatbelt logic
 │   ├── settings/client.lua     # Settings UI, persistence, presets
 │   ├── stall/client.lua        # Engine stall/breakdown logic

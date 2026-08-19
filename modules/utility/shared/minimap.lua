@@ -20,6 +20,8 @@ local SetRadarBigmapEnabled = SetRadarBigmapEnabled
 local BeginScaleformMovieMethod = BeginScaleformMovieMethod
 local ScaleformMovieMethodAddParamInt = ScaleformMovieMethodAddParamInt
 local EndScaleformMovieMethod = EndScaleformMovieMethod
+local AddEventHandler = AddEventHandler
+local GetCurrentResourceName = GetCurrentResourceName
 local Wait = Wait
 
 local minimapReady = false
@@ -27,6 +29,53 @@ local zoomDataApplied = false
 local healthArmorHidden = false
 local minimapScaleform = nil
 local lastExternalMapState = nil
+local stockSatnavHidden = false
+local stockSatnavControllerStarted = false
+local stockSatnavWasHidden = false
+
+local function invokeMinimapMethod(methodName)
+    if not minimapScaleform or not HasScaleformMovieLoaded(minimapScaleform) then
+        minimapScaleform = RequestScaleformMovie("minimap")
+        return false
+    end
+
+    BeginScaleformMovieMethod(minimapScaleform, methodName)
+    EndScaleformMovieMethod()
+    return true
+end
+
+local function startStockSatnavController()
+    if stockSatnavControllerStarted then return end
+    stockSatnavControllerStarted = true
+
+    CreateThread(function()
+        while true do
+            local sleep = 250
+
+            if stockSatnavHidden then
+                if invokeMinimapMethod("HIDE_SATNAV") then
+                    stockSatnavWasHidden = true
+                    sleep = 0
+                else
+                    sleep = 100
+                end
+            elseif stockSatnavWasHidden then
+                if invokeMinimapMethod("SHOW_SATNAV") then
+                    stockSatnavWasHidden = false
+                else
+                    sleep = 100
+                end
+            end
+
+            Wait(sleep)
+        end
+    end)
+end
+
+function minimap.setStockSatnavHidden(hidden)
+    stockSatnavHidden = hidden == true
+    startStockSatnavController()
+end
 
 local function isDebugEnabled(config)
     local minimapConfig = config and config.Minimap or {}
@@ -267,6 +316,7 @@ function minimap.refresh(config, options)
     ensureMapZoomData()
     minimap.checkExternalMapResource(config)
     local texturesReady = ensureMinimapTextures(config)
+    minimap.setStockSatnavHidden(config and config.gta6HudEnabled == true)
     removeHealthArmorBars()
 
     local layout = applyMinimapLayout(config)
@@ -285,5 +335,15 @@ end
 function minimap.apply(config, options)
     return minimap.refresh(config, options)
 end
+
+local currentResource = GetCurrentResourceName()
+AddEventHandler('onClientResourceStop', function(resourceName)
+    if resourceName ~= currentResource then return end
+
+    stockSatnavHidden = false
+    if stockSatnavWasHidden then
+        invokeMinimapMethod("SHOW_SATNAV")
+    end
+end)
 
 return minimap

@@ -160,6 +160,9 @@ const DEFAULTS = {
     minimapOnlyInVehicle: false,
     ammoPositionPreset: 'preset',
     showCrosshair: false,
+    gta6HudEnabled: false,
+    gta6ShowWeaponName: true,
+    gta6VehicleIdentification: true,
     showDynamicWeather: false,
     showFlashFloodWarning: true,
     showHurricaneWarning: true,
@@ -326,6 +329,53 @@ const SettingsModal = ({
                     {}
                     <div className="settings-section">
                         <div className="settings-section-title">Display</div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">GTA 6 HUD</div>
+                                <div className="settings-row-desc">Damage-triggered vitals, active weapon, and brief GTA V place discoveries</div>
+                            </div>
+                            <button
+                                type="button"
+                                className={`settings-toggle ${local.gta6HudEnabled ? 'active' : ''}`}
+                                onClick={() => set('gta6HudEnabled', !local.gta6HudEnabled)}
+                                aria-pressed={local.gta6HudEnabled}
+                            >
+                                <span className="settings-toggle-knob" />
+                            </button>
+                        </div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Show Weapon Name</div>
+                                <div className="settings-row-desc">Show the active weapon name beside its icon in GTA 6 HUD mode</div>
+                            </div>
+                            <button
+                                type="button"
+                                className={`settings-toggle ${local.gta6ShowWeaponName ? 'active' : ''}`}
+                                onClick={() => set('gta6ShowWeaponName', !local.gta6ShowWeaponName)}
+                                aria-pressed={local.gta6ShowWeaponName}
+                            >
+                                <span className="settings-toggle-knob" />
+                            </button>
+                        </div>
+
+                        {local.gta6HudEnabled && (
+                            <div className="settings-row">
+                                <div>
+                                    <div className="settings-row-label">Vehicle Introduction</div>
+                                    <div className="settings-row-desc">Show brand, model, engine health, and fuel when entering a vehicle</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className={`settings-toggle ${local.gta6VehicleIdentification ? 'active' : ''}`}
+                                    onClick={() => set('gta6VehicleIdentification', !local.gta6VehicleIdentification)}
+                                    aria-pressed={local.gta6VehicleIdentification}
+                                >
+                                    <span className="settings-toggle-knob" />
+                                </button>
+                            </div>
+                        )}
 
                         <div className="settings-row">
                             <div>

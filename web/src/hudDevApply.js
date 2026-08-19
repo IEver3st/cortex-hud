@@ -86,6 +86,13 @@ export function applyDevSettingsSave(saved, prev) {
     sectionedBars: Boolean(saved.sectionedBars),
     sectionedIndicator: Boolean(saved.sectionedIndicator),
     showCrosshair: Boolean(saved.showCrosshair),
+    gta6HudEnabled: Boolean(saved.gta6HudEnabled),
+    gta6ShowWeaponName: Object.prototype.hasOwnProperty.call(saved, 'gta6ShowWeaponName')
+      ? saved.gta6ShowWeaponName !== false
+      : prev.gta6ShowWeaponName,
+    gta6VehicleIdentification: Object.prototype.hasOwnProperty.call(saved, 'gta6VehicleIdentification')
+      ? saved.gta6VehicleIdentification !== false
+      : prev.gta6VehicleIdentification,
     showDynamicWeather: Boolean(saved.showDynamicWeather),
     showHurricaneWarning: Object.prototype.hasOwnProperty.call(saved, 'showHurricaneWarning')
       ? Boolean(saved.showHurricaneWarning)

@@ -3,6 +3,7 @@ local Status = {}
 local SendNUIMessage = lib.require("modules.nui.client").send
 local PlayerPedId = PlayerPedId
 local PlayerId = PlayerId
+local IsPedSwimming = IsPedSwimming
 local IsPedSwimmingUnderWater = IsPedSwimmingUnderWater
 local GetPlayerUnderwaterTimeRemaining = GetPlayerUnderwaterTimeRemaining
 local Wait = Wait
@@ -17,6 +18,7 @@ local lastThirst = -1
 local lastStress = -1
 local lastOxygen = 100
 local lastUnderwater = false
+local lastInWater = false
 
 local breathMaxReference = 10.0
 
@@ -350,18 +352,17 @@ local function getOxygenState()
     local ped = PlayerPedId()
     local playerId = PlayerId()
     local currentOxygen = GetPlayerUnderwaterTimeRemaining(playerId)
-    local underwater = IsPedSwimmingUnderWater(ped) or currentOxygen <= 9.99
+    local underwater = IsPedSwimmingUnderWater(ped)
+    local inWater = IsPedSwimming(ped) or underwater
 
-
-    if not underwater and currentOxygen > 9.99 then
-
+    if not underwater then
         breathMaxReference = math_max(breathMaxReference, currentOxygen)
-        return 100, false
+        return 100, false, inWater
     end
 
     local denom = math_max(0.25, breathMaxReference)
     local percent = (currentOxygen / denom) * 100
-    return math_floor(math_max(0, math_min(100, percent))), underwater
+    return math_floor(math_max(0, math_min(100, percent))), true, inWater
 end
 
 function Status.start(config, isFullyVisible)
@@ -389,6 +390,7 @@ function Status.start(config, isFullyVisible)
                         stress = stress,
                         oxygen = lastOxygen,
                         underwater = lastUnderwater,
+                        inWater = lastInWater,
                     })
                 end
             end
@@ -406,19 +408,21 @@ function Status.start(config, isFullyVisible)
             local sleep = 500
 
             if isFullyVisible() then
-                local oxygen, underwater = getOxygenState()
-                local oxygenChanging = underwater or oxygen < 100 or lastUnderwater or lastOxygen < 100
+                local oxygen, underwater, inWater = getOxygenState()
+                local oxygenChanging = inWater or oxygen < 100 or lastInWater or lastOxygen < 100
 
                 sleep = oxygenChanging and 150 or 750
 
-                if oxygen ~= lastOxygen or underwater ~= lastUnderwater then
+                if oxygen ~= lastOxygen or underwater ~= lastUnderwater or inWater ~= lastInWater then
                     lastOxygen = oxygen
                     lastUnderwater = underwater
+                    lastInWater = inWater
 
                     SendNUIMessage({
                         action = 'updateStatus',
                         oxygen = oxygen,
                         underwater = underwater,
+                        inWater = inWater,
                     })
                 end
             end

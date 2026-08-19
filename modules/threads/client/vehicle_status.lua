@@ -5,8 +5,14 @@ local SendNUIMessage = lib.require("modules.nui.client").send
 local PlayerPedId = PlayerPedId
 local IsPedInAnyVehicle = IsPedInAnyVehicle
 local GetVehiclePedIsIn = GetVehiclePedIsIn
+local GetGameTimer = GetGameTimer
 local GetVehicleEngineHealth = GetVehicleEngineHealth
 local GetIsVehicleEngineRunning = GetIsVehicleEngineRunning
+local GetEntityModel = GetEntityModel
+local GetDisplayNameFromVehicleModel = GetDisplayNameFromVehicleModel
+local GetMakeNameFromVehicleModel = GetMakeNameFromVehicleModel
+local GetEntityArchetypeName = GetEntityArchetypeName
+local GetLabelText = GetLabelText
 local GetVehicleHighGear = GetVehicleHighGear
 local GetVehicleCurrentGear = GetVehicleCurrentGear
 local GetEntitySpeed = GetEntitySpeed
@@ -21,6 +27,73 @@ local IsVehicleSearchlightOn = IsVehicleSearchlightOn
 local GetHeliTailRotorHealth = GetHeliTailRotorHealth
 local GetHeliMainRotorHealth = GetHeliMainRotorHealth
 local Wait = Wait
+
+local VEHICLE_IDENTITY_LIVE_MS = 6500
+local vehicleIdentitySequence = 0
+
+local INVALID_VEHICLE_LABELS = {
+    CARNOTFOUND = true,
+    NULL = true,
+    UNDEFINED = true,
+}
+
+local function cleanVehicleText(value)
+    if type(value) ~= 'string' then
+        return nil
+    end
+
+    value = value:gsub('^%s+', ''):gsub('%s+$', '')
+    if value == '' or INVALID_VEHICLE_LABELS[value:upper()] then
+        return nil
+    end
+
+    return value:sub(1, 48)
+end
+
+local function humanizeVehicleText(value)
+    value = cleanVehicleText(value)
+    if not value then
+        return nil
+    end
+
+    value = value:gsub('[_%-]+', ' '):gsub('%s+', ' ')
+    return value:gsub("(%a)([%w']*)", function(first, rest)
+        return first:upper() .. rest:lower()
+    end)
+end
+
+local function resolveVehicleLabel(label)
+    label = cleanVehicleText(label)
+    if not label then
+        return nil
+    end
+
+    local ok, localized = pcall(GetLabelText, label)
+    localized = ok and cleanVehicleText(localized) or nil
+    return localized or humanizeVehicleText(label)
+end
+
+local function buildVehicleIdentity(vehicle)
+    local modelHash = GetEntityModel(vehicle)
+    local modelLabel = GetDisplayNameFromVehicleModel(modelHash)
+    local makeLabel = GetMakeNameFromVehicleModel(modelHash)
+    local archetype = cleanVehicleText(GetEntityArchetypeName(vehicle))
+    local brand = resolveVehicleLabel(makeLabel)
+    local modelName = resolveVehicleLabel(modelLabel) or humanizeVehicleText(archetype) or 'Vehicle'
+
+    return {
+        brand = brand or 'Custom',
+        name = modelName,
+        archetype = archetype or '',
+        proceduralLogo = brand == nil,
+        modelKey = tostring(modelHash),
+    }
+end
+
+local function nextVehicleIdentityEntryId()
+    vehicleIdentitySequence = vehicleIdentitySequence + 1
+    return vehicleIdentitySequence
+end
 
 
 local function enginesListEqual(a, b)
@@ -90,6 +163,13 @@ function VehicleStatusThread:start()
         local convertEngineHealthToPercentage = utility.convertEngineHealthToPercentage
         local lastVehicleState = { visible = false }
         local lastAircraftState = { visible = false }
+        local identityVehicle = 0
+        local identityEntryId = nil
+        local identityActive = false
+        local identityStartedAt = 0
+        local identityEngineState = false
+        local identityEngineHealth = 100
+        local identityFuel = 100
 
         local ok, err = xpcall(function()
             local ped = PlayerPedId()
@@ -118,6 +198,70 @@ function VehicleStatusThread:start()
             local _, lightsOn, highbeamsOn = GetVehicleLightsState(vehicle)
 
             local isAircraft = vehicleType == "heli" or vehicleType == "plane"
+            local identityAllowed = config.gta6HudEnabled == true
+                and config.gta6VehicleIdentification ~= false
+                and not isAircraft
+            local now = GetGameTimer()
+
+            if vehicle ~= identityVehicle then
+                if identityEntryId then
+                    SendNUIMessage({
+                        action = 'hideVehicleIdentification',
+                        entryId = identityEntryId,
+                    })
+                end
+
+                identityVehicle = vehicle
+                identityEntryId = nil
+                identityActive = false
+
+                if identityAllowed then
+                    local identity = buildVehicleIdentity(vehicle)
+                    identityEntryId = nextVehicleIdentityEntryId()
+                    identityActive = true
+                    identityStartedAt = now
+                    identityEngineState = engineState
+                    identityEngineHealth = engineHealth
+                    identityFuel = fuel
+
+                    SendNUIMessage({
+                        action = 'showVehicleIdentification',
+                        entryId = identityEntryId,
+                        brand = identity.brand,
+                        name = identity.name,
+                        archetype = identity.archetype,
+                        proceduralLogo = identity.proceduralLogo,
+                        modelKey = identity.modelKey,
+                        engineState = engineState,
+                        engineHealth = engineHealth,
+                        fuel = fuel,
+                    })
+                end
+            elseif identityActive then
+                if not identityAllowed then
+                    SendNUIMessage({
+                        action = 'hideVehicleIdentification',
+                        entryId = identityEntryId,
+                    })
+                    identityActive = false
+                elseif now - identityStartedAt > VEHICLE_IDENTITY_LIVE_MS then
+                    identityActive = false
+                elseif identityEngineState ~= engineState
+                    or identityEngineHealth ~= engineHealth
+                    or identityFuel ~= fuel then
+                    identityEngineState = engineState
+                    identityEngineHealth = engineHealth
+                    identityFuel = fuel
+
+                    SendNUIMessage({
+                        action = 'updateVehicleIdentification',
+                        entryId = identityEntryId,
+                        engineState = engineState,
+                        engineHealth = engineHealth,
+                        fuel = fuel,
+                    })
+                end
+            end
 
             if isAircraft then
                 local coords = GetEntityCoords(vehicle)
@@ -423,6 +567,13 @@ function VehicleStatusThread:start()
             SendNUIMessage({
                 action = "updateAircraft",
                 visible = false
+            })
+        end
+
+        if identityEntryId then
+            SendNUIMessage({
+                action = 'hideVehicleIdentification',
+                entryId = identityEntryId,
             })
         end
 

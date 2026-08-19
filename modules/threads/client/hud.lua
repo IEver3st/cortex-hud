@@ -8,6 +8,8 @@ local GetEntityCoords = GetEntityCoords
 local GetEntityHealth = GetEntityHealth
 local GetEntityMaxHealth = GetEntityMaxHealth
 local GetPedArmour = GetPedArmour
+local GetPlayerSprintStaminaRemaining = GetPlayerSprintStaminaRemaining
+local GetGameTimer = GetGameTimer
 local GetStreetNameAtCoord = GetStreetNameAtCoord
 local GetStreetNameFromHashKey = GetStreetNameFromHashKey
 local GetNameOfZone = GetNameOfZone
@@ -34,6 +36,9 @@ local HarnessLogic = lib.require("modules.harness.client")
 local VehicleStatusThread = lib.require("modules.threads.client.vehicle_status")
 local CruiseControl = lib.require("modules.cruise.client")
 local Bridge = lib.require("modules.bridge.client")
+local AmmoState = lib.require("modules.threads.client.ammo_state")
+
+local HEALTH_DAMAGE_HOLD_MS = 25000
 
 local visibilityReasons = {
     user = true,
@@ -362,8 +367,14 @@ function hud.start(config)
 
     local lastHealth = -1
     local lastArmor = -1
+    local lastStamina = -1
+    local lastStaminaPercent = -1
+    local lastStaminaRegenerating = false
+    local lastHealthRecentlyDamaged = false
+    local lastDamageAt = nil
     local lastStreet = ""
     local lastZone = ""
+    local lastZoneCode = ""
     local lastHeading = -1
     local lastPostal = ""
     local lastPostalDist = -1
@@ -522,23 +533,55 @@ function hud.start(config)
                 local health = GetEntityHealth(ped)
                 local maxHealth = GetEntityMaxHealth(ped)
                 local armor = GetPedArmour(ped)
+                local staminaUsed = tonumber(GetPlayerSprintStaminaRemaining(PlayerId())) or 0
 
                 local healthBase = math_max(1, maxHealth - 100)
                 local healthPercent = math_max(0, math_min(100, ((health - 100) / healthBase) * 100))
                 local armorPercent = math_max(0, math_min(100, armor))
+                -- This native rises as sprint stamina is consumed, so invert it
+                -- for a conventional full-to-empty stamina meter.
+                local staminaPercent = 100 - math_max(0, math_min(100, staminaUsed))
+                local staminaRounded = math_floor(staminaPercent + 0.5)
+                local staminaRegenerating = lastStaminaPercent >= 0
+                    and staminaPercent > lastStaminaPercent + 0.05
+                    and staminaPercent < 99.95
+                local now = GetGameTimer()
 
-                if health ~= lastHealth or armor ~= lastArmor then
+                if lastHealth >= 0 and health < lastHealth then
+                    lastDamageAt = now
+                end
+
+                if lastDamageAt ~= nil and (now - lastDamageAt) >= HEALTH_DAMAGE_HOLD_MS then
+                    lastDamageAt = nil
+                end
+
+                local healthRecentlyDamaged = lastDamageAt ~= nil
+
+                if health ~= lastHealth
+                    or armor ~= lastArmor
+                    or staminaRounded ~= lastStamina
+                    or staminaRegenerating ~= lastStaminaRegenerating
+                    or healthRecentlyDamaged ~= lastHealthRecentlyDamaged
+                then
                     lastHealth = health
                     lastArmor = armor
+                    lastStamina = staminaRounded
+                    lastStaminaRegenerating = staminaRegenerating
+                    lastHealthRecentlyDamaged = healthRecentlyDamaged
                     SendNUIMessage({
                         action = 'updateHud',
                         health = math_floor(healthPercent),
-                        armor = math_floor(armorPercent)
+                        armor = math_floor(armorPercent),
+                        stamina = staminaRounded,
+                        staminaRegenerating = staminaRegenerating,
+                        healthRecentlyDamaged = healthRecentlyDamaged,
                     })
                 end
+                lastStaminaPercent = staminaPercent
 
                 local streetName = lastStreet
                 local zoneLabel = lastZone
+                local zoneCode = lastZoneCode
                 local dx = lastLocationX and (coords.x - lastLocationX) or 0.0
                 local dy = lastLocationY and (coords.y - lastLocationY) or 0.0
                 local locationChanged = not lastLocationX or ((dx * dx) + (dy * dy)) >= 4.0
@@ -546,7 +589,8 @@ function hud.start(config)
                 if locationChanged then
                     local streetHash = GetStreetNameAtCoord(coords.x, coords.y, coords.z)
                     streetName = GetStreetNameFromHashKey(streetHash)
-                    zoneLabel = GetLabelText(GetNameOfZone(coords.x, coords.y, coords.z))
+                    zoneCode = GetNameOfZone(coords.x, coords.y, coords.z)
+                    zoneLabel = GetLabelText(zoneCode)
                     lastLocationX = coords.x
                     lastLocationY = coords.y
                 end
@@ -554,9 +598,10 @@ function hud.start(config)
                 local heading = GetEntityHeading(ped)
 
                 local hasDistanceChanged = config.ShowPostalDistance and math_abs(nearestPostalDist - lastPostalDist) > 2.0
-                if streetName ~= lastStreet or zoneLabel ~= lastZone or math_abs(heading - lastHeading) > 2 or nearestPostalCode ~= lastPostal or hasDistanceChanged then
+                if streetName ~= lastStreet or zoneLabel ~= lastZone or zoneCode ~= lastZoneCode or math_abs(heading - lastHeading) > 2 or nearestPostalCode ~= lastPostal or hasDistanceChanged then
                     lastStreet = streetName
                     lastZone = zoneLabel
+                    lastZoneCode = zoneCode
                     lastHeading = heading
                     lastPostal = nearestPostalCode
                     lastPostalDist = nearestPostalDist
@@ -566,6 +611,7 @@ function hud.start(config)
                         heading = heading,
                         street = streetName,
                         zone = zoneLabel,
+                        zoneCode = zoneCode,
                         postal = nearestPostalCode,
                         postalDist = config.ShowPostalDistance and nearestPostalDist or nil
                     })
@@ -587,8 +633,37 @@ function hud.start(config)
     local GetFirstBlipInfoId = GetFirstBlipInfoId
     local DoesBlipExist = DoesBlipExist
     local GetBlipInfoIdCoord = GetBlipInfoIdCoord
+    local GetGpsBlipRouteLength = GetGpsBlipRouteLength
+    local CalculateTravelDistanceBetweenPoints = CalculateTravelDistanceBetweenPoints
     local lastWpDist = -1
-    local useMiles = (config.speedUnit == "mph")
+    local lastWpX = nil
+    local lastWpY = nil
+    local lastWpZ = nil
+
+    local function isValidRouteDistance(value)
+        return type(value) == "number"
+            and value == value
+            and value > 0.0
+            and value < 100000.0
+    end
+
+    local function clearWaypointDisplay()
+        if lastWpDist == -1 then return end
+
+        lastWpDist = -1
+        SendNUIMessage({
+            action = 'updateWaypoint',
+            waypointDist = -1,
+            waypointUnit = ""
+        })
+    end
+
+    local function resetWaypointTracking()
+        lastWpX = nil
+        lastWpY = nil
+        lastWpZ = nil
+        clearWaypointDisplay()
+    end
 
     CreateThread(function()
         local IsPedInAnyVehicle = IsPedInAnyVehicle
@@ -601,49 +676,58 @@ function hud.start(config)
                 local wpBlip = GetFirstBlipInfoId(8)
                 if DoesBlipExist(wpBlip) then
                     local wpCoords = GetBlipInfoIdCoord(wpBlip)
-                    local ped = PlayerPedId()
-                    local pCoords = GetEntityCoords(ped)
-                    local distM = #(pCoords - wpCoords)
+                    local destinationChanged = not lastWpX
+                        or math_abs(wpCoords.x - lastWpX) > 1.0
+                        or math_abs(wpCoords.y - lastWpY) > 1.0
+                        or math_abs(wpCoords.z - lastWpZ) > 1.0
 
-                    local distDisplay
-                    local distUnit
-                    if useMiles then
-                        local distMi = distM / 1609.34
-                        distDisplay = distMi
-                        distUnit = "mi"
-                    else
-                        local distKm = distM / 1000.0
-                        distDisplay = distKm
-                        distUnit = "km"
+                    if destinationChanged then
+                        lastWpX = wpCoords.x
+                        lastWpY = wpCoords.y
+                        lastWpZ = wpCoords.z
+                        clearWaypointDisplay()
                     end
 
-                    if math_abs(distDisplay - lastWpDist) > 0.01 then
-                        lastWpDist = distDisplay
-                        SendNUIMessage({
-                            action = 'updateWaypoint',
-                            waypointDist = math_floor(distDisplay * 100 + 0.5) / 100,
-                            waypointUnit = distUnit
-                        })
+                    local routeDistanceM = GetGpsBlipRouteLength()
+                    if not isValidRouteDistance(routeDistanceM) then
+                        local pCoords = GetEntityCoords(PlayerPedId())
+                        routeDistanceM = CalculateTravelDistanceBetweenPoints(
+                            pCoords.x,
+                            pCoords.y,
+                            pCoords.z,
+                            wpCoords.x,
+                            wpCoords.y,
+                            wpCoords.z
+                        )
+                    end
+
+                    if isValidRouteDistance(routeDistanceM) then
+                        local useMiles = config.speedUnit == "mph"
+                        local distDisplay
+                        local distUnit
+                        if useMiles then
+                            distDisplay = routeDistanceM / 1609.34
+                            distUnit = "mi"
+                        else
+                            distDisplay = routeDistanceM / 1000.0
+                            distUnit = "km"
+                        end
+
+                        local roundedDist = math_floor(distDisplay * 100 + 0.5) / 100
+                        if roundedDist ~= lastWpDist then
+                            lastWpDist = roundedDist
+                            SendNUIMessage({
+                                action = 'updateWaypoint',
+                                waypointDist = roundedDist,
+                                waypointUnit = distUnit
+                            })
+                        end
                     end
                 else
-                    if lastWpDist ~= -1 then
-                        lastWpDist = -1
-                        SendNUIMessage({
-                            action = 'updateWaypoint',
-                            waypointDist = -1,
-                            waypointUnit = ""
-                        })
-                    end
+                    resetWaypointTracking()
                 end
             else
-                if lastWpDist ~= -1 then
-                    lastWpDist = -1
-                    SendNUIMessage({
-                        action = 'updateWaypoint',
-                        waypointDist = -1,
-                        waypointUnit = ""
-                    })
-                end
+                resetWaypointTracking()
             end
 
             Wait(sleep)
@@ -652,12 +736,134 @@ function hud.start(config)
 
 
     local GetSelectedPedWeapon = GetSelectedPedWeapon
+    local GetWeapontypeGroup = GetWeapontypeGroup
+    local GetWeaponTimeBetweenShots = GetWeaponTimeBetweenShots
     local GetAmmoInClip = GetAmmoInClip
     local GetAmmoInPedWeapon = GetAmmoInPedWeapon
+    local GetMaxAmmoInClip = GetMaxAmmoInClip
+    local IsPedWeaponReadyToShoot = IsPedWeaponReadyToShoot
     local UNARMED_HASH = `WEAPON_UNARMED`
     local lastAmmoClip = -1
     local lastAmmoReserve = -1
     local lastIsArmed = false
+    local lastWeaponType = 'none'
+    local lastWeaponIcon = nil
+    local lastWeaponName = nil
+    local lastWeaponUsesCharge = false
+    local lastWeaponChargeReady = true
+    local lastWeaponChargeProgress = 100
+    local chargeStateByHash = {}
+    local lastKnownClipByWeapon = {}
+
+    local chargeWeaponHashes = {
+        [`WEAPON_RAYPISTOL`] = true,
+        [`WEAPON_STUNGUN`] = true,
+        [`WEAPON_STUNGUN_MP`] = true,
+    }
+
+    local weaponGroupTypes = {
+        [`GROUP_PISTOL`] = 'pistol',
+        [`GROUP_SMG`] = 'smg',
+        [`GROUP_MG`] = 'smg',
+        [`GROUP_RIFLE`] = 'rifle',
+        [`GROUP_SHOTGUN`] = 'shotgun',
+        [`GROUP_SNIPER`] = 'sniper',
+        [`GROUP_HEAVY`] = 'heavy',
+        [`GROUP_THROWN`] = 'thrown',
+        [`GROUP_MELEE`] = 'melee',
+        [`GROUP_PETROLCAN`] = 'utility',
+        [`GROUP_FIREEXTINGUISHER`] = 'utility',
+    }
+
+    local function getWeaponType(weaponHash)
+        return weaponGroupTypes[GetWeapontypeGroup(weaponHash)] or 'weapon'
+    end
+
+    local function getWeaponName(weaponIcon, fallback)
+        if type(weaponIcon) ~= 'string' then
+            return fallback
+        end
+
+        local displayName = weaponIcon:gsub('^weapon_', ''):gsub('_+', ' ')
+        if displayName == '' then
+            return fallback
+        end
+
+        return displayName:gsub('(%a)([%w]*)', function(initial, remainder)
+            return initial:upper() .. remainder:lower()
+        end):sub(1, 48)
+    end
+
+    local function isChargeWeapon(weaponHash, weaponIcon, weaponName)
+        if chargeWeaponHashes[weaponHash] then
+            return true
+        end
+
+        local identity = ((weaponIcon or '') .. ' ' .. (weaponName or '')):lower()
+        return identity:find('atomizer', 1, true) ~= nil
+            or identity:find('stungun', 1, true) ~= nil
+            or identity:find('stun gun', 1, true) ~= nil
+            or identity:find('taser', 1, true) ~= nil
+            or identity:find('tazer', 1, true) ~= nil
+    end
+
+    local function getWeaponChargeState(ped, weaponHash)
+        local readyValue = IsPedWeaponReadyToShoot(ped)
+        local ready = readyValue == true or readyValue == 1
+        local state = chargeStateByHash[weaponHash]
+
+        if state == nil then
+            local durationSeconds = tonumber(GetWeaponTimeBetweenShots(weaponHash)) or 0
+            state = {
+                durationMs = durationSeconds > 0 and math_floor((durationSeconds * 1000) + 0.5) or 0,
+                ready = true,
+                startedAt = nil,
+            }
+            chargeStateByHash[weaponHash] = state
+        end
+
+        if ready then
+            state.ready = true
+            state.startedAt = nil
+            return true, 100
+        end
+
+        local now = GetGameTimer()
+        if state.ready ~= false or state.startedAt == nil then
+            state.startedAt = now
+        end
+        state.ready = false
+
+        if state.durationMs <= 0 then
+            return false, 0
+        end
+
+        local elapsedMs = now - state.startedAt
+        if elapsedMs < 0 then
+            state.startedAt = now
+            elapsedMs = 0
+        end
+
+        local progress = math_floor(((elapsedMs / state.durationMs) * 100) + 0.5)
+        return false, math_max(0, math_min(99, progress))
+    end
+
+    local weaponIconByHash = {}
+    do
+        local rawManifest = LoadResourceFile(GetCurrentResourceName(), 'web/dist/weapons/manifest.json')
+        if rawManifest then
+            local decoded, labels = pcall(json.decode, rawManifest)
+            if decoded and type(labels) == 'table' then
+                for index = 1, #labels do
+                    local label = labels[index]
+                    if type(label) == 'string' and label:match('^weapon_[%w_]+$') then
+                        local normalizedLabel = label:lower()
+                        weaponIconByHash[GetHashKey(normalizedLabel:upper())] = normalizedLabel
+                    end
+                end
+            end
+        end
+    end
 
     local function getCurrentWeaponState()
         local ped = PlayerPedId()
@@ -665,29 +871,70 @@ function hud.start(config)
         local isArmed = weaponHash ~= UNARMED_HASH
         local clipAmmo = -1
         local reserveAmmo = -1
+        local weaponType = 'none'
+        local weaponIcon = nil
+        local weaponName = nil
+        local weaponUsesCharge = false
+        local weaponChargeReady = true
+        local weaponChargeProgress = 100
 
         if isArmed then
-            local _, currentClipAmmo = GetAmmoInClip(ped, weaponHash)
-            clipAmmo = tonumber(currentClipAmmo) or 0
+            weaponType = getWeaponType(weaponHash)
+            weaponIcon = weaponIconByHash[weaponHash]
+            weaponName = getWeaponName(weaponIcon, weaponType)
+            weaponUsesCharge = isChargeWeapon(weaponHash, weaponIcon, weaponName)
+            if weaponUsesCharge then
+                weaponChargeReady, weaponChargeProgress = getWeaponChargeState(ped, weaponHash)
+            end
+            local clipReadSucceeded, currentClipAmmo = GetAmmoInClip(ped, weaponHash)
             local totalAmmo = tonumber(GetAmmoInPedWeapon(ped, weaponHash)) or 0
-            reserveAmmo = math_max(0, totalAmmo - clipAmmo)
+            local clipReadWasSuccessful = clipReadSucceeded == true or clipReadSucceeded == 1
+            local lastKnownClipAmmo = lastKnownClipByWeapon[weaponHash]
+            local maxClipAmmo = 0
+            if not clipReadWasSuccessful and lastKnownClipAmmo == nil then
+                maxClipAmmo = tonumber(GetMaxAmmoInClip(ped, weaponHash, true)) or 0
+            end
+            clipAmmo, reserveAmmo = AmmoState.resolve(
+                totalAmmo,
+                clipReadWasSuccessful,
+                currentClipAmmo,
+                maxClipAmmo,
+                lastKnownClipAmmo
+            )
+            if clipReadWasSuccessful then
+                lastKnownClipByWeapon[weaponHash] = clipAmmo
+            end
         end
 
-        return isArmed, clipAmmo, reserveAmmo
+        return isArmed, clipAmmo, reserveAmmo, weaponType, weaponIcon, weaponName,
+            weaponUsesCharge, weaponChargeReady, weaponChargeProgress
     end
 
     local function sendCurrentWeaponState()
-        local isArmed, clipAmmo, reserveAmmo = getCurrentWeaponState()
+        local isArmed, clipAmmo, reserveAmmo, weaponType, weaponIcon, weaponName,
+            weaponUsesCharge, weaponChargeReady, weaponChargeProgress = getCurrentWeaponState()
 
         lastAmmoClip = clipAmmo
         lastAmmoReserve = reserveAmmo
         lastIsArmed = isArmed
+        lastWeaponType = weaponType
+        lastWeaponIcon = weaponIcon
+        lastWeaponName = weaponName
+        lastWeaponUsesCharge = weaponUsesCharge
+        lastWeaponChargeReady = weaponChargeReady
+        lastWeaponChargeProgress = weaponChargeProgress
 
         SendNUIMessage({
             action = 'updateAmmo',
             ammoClip = clipAmmo,
             ammoReserve = reserveAmmo,
             isArmed = isArmed,
+            weaponType = weaponType,
+            weaponIcon = weaponIcon,
+            weaponName = weaponName,
+            weaponUsesCharge = weaponUsesCharge,
+            weaponChargeReady = weaponChargeReady,
+            weaponChargeProgress = weaponChargeProgress,
         })
     end
 
@@ -709,20 +956,42 @@ function hud.start(config)
             local sleep = 750
 
             if isFullyVisible() then
-                local isArmed, clipAmmo, reserveAmmo = getCurrentWeaponState()
+                local isArmed, clipAmmo, reserveAmmo, weaponType, weaponIcon, weaponName,
+                    weaponUsesCharge, weaponChargeReady, weaponChargeProgress = getCurrentWeaponState()
 
                 if isArmed then
-                    sleep = 100
+                    sleep = weaponUsesCharge and not weaponChargeReady and 50 or 100
 
-                    if clipAmmo ~= lastAmmoClip or reserveAmmo ~= lastAmmoReserve or isArmed ~= lastIsArmed then
+                    if clipAmmo ~= lastAmmoClip
+                        or reserveAmmo ~= lastAmmoReserve
+                        or isArmed ~= lastIsArmed
+                        or weaponType ~= lastWeaponType
+                        or weaponIcon ~= lastWeaponIcon
+                        or weaponName ~= lastWeaponName
+                        or weaponUsesCharge ~= lastWeaponUsesCharge
+                        or weaponChargeReady ~= lastWeaponChargeReady
+                        or weaponChargeProgress ~= lastWeaponChargeProgress
+                    then
                         lastAmmoClip = clipAmmo
                         lastAmmoReserve = reserveAmmo
                         lastIsArmed = isArmed
+                        lastWeaponType = weaponType
+                        lastWeaponIcon = weaponIcon
+                        lastWeaponName = weaponName
+                        lastWeaponUsesCharge = weaponUsesCharge
+                        lastWeaponChargeReady = weaponChargeReady
+                        lastWeaponChargeProgress = weaponChargeProgress
                         SendNUIMessage({
                             action = 'updateAmmo',
                             ammoClip = clipAmmo,
                             ammoReserve = reserveAmmo,
-                            isArmed = isArmed
+                            isArmed = isArmed,
+                            weaponType = weaponType,
+                            weaponIcon = weaponIcon,
+                            weaponName = weaponName,
+                            weaponUsesCharge = weaponUsesCharge,
+                            weaponChargeReady = weaponChargeReady,
+                            weaponChargeProgress = weaponChargeProgress,
                         })
                     end
                 else
@@ -731,11 +1000,21 @@ function hud.start(config)
                         lastAmmoClip = -1
                         lastAmmoReserve = -1
                         lastIsArmed = false
+                        lastWeaponType = 'none'
+                        lastWeaponIcon = nil
+                        lastWeaponName = nil
+                        lastWeaponUsesCharge = false
+                        lastWeaponChargeReady = true
+                        lastWeaponChargeProgress = 100
                         SendNUIMessage({
                             action = 'updateAmmo',
                             ammoClip = -1,
                             ammoReserve = -1,
-                            isArmed = false
+                            isArmed = false,
+                            weaponType = 'none',
+                            weaponUsesCharge = false,
+                            weaponChargeReady = true,
+                            weaponChargeProgress = 100,
                         })
                     end
                 end

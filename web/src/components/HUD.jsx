@@ -1,6 +1,6 @@
-import React, { useMemo, useEffect, useCallback, useId } from 'react'
+import React, { useMemo, useEffect, useCallback, useId, useState } from 'react'
 import { IoShieldHalf } from 'react-icons/io5'
-import { FaBurger, FaDroplet, FaWalkieTalkie, FaLocationDot, FaMicrophone } from 'react-icons/fa6'
+import { FaBolt, FaBurger, FaDroplet, FaWalkieTalkie, FaLocationDot, FaMicrophone } from 'react-icons/fa6'
 import { FaHeart } from 'react-icons/fa'
 import { BsFuelPumpFill, BsLungsFill } from 'react-icons/bs'
 import { LuBrain } from 'react-icons/lu'
@@ -26,6 +26,119 @@ function clamp(n, min, max) {
 
 const BAR_SECTIONS = 4
 const BAR_SECTION_PCT = 100 / BAR_SECTIONS
+
+const Gta6WeaponIcon = ({ weaponIcon, onError }) => (
+  <img
+    src={`./weapons/${weaponIcon}.png`}
+    alt=""
+    aria-hidden="true"
+    draggable={false}
+    onError={() => onError(weaponIcon)}
+  />
+)
+
+const Gta6Interactions = ({ items, layout }) => {
+  const interactions = Array.isArray(items) ? items : []
+  if (interactions.length === 0) return null
+
+  const screenWidth = Number(layout?.screenWidth) || 1920
+  const screenHeight = Number(layout?.screenHeight) || 1080
+  const scale = clamp(Math.min(screenWidth / 1920, screenHeight / 1080), 0.75, 1.5)
+  const style = {
+    '--gta6-interaction-safe-right': `${Math.max(0, Number(layout?.insetRight) || 0)}px`,
+    '--gta6-interaction-safe-bottom': `${Math.max(0, Number(layout?.insetBottom) || 0)}px`,
+    '--gta6-interaction-scale': scale,
+  }
+
+  return (
+    <div className="gta6-interactions" style={style} role="list" aria-label="Available actions">
+      {interactions.map((interaction) => (
+        <div
+          className="gta6-interaction"
+          key={`${interaction.owner}:${interaction.id}`}
+          role="listitem"
+        >
+          <span className="gta6-interaction-label">{interaction.label}</span>
+          <span
+            className={`gta6-interaction-key${interaction.key.length > 3 ? ' is-wide' : ''}`}
+            aria-label={`Press ${interaction.key}`}
+          >
+            {interaction.key}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const Gta6WorldInteractions = () => {
+  const [interactions, setInteractions] = useState([])
+
+  useEffect(() => {
+    const handleMessage = (event) => {
+      const data = event.data
+      if (!data || data.action !== 'interaction:world') return
+
+      const nextItems = Array.isArray(data.items)
+        ? data.items
+            .filter((item) => (
+              item
+              && typeof item.label === 'string'
+              && typeof item.key === 'string'
+              && Number.isFinite(Number(item.x))
+              && Number.isFinite(Number(item.y))
+            ))
+            .slice(0, 4)
+            .map((item, index) => ({
+              id: typeof item.id === 'string' ? item.id : `world-interaction-${index}`,
+              owner: typeof item.owner === 'string' ? item.owner : 'unknown',
+              label: item.label.trim().slice(0, 96),
+              key: item.key.trim().slice(0, 16),
+              x: clamp(Number(item.x), 0, 1),
+              y: clamp(Number(item.y), 0, 1),
+              distance: clamp(Number(item.distance) || 0, 0, 25),
+            }))
+        : []
+
+      setInteractions(nextItems)
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
+
+  if (interactions.length === 0) return null
+
+  return (
+    <div className="gta6-world-interactions" role="list" aria-label="Nearby world actions">
+      {interactions.map((interaction) => {
+        const scale = clamp(1.035 - (interaction.distance * 0.025), 0.96, 1.02)
+        const style = {
+          '--gta6-world-x': `${clamp(interaction.x, 0, 1) * 100}vw`,
+          '--gta6-world-y': `${clamp(interaction.y, 0, 1) * 100}vh`,
+          '--gta6-world-scale': scale,
+        }
+
+        return (
+          <div
+            className="gta6-world-interaction"
+            key={`${interaction.owner}:${interaction.id}`}
+            style={style}
+            role="listitem"
+          >
+            <span className="gta6-world-interaction-label">{interaction.label}</span>
+            <span
+              className={`gta6-world-interaction-key${interaction.key.length > 3 ? ' is-wide' : ''}`}
+              aria-label={`Press ${interaction.key} to ${interaction.label.toLowerCase()}`}
+            >
+              {interaction.key}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 function getBarSectionWidths(value) {
   const v = clamp(value, 0, 100)
@@ -125,7 +238,10 @@ const VoipVisualizer = ({ isTalking, color, range }) => {
 
 const HUD = React.memo(({
   health,
+  healthRecentlyDamaged,
   armor,
+  stamina,
+  staminaRegenerating,
   vehicleVisible,
   speedUnit,
   speed,
@@ -147,6 +263,7 @@ const HUD = React.memo(({
   stress,
   oxygen,
   underwater,
+  inWater,
   voipTalking,
   voipRange,
   voipConnected,
@@ -180,21 +297,43 @@ const HUD = React.memo(({
   ammoPos,
   ammoColor,
   ammoPositionPreset,
+  isArmed,
+  weaponType,
+  weaponIcon,
+  weaponName,
+  weaponUsesCharge,
+  weaponChargeReady,
+  weaponChargeProgress,
+  gta6HudEnabled,
+  gta6ShowWeaponName,
+  interactions,
+  interactionLayout,
   sectionedBars,
   oxygenDisplayLocation,
 }) => {
   const showAmmo = ammoClip >= 0 || ammoEditMode
   const showWaypoint = waypointDist > 0
+  const gta6Health = clamp(Number(health) || 0, 0, 100)
+  const gta6Stamina = clamp(Number(stamina) || 0, 0, 100)
+  const gta6Oxygen = clamp(Number(oxygen) || 0, 0, 100)
+  const gta6SecondaryValue = inWater ? gta6Oxygen : gta6Stamina
+  const gta6SecondaryLabel = inWater ? 'Oxygen' : 'Stamina'
 
   const speedoPresence = usePresence(vehicleVisible, 220)
   const ammoPresence = usePresence(showAmmo, 240)
+  const gta6WeaponPresence = usePresence(gta6HudEnabled && isArmed && !ammoEditMode, 220)
+  const gta6HealthPresence = usePresence(gta6HudEnabled && healthRecentlyDamaged, 320)
+  const gta6StaminaPresence = usePresence(
+    gta6HudEnabled && (inWater || gta6Stamina < 99.5),
+    380,
+  )
   const waypointPresence = usePresence(showWaypoint, 260)
 
   const healthFlash = useDeltaFlash(health, 420)
   const armorBreak = useBreakAway(Math.max(armor, 0), 480)
   const gearTick = useOneShot(currentGear, 300)
   const cruisePop = useOneShot(cruiseActive ? `on-${cruiseSpeed}` : null, 420)
-  const reloadPulse = useReloadPulse(ammoClip, ammoReserve, 360)
+  const reloadPulse = useReloadPulse(ammoClip, ammoReserve, 440)
 
   const talkToken = (voipTalking || radioTalking) ? 'talk' : null
   const voipTalkRamp = useOneShot(talkToken, 320)
@@ -203,6 +342,13 @@ const HUD = React.memo(({
   const displayReserve = ammoClip >= 0 ? ammoReserve : 85
   const ammoLow = displayClip > 0 && displayClip <= 5
   const ammoEmpty = displayClip === 0
+  const gta6WeaponName = String(weaponName || weaponType || 'Weapon').trim().slice(0, 48)
+  const isMeleeWeapon = weaponType === 'melee'
+  const showGta6WeaponName = gta6ShowWeaponName !== false
+  const showGta6WeaponDetails = showGta6WeaponName || !isMeleeWeapon
+  const gta6WeaponChargeProgress = clamp(Number(weaponChargeProgress) || 0, 0, 100)
+  const [failedWeaponIcon, setFailedWeaponIcon] = useState(null)
+  const hasGta6WeaponIcon = Boolean(weaponIcon && failedWeaponIcon !== weaponIcon)
 
   const oxygenUrgency = useMemo(() => {
     const v = clamp(Number(oxygen) || 0, 0, 100)
@@ -368,11 +514,21 @@ const HUD = React.memo(({
     offsetY: 20,
   }), [layout])
 
-  const waypointStyle = useMemo(() => resolveAnchorStyle(layout?.waypoint, {
-    anchor: 'above-minimap',
-    offsetX: 0,
-    offsetY: 54,
-  }), [layout])
+  const waypointStyle = useMemo(() => {
+    if (gta6HudEnabled) {
+      return {
+        position: 'fixed',
+        left: 'calc(var(--hud-minimap-left) + calc(10px * var(--es-ui-scale)))',
+        bottom: 'calc(var(--hud-safezone-bottom) + var(--hud-minimap-height) + calc(12px * var(--es-ui-scale)))',
+      }
+    }
+
+    return resolveAnchorStyle(layout?.waypoint, {
+      anchor: 'above-minimap',
+      offsetX: 0,
+      offsetY: 54,
+    })
+  }, [gta6HudEnabled, layout])
 
   const voipStyle = useMemo(() => resolveAnchorStyle(layout?.voip, {
     anchor: 'bottom-right',
@@ -545,6 +701,7 @@ const HUD = React.memo(({
   const ammoVariant = layout?.ammo?.variant || 'stacked'
 
   const voipTrayEligible = showVoip
+    && !gta6HudEnabled
     && (!isStandaloneFramework || standaloneVoipHudEnabled)
     && (normalizedStatusShape === 'hexagon' || normalizedStatusShape === 'circle')
 
@@ -777,6 +934,135 @@ const HUD = React.memo(({
 
   return (
     <>
+      {(gta6HealthPresence.mounted || gta6StaminaPresence.mounted) && (
+        <div className="gta6-vitals" role="group" aria-label={`Health and ${gta6SecondaryLabel.toLowerCase()}`}>
+          {gta6HealthPresence.mounted && (
+          <div
+            className={`gta6-vital gta6-vital--health ${gta6HealthPresence.visible ? 'hud-presence-in' : 'hud-presence-out'}`}
+          >
+            <div className="gta6-vital-badge gta6-vital-badge--heart" aria-hidden="true">
+              <FaHeart />
+            </div>
+            <div
+              className="gta6-vital-track"
+              role="progressbar"
+              aria-label="Health"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={Math.round(gta6Health)}
+            >
+              <div className="gta6-vital-fill" style={{ width: `${gta6Health}%` }} />
+            </div>
+          </div>
+          )}
+          {gta6StaminaPresence.mounted && (
+          <div
+            className={[
+              'gta6-vital',
+              'gta6-vital--stamina',
+              !inWater && staminaRegenerating ? 'is-regenerating' : '',
+              gta6StaminaPresence.visible ? 'hud-presence-in' : 'hud-presence-out',
+            ].filter(Boolean).join(' ')}
+          >
+            <div className="gta6-vital-badge gta6-vital-badge--stamina" aria-hidden="true">
+              {inWater ? (
+                <span className="gta6-vital-o2">
+                  O<sub>2</sub>
+                </span>
+              ) : <FaBolt />}
+            </div>
+            <div
+              className="gta6-vital-track"
+              role="progressbar"
+              aria-label={gta6SecondaryLabel}
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={Math.round(gta6SecondaryValue)}
+            >
+              <div className="gta6-vital-fill" style={{ width: `${gta6SecondaryValue}%` }} />
+            </div>
+          </div>
+          )}
+        </div>
+      )}
+
+      {gta6HudEnabled && (
+        <Gta6Interactions items={interactions} layout={interactionLayout} />
+      )}
+
+      {gta6HudEnabled && <Gta6WorldInteractions />}
+
+      {gta6WeaponPresence.mounted && (
+        <div
+          className={[
+            'gta6-weapon',
+            gta6WeaponPresence.visible ? 'hud-presence-in' : 'hud-presence-out',
+            !isMeleeWeapon && !weaponUsesCharge && ammoLow ? 'ammo-low' : '',
+            !isMeleeWeapon && !weaponUsesCharge && ammoEmpty ? 'ammo-empty' : '',
+            !isMeleeWeapon && !weaponUsesCharge && reloadPulse ? 'ammo-reload' : '',
+            hasGta6WeaponIcon ? 'has-weapon-image' : 'gta6-weapon--text-only',
+            hasGta6WeaponIcon && !showGta6WeaponDetails ? 'gta6-weapon--image-only' : '',
+          ].filter(Boolean).join(' ')}
+          role="group"
+          aria-label={isMeleeWeapon || weaponUsesCharge
+            ? `Active ${gta6WeaponName}`
+            : `Active ${gta6WeaponName} ammunition`}
+        >
+          {hasGta6WeaponIcon && (
+            <div className="gta6-weapon-art">
+              <Gta6WeaponIcon weaponIcon={weaponIcon} onError={setFailedWeaponIcon} />
+            </div>
+          )}
+          {showGta6WeaponDetails && (
+            <>
+              {hasGta6WeaponIcon && <div className="gta6-weapon-divider" aria-hidden="true" />}
+              <div className="gta6-weapon-info">
+                {showGta6WeaponName && (
+                  <div className="gta6-weapon-name">{gta6WeaponName}</div>
+                )}
+                {!isMeleeWeapon && weaponUsesCharge && (
+                  <div
+                    className={`gta6-charge${weaponChargeReady ? ' is-ready' : ' is-charging'}`}
+                  >
+                    <span className="gta6-charge-label" role="status" aria-live="polite">
+                      {weaponChargeReady ? 'READY' : 'CHARGING'}
+                    </span>
+                    <span
+                      className="gta6-charge-track"
+                      role="progressbar"
+                      aria-label="Weapon charge"
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                      aria-valuenow={Math.round(gta6WeaponChargeProgress)}
+                    >
+                      <span
+                        className="gta6-charge-fill"
+                        style={{ width: `${gta6WeaponChargeProgress}%` }}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </div>
+                )}
+                {!isMeleeWeapon && !weaponUsesCharge && (
+                  <div
+                    className="gta6-ammo-readout"
+                    aria-label={`${displayClip} rounds loaded, ${displayReserve} in reserve`}
+                  >
+                    <span className="gta6-ammo-clip" aria-hidden="true">
+                      <SlidingNumber value={displayClip} minDigits={2} durationMs={180} />
+                    </span>
+                    <span className="gta6-ammo-separator" aria-hidden="true" />
+                    <span className="gta6-ammo-reserve" aria-hidden="true">
+                      <SlidingNumber value={displayReserve} durationMs={240} />
+                    </span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {voipStandalonePresence.mounted && (
         <div className="hud-presence-shell" style={voipStyle}>
           <div
@@ -815,6 +1101,7 @@ const HUD = React.memo(({
         </div>
       )}
 
+      {!gta6HudEnabled && (
       <div className={`status-cluster variant-${statusVariant}${barRailMode ? ' status-cluster--bar-rail' : ''}`} style={statusClusterStyle}>
         {barRailMode && (
           <div className="hud-bar-deck">
@@ -890,17 +1177,22 @@ const HUD = React.memo(({
           </div>
         )}
       </div>
+      )}
 
       {waypointPresence.mounted && (
         <div className="hud-presence-shell" style={waypointStyle}>
           <div
             className={[
               'waypoint-distance',
+              gta6HudEnabled ? 'waypoint-distance--gta6' : '',
               waypointPresence.visible ? 'hud-presence-in' : 'hud-presence-out',
-            ].join(' ')}
+            ].filter(Boolean).join(' ')}
+            role="status"
+            aria-live="polite"
+            aria-label={`${Math.max(0, waypointDist).toFixed(2)} ${waypointUnit}`}
           >
-            <FaLocationDot className="waypoint-icon waypoint-pin-pulse" />
-            <span className="waypoint-value">
+            {!gta6HudEnabled && <FaLocationDot className="waypoint-icon waypoint-pin-pulse" />}
+            <span className="waypoint-value" aria-hidden="true">
               <SlidingNumber
                 value={Math.floor(Math.max(0, waypointDist))}
                 durationMs={160}
@@ -910,7 +1202,7 @@ const HUD = React.memo(({
                 {`.${String(Math.floor((Math.max(0, waypointDist) % 1) * 100)).padStart(2, '0')}`}
               </span>
             </span>
-            <span className="waypoint-unit">{waypointUnit}</span>
+            <span className="waypoint-unit" aria-hidden="true">{waypointUnit}</span>
           </div>
         </div>
       )}
@@ -1025,7 +1317,7 @@ const HUD = React.memo(({
         </div>
       )}
 
-      {ammoPresence.mounted && (
+      {(!gta6HudEnabled || ammoEditMode) && ammoPresence.mounted && (
         <div
           className="hud-presence-shell"
           style={ammoContainerStyle}

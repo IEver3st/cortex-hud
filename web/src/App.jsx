@@ -2,12 +2,15 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import HUD from './components/HUD'
 import AircraftHUD from './components/AircraftHUD'
 import Indicator from './components/Indicator'
+import Gta6Navigation from './components/Gta6Navigation'
+import VehicleIdentification from './components/VehicleIdentification'
 import SniperScope from './components/SniperScope'
 import SettingsModal from './components/SettingsModal'
 import HudDevPanel from './components/HudDevPanel'
 import { isHudDevBrowser, loadDevPlayfieldColor, saveDevPlayfieldColor } from './hudDevEnv'
 import { applyDevSettingsSave } from './hudDevApply'
 import { postNui } from './nui'
+import { normalizeVehicleIdentity } from './vehicleIdentity.js'
 
 function App() {
   const [devPlayfieldColor, setDevPlayfieldColor] = useState(() =>
@@ -22,11 +25,15 @@ function App() {
 
   const [hudData, setHudData] = useState({
     health: 100,
+    healthRecentlyDamaged: false,
     armor: 50,
+    stamina: 100,
+    staminaRegenerating: false,
     visible: true,
     heading: 0,
     street: 'Unknown',
     zone: 'Unknown',
+    zoneCode: '',
     postal: '',
     postalDist: 0,
     vehicleVisible: false,
@@ -73,6 +80,7 @@ function App() {
     stress: 0,
     oxygen: 100,
     underwater: false,
+    inWater: false,
     voipTalking: false,
     voipRange: 'normal',
     voipConnected: false,
@@ -125,12 +133,32 @@ function App() {
     ammoColor: '#10b981',
     speedometerPos: null,
     showCrosshair: false,
+    gta6HudEnabled: false,
+    gta6ShowWeaponName: true,
+    gta6VehicleIdentification: true,
+    vehicleIdentity: null,
     sniperScopeVisible: false,
     sniperScopeWeapon: 'SNIPER',
+    sniperScopeZoom: 1,
+    sniperScopeRange: null,
+    sniperScopeSteadiness: 100,
     sectionedBars: false,
     sectionedIndicator: false,
     oxygenDisplayLocation: 'statusCluster',
     isArmed: false,
+    weaponType: 'none',
+    weaponIcon: null,
+    weaponName: '',
+    weaponUsesCharge: false,
+    weaponChargeReady: true,
+    weaponChargeProgress: 100,
+    interactions: [],
+    interactionLayout: {
+      insetRight: 0,
+      insetBottom: 0,
+      screenWidth: 1920,
+      screenHeight: 1080,
+    },
     radarVisible: true,
 
     devFrameworkOverride: isHudDevBrowser ? 'esx' : null,
@@ -154,6 +182,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsData, setSettingsData] = useState({})
   const [cinematicMode, setCinematicMode] = useState(false)
+  const [vehicleIdentityActive, setVehicleIdentityActive] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [dragPos, setDragPos] = useState(null)
   const dragPosRef = useRef(null)
@@ -210,6 +239,7 @@ function App() {
           stress: data.stress ?? prev.stress,
           oxygen: data.oxygen ?? prev.oxygen,
           underwater: data.underwater ?? prev.underwater,
+          inWater: data.inWater ?? prev.inWater,
         }))
         break
       case 'updateVoip':
@@ -260,6 +290,15 @@ function App() {
           resolvedAmmoPositionPreset:
             data.resolvedAmmoPositionPreset ?? data.ammoPositionPreset ?? prev.resolvedAmmoPositionPreset,
           showCrosshair: data.showCrosshair ?? prev.showCrosshair,
+          gta6HudEnabled: Object.prototype.hasOwnProperty.call(data, 'gta6HudEnabled')
+            ? data.gta6HudEnabled === true
+            : prev.gta6HudEnabled,
+          gta6ShowWeaponName: Object.prototype.hasOwnProperty.call(data, 'gta6ShowWeaponName')
+            ? data.gta6ShowWeaponName !== false
+            : prev.gta6ShowWeaponName,
+          gta6VehicleIdentification: Object.prototype.hasOwnProperty.call(data, 'gta6VehicleIdentification')
+            ? data.gta6VehicleIdentification !== false
+            : prev.gta6VehicleIdentification,
           sectionedBars: data.sectionedBars ?? prev.sectionedBars,
           sectionedIndicator: data.sectionedIndicator ?? prev.sectionedIndicator,
           oxygenDisplayLocation: data.oxygenDisplayLocation ?? prev.oxygenDisplayLocation,
@@ -292,7 +331,14 @@ function App() {
         }))
         break
       case 'updateHud':
-        setHudData((prev) => ({ ...prev, health: data.health, armor: data.armor }))
+        setHudData((prev) => ({
+          ...prev,
+          health: data.health ?? prev.health,
+          healthRecentlyDamaged: data.healthRecentlyDamaged ?? prev.healthRecentlyDamaged,
+          armor: data.armor ?? prev.armor,
+          stamina: data.stamina ?? prev.stamina,
+          staminaRegenerating: data.staminaRegenerating ?? prev.staminaRegenerating,
+        }))
         break
       case 'updateLocation':
         setHudData((prev) => ({
@@ -300,6 +346,7 @@ function App() {
           heading: data.heading,
           street: data.street,
           zone: data.zone,
+          zoneCode: typeof data.zoneCode === 'string' ? data.zoneCode : prev.zoneCode,
           postal: data.postal,
           postalDist: data.postalDist,
         }))
@@ -368,15 +415,75 @@ function App() {
           ammoClip: data.ammoClip,
           ammoReserve: data.ammoReserve,
           isArmed: data.isArmed ?? prev.isArmed,
+          weaponType: typeof data.weaponType === 'string' ? data.weaponType : prev.weaponType,
+          weaponIcon:
+            typeof data.weaponIcon === 'string' && /^weapon_[a-z0-9_]+$/i.test(data.weaponIcon)
+              ? data.weaponIcon.toLowerCase()
+              : null,
+          weaponName: typeof data.weaponName === 'string'
+            ? data.weaponName.trim().slice(0, 48)
+            : prev.weaponName,
+          weaponUsesCharge: typeof data.weaponUsesCharge === 'boolean'
+            ? data.weaponUsesCharge
+            : prev.weaponUsesCharge,
+          weaponChargeReady: typeof data.weaponChargeReady === 'boolean'
+            ? data.weaponChargeReady
+            : prev.weaponChargeReady,
+          weaponChargeProgress: Number.isFinite(Number(data.weaponChargeProgress))
+            ? Math.min(100, Math.max(0, Math.round(Number(data.weaponChargeProgress))))
+            : prev.weaponChargeProgress,
         }))
         break
-      case 'setSniperScope':
+      case 'interaction:update':
+        setHudData((prev) => ({
+          ...prev,
+          interactions: Array.isArray(data.items)
+            ? data.items
+                .filter((item) => item && typeof item.label === 'string' && typeof item.key === 'string')
+                .slice(0, 8)
+                .map((item, index) => ({
+                  id: typeof item.id === 'string' ? item.id : `interaction-${index}`,
+                  owner: typeof item.owner === 'string' ? item.owner : 'unknown',
+                  label: item.label,
+                  key: item.key,
+                }))
+            : [],
+        }))
+        break
+      case 'interaction:layout': {
+        const screenWidth = Math.min(7680, Math.max(640, Number(data.screenWidth) || 1920))
+        const screenHeight = Math.min(4320, Math.max(360, Number(data.screenHeight) || 1080))
+        setHudData((prev) => ({
+          ...prev,
+          interactionLayout: {
+            insetRight: Math.min(screenWidth * 0.2, Math.max(0, Number(data.insetRight) || 0)),
+            insetBottom: Math.min(screenHeight * 0.2, Math.max(0, Number(data.insetBottom) || 0)),
+            screenWidth,
+            screenHeight,
+          },
+        }))
+        break
+      }
+      case 'setSniperScope': {
+        const zoom = Number(data.zoom)
+        const range = Number(data.range)
+        const steadiness = Number(data.steadiness)
         setHudData((prev) => ({
           ...prev,
           sniperScopeVisible: data.visible === true,
           sniperScopeWeapon: typeof data.weapon === 'string' ? data.weapon : prev.sniperScopeWeapon,
+          sniperScopeZoom: Number.isFinite(zoom)
+            ? Math.min(20, Math.max(1, zoom))
+            : prev.sniperScopeZoom,
+          sniperScopeRange: Number.isFinite(range) && range > 0 && range <= 1200
+            ? Math.round(range)
+            : null,
+          sniperScopeSteadiness: Number.isFinite(steadiness)
+            ? Math.min(100, Math.max(0, Math.round(steadiness)))
+            : prev.sniperScopeSteadiness,
         }))
         break
+      }
       case 'toggleVisibility':
         setHudData((prev) => ({
           ...prev,
@@ -386,6 +493,33 @@ function App() {
         break
       case 'setForceAircraftHud':
         setHudData((prev) => ({ ...prev, forceAircraftHud: data.forced ?? false }))
+        break
+      case 'showVehicleIdentification': {
+        const identity = normalizeVehicleIdentity(data)
+        if (identity) {
+          setHudData((prev) => ({ ...prev, vehicleIdentity: identity }))
+        }
+        break
+      }
+      case 'updateVehicleIdentification':
+        setHudData((prev) => {
+          if (!prev.vehicleIdentity || Number(data.entryId) !== prev.vehicleIdentity.entryId) {
+            return prev
+          }
+
+          const identity = normalizeVehicleIdentity({ ...prev.vehicleIdentity, ...data })
+          return identity ? { ...prev, vehicleIdentity: identity } : prev
+        })
+        break
+      case 'hideVehicleIdentification':
+        setHudData((prev) => {
+          if (!prev.vehicleIdentity) return prev
+          const entryId = Number(data.entryId)
+          if (Number.isSafeInteger(entryId) && entryId > 0 && entryId !== prev.vehicleIdentity.entryId) {
+            return prev
+          }
+          return { ...prev, vehicleIdentity: null }
+        })
         break
       case 'updateVehicle':
         setHudData((prev) => ({
@@ -407,6 +541,7 @@ function App() {
           useSeatbelt: data.useSeatbelt ?? prev.useSeatbelt,
           cruiseActive: data.visible ? (data.cruiseActive ?? false) : false,
           cruiseSpeed: data.visible ? (data.cruiseSpeed ?? 0) : 0,
+          vehicleIdentity: data.visible === false ? null : prev.vehicleIdentity,
         }))
         break
       case 'updateAircraft':
@@ -414,6 +549,7 @@ function App() {
           ...prev,
           aircraftVisible: data.visible,
           vehicleVisible: false,
+          vehicleIdentity: data.visible ? null : prev.vehicleIdentity,
           altitude: data.altitude ?? prev.altitude,
           altitudeAgl: data.altitudeAgl ?? prev.altitudeAgl,
           airspeed: data.airspeed ?? prev.airspeed,
@@ -679,9 +815,16 @@ function App() {
     return null
   }
 
+  const showSniperScope = hudData.sniperScopeVisible
+    && hudData.visible
+    && !cinematicMode
+    && !settingsOpen
+    && !editMode
+    && !ammoEditMode
   const showMainHud = hudData.visible || editMode || ammoEditMode
-  const showAircraftHud = hudData.aircraftVisible && (hudData.visible || hudData.forceAircraftHud) && !editMode
-  const showSniperScope = hudData.sniperScopeVisible && hudData.visible && !cinematicMode && !editMode
+  const showAircraftHud = hudData.aircraftVisible
+    && (hudData.visible || hudData.forceAircraftHud)
+    && !editMode
 
   return (
     <div
@@ -692,7 +835,12 @@ function App() {
           : undefined
       }
     >
-      <SniperScope visible={showSniperScope} weapon={hudData.sniperScopeWeapon} />
+      <SniperScope
+        visible={showSniperScope}
+        zoom={hudData.sniperScopeZoom}
+        range={hudData.sniperScopeRange}
+        steadiness={hudData.sniperScopeSteadiness}
+      />
       {hudData.showCrosshair && hudData.isArmed && !showSniperScope && <div className="crosshair-dot" />}
       {editMode && (
         <div className="edit-mode-overlay">
@@ -726,8 +874,8 @@ function App() {
         </div>
       )}
       {showMainHud && (
-        <>
-          <Indicator
+        <div className={`main-hud-layer${showSniperScope ? ' main-hud-layer--scope-hidden' : ''}`}>
+          {!hudData.gta6HudEnabled && <Indicator
             heading={hudData.heading}
             street={hudData.street}
             zone={hudData.zone}
@@ -750,10 +898,33 @@ function App() {
             floodWarningDetail={hudData.floodWarningDetail}
             hurricaneWarningActive={hudData.hurricaneWarningActive && Boolean(hudData.showHurricaneWarning)}
             hurricaneWarningDetail={hudData.hurricaneWarningDetail}
-          />
+          />}
+          {hudData.gta6HudEnabled && (
+            <VehicleIdentification
+              identity={hudData.vehicleIdentity}
+              enabled={hudData.gta6VehicleIdentification && !cinematicMode && !settingsOpen}
+              vehicleVisible={Boolean(hudData.vehicleIdentity)}
+              radarVisible={hudData.radarVisible}
+              layout={hudData.interactionLayout}
+              onActiveChange={setVehicleIdentityActive}
+            />
+          )}
+          {hudData.gta6HudEnabled && (
+            <Gta6Navigation
+              street={hudData.street}
+              zone={hudData.zone}
+              zoneCode={hudData.zoneCode}
+              radarVisible={hudData.radarVisible}
+              layout={hudData.interactionLayout}
+              suspended={vehicleIdentityActive}
+            />
+          )}
           <HUD
             health={hudData.health}
+            healthRecentlyDamaged={hudData.healthRecentlyDamaged}
             armor={hudData.armor}
+            stamina={hudData.stamina}
+            staminaRegenerating={hudData.staminaRegenerating}
             vehicleVisible={hudData.vehicleVisible || editMode}
             speedUnit={hudData.speedUnit}
             speed={hudData.speed}
@@ -778,6 +949,7 @@ function App() {
             stress={hudData.stress}
             oxygen={hudData.oxygen}
             underwater={hudData.underwater}
+            inWater={hudData.inWater}
             voipTalking={hudData.voipTalking}
             voipRange={hudData.voipRange}
             voipConnected={hudData.voipConnected}
@@ -813,6 +985,17 @@ function App() {
             ammoColor={hudData.ammoColor}
             ammoPositionPreset={hudData.ammoPositionPreset}
             resolvedAmmoPositionPreset={hudData.resolvedAmmoPositionPreset}
+            isArmed={hudData.isArmed}
+            weaponType={hudData.weaponType}
+            weaponIcon={hudData.weaponIcon}
+            weaponName={hudData.weaponName}
+            weaponUsesCharge={hudData.weaponUsesCharge}
+            weaponChargeReady={hudData.weaponChargeReady}
+            weaponChargeProgress={hudData.weaponChargeProgress}
+            gta6HudEnabled={hudData.gta6HudEnabled}
+            gta6ShowWeaponName={hudData.gta6ShowWeaponName}
+            interactions={hudData.interactions}
+            interactionLayout={hudData.interactionLayout}
             ammoEditMode={ammoEditMode}
             onAmmoDrag={handleAmmoDrag}
             layout={hudData.layout}
@@ -820,26 +1003,28 @@ function App() {
             sectionedBars={hudData.sectionedBars}
             oxygenDisplayLocation={hudData.oxygenDisplayLocation}
           />
-        </>
+        </div>
       )}
       {showAircraftHud && (
-        <AircraftHUD
-          altitude={hudData.altitude}
-          altitudeAgl={hudData.altitudeAgl}
-          airspeed={hudData.airspeed}
-          heading={hudData.aircraftHeading}
-          fuel={hudData.aircraftFuel}
-          hasFuelProvider={hudData.aircraftHasFuelProvider}
-          engineHealth={hudData.aircraftEngineHealth}
-          engines={hudData.engines}
-          gearDown={hudData.aircraftGearDown}
-          hasFixedGear={hudData.aircraftHasFixedGear}
-          tailRotorHealth={hudData.aircraftTailRotorHealth}
-          isHelicopter={hudData.aircraftIsHelicopter}
-          isStalled={hudData.aircraftStalled}
-          hydraulicsHudEnabled={hudData.aircraftHydraulicsHudEnabled}
-          hydraulicsHealth={hudData.aircraftHydraulicsHealth}
-        />
+        <div className={`aircraft-hud-layer${showSniperScope ? ' aircraft-hud-layer--scope-hidden' : ''}`}>
+          <AircraftHUD
+            altitude={hudData.altitude}
+            altitudeAgl={hudData.altitudeAgl}
+            airspeed={hudData.airspeed}
+            heading={hudData.aircraftHeading}
+            fuel={hudData.aircraftFuel}
+            hasFuelProvider={hudData.aircraftHasFuelProvider}
+            engineHealth={hudData.aircraftEngineHealth}
+            engines={hudData.engines}
+            gearDown={hudData.aircraftGearDown}
+            hasFixedGear={hudData.aircraftHasFixedGear}
+            tailRotorHealth={hudData.aircraftTailRotorHealth}
+            isHelicopter={hudData.aircraftIsHelicopter}
+            isStalled={hudData.aircraftStalled}
+            hydraulicsHudEnabled={hudData.aircraftHydraulicsHudEnabled}
+            hydraulicsHealth={hudData.aircraftHydraulicsHealth}
+          />
+        </div>
       )}
       <SettingsModal
         key={JSON.stringify(settingsData)}

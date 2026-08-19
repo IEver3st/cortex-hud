@@ -11,6 +11,11 @@ files {
     'web/dist/index.html',
     'web/dist/assets/index.js',
     'web/dist/assets/index.css',
+    'web/dist/assets/*.woff',
+    'web/dist/assets/*.woff2',
+    'web/third-party/barlow-condensed-OFL.txt',
+    'web/dist/weapons/*.png',
+    'web/dist/weapons/manifest.json',
     'config/shared.lua',
     'modules/**/*.lua',
 }
@@ -23,6 +28,10 @@ shared_scripts {
 
 client_scripts {
     'init.lua'
+}
+
+server_scripts {
+    'modules/interactions/server.lua'
 }
 
 exports {

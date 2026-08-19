@@ -89,11 +89,13 @@ const SlidingNumber = React.memo(({
   className = '',
   style,
   durationMs = 200,
+  minDigits = 1,
 }) => {
   const safeValue = Math.max(0, Math.floor(Number(value) || 0))
+  const safeMinDigits = Math.max(1, Math.min(6, Math.floor(Number(minDigits) || 1)))
   const digits = useMemo(
-    () => String(safeValue).split('').map((ch) => Number(ch)),
-    [safeValue],
+    () => String(safeValue).padStart(safeMinDigits, '0').split('').map((ch) => Number(ch)),
+    [safeValue, safeMinDigits],
   )
 
   return (

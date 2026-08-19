@@ -37,6 +37,11 @@ body {
   pointer-events: none;
 }
 
+.main-hud-layer--scope-hidden,
+.aircraft-hud-layer--scope-hidden {
+  visibility: hidden;
+}
+
 .cinematic-bars {
   position: absolute;
   inset: 0;

@@ -56,6 +56,9 @@ local KEY_MAP = {
     hud_ammoPosY = 'ammoPosY',
     hud_ammoPositionPreset = 'ammoPositionPreset',
     hud_showCrosshair = 'showCrosshair',
+    hud_gta6HudEnabled = 'gta6HudEnabled',
+    hud_gta6ShowWeaponName = 'gta6ShowWeaponName',
+    hud_gta6VehicleIdentification = 'gta6VehicleIdentification',
     hud_sectionedBars = 'sectionedBars',
     hud_sectionedIndicator = 'sectionedIndicator',
     hud_backdropBlur = 'backdropBlur',
@@ -278,6 +281,9 @@ local function buildDefaultSettings()
         ammoPosY = 0,
         ammoPositionPreset = 'preset',
         showCrosshair = config.showCrosshair == true,
+        gta6HudEnabled = config.gta6HudEnabled == true,
+        gta6ShowWeaponName = config.gta6ShowWeaponName ~= false,
+        gta6VehicleIdentification = config.gta6VehicleIdentification ~= false,
         showDynamicWeather = config.showDynamicWeather == true,
         showFlashFloodWarning = config.showFlashFloodWarning ~= false,
         showHurricaneWarning = config.showHurricaneWarning ~= false,
@@ -445,6 +451,28 @@ local function getSettingsDefinition()
                 label = 'Crosshair Dot',
                 description = 'Show a small aiming dot while armed',
                 default = config.showCrosshair == true,
+            },
+            {
+                key = 'hud_gta6HudEnabled',
+                type = 'toggle',
+                label = 'GTA 6 HUD',
+                description = 'Use contextual vitals, an active weapon display, and brief GTA V place discoveries',
+                default = config.gta6HudEnabled == true,
+            },
+            {
+                key = 'hud_gta6ShowWeaponName',
+                type = 'toggle',
+                label = 'GTA 6 Weapon Name',
+                description = 'Show the active weapon name beside its icon in GTA 6 HUD mode',
+                default = config.gta6ShowWeaponName ~= false,
+            },
+            {
+                key = 'hud_gta6VehicleIdentification',
+                type = 'toggle',
+                label = 'GTA 6 Vehicle Introduction',
+                description = 'Show brand, model, engine health, and fuel when entering a vehicle',
+                default = config.gta6VehicleIdentification ~= false,
+                hidden = true,
             },
             {
                 key = 'hud_statusIconShape',
@@ -685,6 +713,7 @@ local function getSettingsDefinition()
         },
         sections = {
             { label = 'Appearance', keys = { 'hud_backdropBlur', 'hud_panelOpacity' } },
+            { label = 'HUD Style', keys = { 'hud_gta6HudEnabled', 'hud_gta6ShowWeaponName' } },
             { label = 'Speedometer', keys = { 'hud_speedUnit', 'hud_fuelDisplayStyle', 'hud_disableSpeedometer', 'hud_cruiseAutoThrottle', 'hud_speedometerActions' } },
             { label = 'Postal', keys = { 'hud_showPostal', 'hud_showPostalDistance' } },
             { label = 'Weather', keys = { 'hud_showDynamicWeather', 'hud_showFlashFloodWarning', 'hud_showHurricaneWarning' } },
@@ -887,6 +916,9 @@ local function pushResolvedHud(data)
         resolvedAmmoPositionPreset = presentation.resolvedAmmoPositionPreset,
         ammoPos = presentation.ammoPos,
         showCrosshair = config.showCrosshair,
+        gta6HudEnabled = config.gta6HudEnabled == true,
+        gta6ShowWeaponName = config.gta6ShowWeaponName ~= false,
+        gta6VehicleIdentification = config.gta6VehicleIdentification ~= false,
         sectionedBars = data.sectionedBars == true,
         sectionedIndicator = data.sectionedIndicator == true,
         oxygenDisplayLocation = data.oxygenDisplayLocation or config.oxygenDisplayLocation or 'statusCluster',
@@ -922,6 +954,9 @@ function Settings.apply(data, options)
     config.StatusIcons.oxygenThreshold = tonumber(data.oxygenThreshold) or config.StatusIcons.oxygenThreshold
     config.StatusIcons.colors = copyTable(presentation.colors)
     config.showCrosshair = toBoolean(data.showCrosshair, config.showCrosshair == true)
+    config.gta6HudEnabled = toBoolean(data.gta6HudEnabled, config.gta6HudEnabled == true)
+    config.gta6ShowWeaponName = toBoolean(data.gta6ShowWeaponName, config.gta6ShowWeaponName ~= false)
+    config.gta6VehicleIdentification = toBoolean(data.gta6VehicleIdentification, config.gta6VehicleIdentification ~= false)
     config.showDynamicWeather = toBoolean(data.showDynamicWeather, config.showDynamicWeather == true)
     if not config.showDynamicWeather then
         SendNUIMessage({
@@ -989,6 +1024,15 @@ local function persistSettingsData(data)
             end
             if libKey == 'hud_panelOpacity' and type(v) == 'number' and v <= 1 then
                 v = math_floor(v * 100 + 0.5)
+            end
+            if libKey == 'hud_gta6HudEnabled' then
+                v = toBoolean(v, false)
+            end
+            if libKey == 'hud_gta6ShowWeaponName' then
+                v = toBoolean(v, true)
+            end
+            if libKey == 'hud_gta6VehicleIdentification' then
+                v = toBoolean(v, true)
             end
             setLibSetting(libKey, v)
         end
@@ -1059,6 +1103,9 @@ function Settings.get()
 
     data.backdropBlur = normalizeBackdropBlur(data.backdropBlur) or 1.0
     data.panelOpacity = normalizePanelOpacity(data.panelOpacity) or 1.0
+    data.gta6HudEnabled = toBoolean(data.gta6HudEnabled, false)
+    data.gta6ShowWeaponName = toBoolean(data.gta6ShowWeaponName, true)
+    data.gta6VehicleIdentification = toBoolean(data.gta6VehicleIdentification, true)
 
     local speedometerPosX = tonumber(data.speedometerPosX) or 0
     local speedometerPosY = tonumber(data.speedometerPosY) or 0

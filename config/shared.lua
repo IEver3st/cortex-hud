@@ -132,6 +132,46 @@ Config.cinematicNotifications = true
 Config.minimapOnlyInVehicle = false
 Config.fuelDisplayStyle = 'bar'
 Config.showCrosshair = false
+-- Replaces the core status/ammo presentation with the GTA 6-inspired
+-- top-left vitals and top-right active weapon/ammo cluster.
+Config.gta6HudEnabled = false
+-- Show the active weapon name beside its icon in GTA 6 HUD mode.
+Config.gta6ShowWeaponName = true
+-- Show the GTA 6-style vehicle introduction card when entering a vehicle.
+-- This preference is only exposed while GTA 6 HUD mode is enabled.
+Config.gta6VehicleIdentification = true
+-- Grounded world-space vehicle panel prompt. Gameplay remains owned by this
+-- resource while cortex-lib only arbitrates and presents the action.
+Config.VehicleDoorInteractions = {
+    enabled = true,
+    requireGta6Hud = true,
+    key = 'E',
+    command = 'cortexVehicleDoor',
+    description = 'Open or close the nearest vehicle door',
+    priority = 100,
+    openLabel = 'OPEN',
+    closeLabel = 'CLOSE',
+    interactionDistance = 2.0,
+    scanRadius = 6.0,
+    activeScanInterval = 100,
+    idleScanInterval = 450,
+    maxVehicleSpeed = 1.0,
+    switchBias = 0.18,
+    -- Fine tuning in vehicle-local metres. Positive Y moves toward the hood;
+    -- negative Y moves toward the trunk. Door offsets start from handle bones.
+    panelOffsets = {
+        frontDoor = { x = 0.0, y = 0.18, z = -0.12 },
+        rearDoor = { x = 0.0, y = 0.15, z = -0.12 },
+        hood = { x = 0.0, y = 0.68, z = 0.04 },
+        trunk = { x = 0.0, y = -0.72, z = 0.04 },
+    },
+    anchorOffsetZ = 0.0,
+    includeHood = true,
+    includeTrunk = true,
+    serverMaxDistance = 8.0,
+    requestCooldown = 220,
+    panelCooldown = 280,
+}
 -- Indicator strip: forecast from Dynamic_weather (requires resource + HUD setting).
 Config.showDynamicWeather = false
 -- Flash flood segment when Dynamic_weather reports active flood (requires HUD setting in cortex-lib Weather).
