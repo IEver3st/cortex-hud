@@ -85,8 +85,10 @@ export function applyDevSettingsSave(saved, prev) {
     resolvedFuelDisplayStyle: fuelStyle,
     sectionedBars: Boolean(saved.sectionedBars),
     sectionedIndicator: Boolean(saved.sectionedIndicator),
+    disableSpeedometer: Boolean(saved.disableSpeedometer),
     showCrosshair: Boolean(saved.showCrosshair),
     gta6HudEnabled: Boolean(saved.gta6HudEnabled),
+    gta6AuthenticWeaponHud: Boolean(saved.gta6AuthenticWeaponHud),
     gta6ShowWeaponName: Object.prototype.hasOwnProperty.call(saved, 'gta6ShowWeaponName')
       ? saved.gta6ShowWeaponName !== false
       : prev.gta6ShowWeaponName,
@@ -106,6 +108,39 @@ export function applyDevSettingsSave(saved, prev) {
   }
 }
 
-export function getDefaultOpenSettingsPayload() {
-  return {}
+export function getDefaultOpenSettingsPayload(hudData = {}) {
+  const colors = hudData.colors || {}
+  const theme = hudData.theme || {}
+
+  return {
+    layoutPreset: hudData.layoutPreset || 'classic',
+    colorPreset: hudData.colorPreset || hudData.layoutPreset || 'classic',
+    speedUnit: hudData.speedUnit || 'mph',
+    disableSpeedometer: hudData.disableSpeedometer === true,
+    hungerThreshold: hudData.hungerThreshold ?? 100,
+    thirstThreshold: hudData.thirstThreshold ?? 100,
+    stressThreshold: hudData.stressThreshold ?? 100,
+    oxygenThreshold: hudData.oxygenThreshold ?? 100,
+    colorHealth: colors.health || '#10b981',
+    colorArmor: colors.armor || '#5eb2ff',
+    colorHunger: colors.hunger || '#f59e0b',
+    colorThirst: colors.thirst || '#38bdf8',
+    colorStress: colors.stress || '#ef4444',
+    colorOxygen: colors.oxygen || '#06b6d4',
+    colorAmmo: hudData.ammoColor || theme.ammo || '#10b981',
+    ammoPositionPreset: hudData.ammoPositionPreset || 'preset',
+    showCrosshair: hudData.showCrosshair === true,
+    gta6HudEnabled: hudData.gta6HudEnabled === true,
+    gta6AuthenticWeaponHud: hudData.gta6AuthenticWeaponHud === true,
+    gta6ShowWeaponName: hudData.gta6ShowWeaponName !== false,
+    gta6VehicleIdentification: hudData.gta6VehicleIdentification !== false,
+    showDynamicWeather: hudData.showDynamicWeather === true,
+    showHurricaneWarning: hudData.showHurricaneWarning !== false,
+    sectionedBars: hudData.sectionedBars === true,
+    sectionedIndicator: hudData.sectionedIndicator === true,
+    statusIconShape: hudData.resolvedStatusIconShape || hudData.statusIconShape || 'bar',
+    oxygenDisplayLocation: hudData.oxygenDisplayLocation || 'statusCluster',
+    backdropBlur: theme.backdropBlur ?? 1,
+    panelOpacity: theme.panelOpacity ?? 1,
+  }
 }

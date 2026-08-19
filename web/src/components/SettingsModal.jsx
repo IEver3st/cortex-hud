@@ -161,6 +161,7 @@ const DEFAULTS = {
     ammoPositionPreset: 'preset',
     showCrosshair: false,
     gta6HudEnabled: false,
+    gta6AuthenticWeaponHud: false,
     gta6ShowWeaponName: true,
     gta6VehicleIdentification: true,
     showDynamicWeather: false,
@@ -219,6 +220,8 @@ const SettingsModal = ({
     const [local, setLocal] = useState(() => buildInitialState(settings))
     const initialState = buildInitialState(settings)
     const selectedAmmoPosition = local.ammoPositionPreset || settings?.resolvedAmmoPositionPreset || 'preset'
+    const speedometerForcedOff = local.gta6HudEnabled
+    const speedometerSuppressed = speedometerForcedOff || local.disableSpeedometer
 
     const set = useCallback((key, value) => {
         setLocal(prev => ({ ...prev, [key]: value }))
@@ -345,36 +348,56 @@ const SettingsModal = ({
                             </button>
                         </div>
 
-                        <div className="settings-row">
-                            <div>
-                                <div className="settings-row-label">Show Weapon Name</div>
-                                <div className="settings-row-desc">Show the active weapon name beside its icon in GTA 6 HUD mode</div>
-                            </div>
-                            <button
-                                type="button"
-                                className={`settings-toggle ${local.gta6ShowWeaponName ? 'active' : ''}`}
-                                onClick={() => set('gta6ShowWeaponName', !local.gta6ShowWeaponName)}
-                                aria-pressed={local.gta6ShowWeaponName}
-                            >
-                                <span className="settings-toggle-knob" />
-                            </button>
-                        </div>
-
                         {local.gta6HudEnabled && (
-                            <div className="settings-row">
-                                <div>
-                                    <div className="settings-row-label">Vehicle Introduction</div>
-                                    <div className="settings-row-desc">Show brand, model, engine health, and fuel when entering a vehicle</div>
+                            <>
+                                <div className="settings-row">
+                                    <div>
+                                        <div className="settings-row-label">Authentic Weapon HUD</div>
+                                        <div className="settings-row-desc">Compact GTA 6 ammo layout and minimal firearm reticle</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className={`settings-toggle ${local.gta6AuthenticWeaponHud ? 'active' : ''}`}
+                                        onClick={() => set('gta6AuthenticWeaponHud', !local.gta6AuthenticWeaponHud)}
+                                        aria-pressed={local.gta6AuthenticWeaponHud}
+                                        aria-label="Use authentic GTA 6 weapon HUD and crosshair"
+                                    >
+                                        <span className="settings-toggle-knob" />
+                                    </button>
                                 </div>
-                                <button
-                                    type="button"
-                                    className={`settings-toggle ${local.gta6VehicleIdentification ? 'active' : ''}`}
-                                    onClick={() => set('gta6VehicleIdentification', !local.gta6VehicleIdentification)}
-                                    aria-pressed={local.gta6VehicleIdentification}
-                                >
-                                    <span className="settings-toggle-knob" />
-                                </button>
-                            </div>
+
+                                {!local.gta6AuthenticWeaponHud && (
+                                    <div className="settings-row">
+                                        <div>
+                                            <div className="settings-row-label">Show Weapon Name</div>
+                                            <div className="settings-row-desc">Show the active weapon name beside its icon in GTA 6 HUD mode</div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className={`settings-toggle ${local.gta6ShowWeaponName ? 'active' : ''}`}
+                                            onClick={() => set('gta6ShowWeaponName', !local.gta6ShowWeaponName)}
+                                            aria-pressed={local.gta6ShowWeaponName}
+                                        >
+                                            <span className="settings-toggle-knob" />
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div className="settings-row">
+                                    <div>
+                                        <div className="settings-row-label">Vehicle Introduction</div>
+                                        <div className="settings-row-desc">Show brand, model, engine health, and fuel when entering a vehicle</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className={`settings-toggle ${local.gta6VehicleIdentification ? 'active' : ''}`}
+                                        onClick={() => set('gta6VehicleIdentification', !local.gta6VehicleIdentification)}
+                                        aria-pressed={local.gta6VehicleIdentification}
+                                    >
+                                        <span className="settings-toggle-knob" />
+                                    </button>
+                                </div>
+                            </>
                         )}
 
                         <div className="settings-row">
@@ -392,14 +415,22 @@ const SettingsModal = ({
                         <div className="settings-row">
                             <div>
                                 <div className="settings-row-label">Disable Speedometer</div>
-                                <div className="settings-row-desc">Hide the vehicle speedometer HUD element</div>
+                                <div className="settings-row-desc">
+                                    {speedometerForcedOff
+                                        ? 'Disabled automatically while GTA 6 HUD mode is active'
+                                        : 'Hide the vehicle speedometer HUD element'}
+                                </div>
                             </div>
-                            <div
-                                className={`settings-toggle ${local.disableSpeedometer ? 'active' : ''}`}
+                            <button
+                                type="button"
+                                className={`settings-toggle ${speedometerSuppressed ? 'active' : ''}`}
                                 onClick={() => set('disableSpeedometer', !local.disableSpeedometer)}
+                                disabled={speedometerForcedOff}
+                                aria-pressed={speedometerSuppressed}
+                                aria-label="Disable speedometer"
                             >
-                                <div className="settings-toggle-knob" />
-                            </div>
+                                <span className="settings-toggle-knob" />
+                            </button>
                         </div>
 
                         <div className="settings-row">
@@ -522,6 +553,8 @@ const SettingsModal = ({
                                 <button 
                                     className="settings-btn-small settings-btn-move" 
                                     onClick={onStartMoveSpeedometer}
+                                    disabled={speedometerSuppressed}
+                                    title={speedometerSuppressed ? 'Enable the speedometer before moving it' : undefined}
                                 >
                                     Move
                                 </button>

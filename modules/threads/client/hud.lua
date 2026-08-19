@@ -39,6 +39,7 @@ local Bridge = lib.require("modules.bridge.client")
 local AmmoState = lib.require("modules.threads.client.ammo_state")
 
 local HEALTH_DAMAGE_HOLD_MS = 25000
+local ARMOR_APPLIED_HOLD_MS = 6000
 
 local visibilityReasons = {
     user = true,
@@ -372,6 +373,7 @@ function hud.start(config)
     local lastStaminaRegenerating = false
     local lastHealthRecentlyDamaged = false
     local lastDamageAt = nil
+    local lastArmorAppliedAt = nil
     local lastStreet = ""
     local lastZone = ""
     local lastZoneCode = ""
@@ -541,21 +543,40 @@ function hud.start(config)
                 -- This native rises as sprint stamina is consumed, so invert it
                 -- for a conventional full-to-empty stamina meter.
                 local staminaPercent = 100 - math_max(0, math_min(100, staminaUsed))
+                local meleeStamina = LocalPlayer and LocalPlayer.state
+                    and tonumber(LocalPlayer.state.cortexMeleeStamina)
+                    or nil
+                if meleeStamina and meleeStamina == meleeStamina
+                    and meleeStamina ~= math.huge and meleeStamina ~= -math.huge
+                then
+                    -- cortex-subtleadditions publishes a local-only melee pool.
+                    -- The HUD displays the more constrained of sprint and melee
+                    -- stamina without making either resource a hard dependency.
+                    staminaPercent = math_min(staminaPercent, math_max(0, math_min(100, meleeStamina)))
+                end
                 local staminaRounded = math_floor(staminaPercent + 0.5)
                 local staminaRegenerating = lastStaminaPercent >= 0
                     and staminaPercent > lastStaminaPercent + 0.05
                     and staminaPercent < 99.95
                 local now = GetGameTimer()
 
-                if lastHealth >= 0 and health < lastHealth then
+                if lastHealth >= 0 and (health < lastHealth or armor < lastArmor) then
                     lastDamageAt = now
+                end
+
+                if lastArmor >= 0 and armor > lastArmor then
+                    lastArmorAppliedAt = now
                 end
 
                 if lastDamageAt ~= nil and (now - lastDamageAt) >= HEALTH_DAMAGE_HOLD_MS then
                     lastDamageAt = nil
                 end
 
-                local healthRecentlyDamaged = lastDamageAt ~= nil
+                if lastArmorAppliedAt ~= nil and (now - lastArmorAppliedAt) >= ARMOR_APPLIED_HOLD_MS then
+                    lastArmorAppliedAt = nil
+                end
+
+                local healthRecentlyDamaged = lastDamageAt ~= nil or lastArmorAppliedAt ~= nil
 
                 if health ~= lastHealth
                     or armor ~= lastArmor

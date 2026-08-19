@@ -135,6 +135,9 @@ Config.showCrosshair = false
 -- Replaces the core status/ammo presentation with the GTA 6-inspired
 -- top-left vitals and top-right active weapon/ammo cluster.
 Config.gta6HudEnabled = false
+-- Use the compact GTA 6 weapon/ammo lockup and its minimal firearm reticle.
+-- This only has an effect while GTA 6 HUD mode is enabled.
+Config.gta6AuthenticWeaponHud = false
 -- Show the active weapon name beside its icon in GTA 6 HUD mode.
 Config.gta6ShowWeaponName = true
 -- Show the GTA 6-style vehicle introduction card when entering a vehicle.
@@ -171,6 +174,71 @@ Config.VehicleDoorInteractions = {
     serverMaxDistance = 8.0,
     requestCooldown = 220,
     panelCooldown = 280,
+}
+-- Locked-vehicle actions presented together at the nearest intact side window.
+-- Key cloning uses qbx_vehiclekeys/qb-vehiclekeys when available and otherwise
+-- falls back to runtime-session standalone access owned by this resource.
+-- Presentation scale: vehicle-access world prompt rendered at 75% (25% smaller)
+-- via cortex-lib ui/style.css .cortex-world-access transform scale(calc(var(--cortex-world-scale,1)*0.75)).
+Config.VehicleAccessInteractions = {
+    enabled = true,
+    requireGta6Hud = true,
+    interactionDistance = 2.0,
+    scanRadius = 6.0,
+    activeScanInterval = 100,
+    idleScanInterval = 450,
+    maxVehicleSpeed = 1.0,
+    switchBias = 0.18,
+    onlyLocked = true,
+    includeRearWindows = true,
+    serverMaxDistance = 8.0,
+    requestCooldown = 700,
+    actionCooldown = 1200,
+    smash = {
+        enabled = true,
+        key = 'G',
+        command = 'cortexVehicleSmashWindow',
+        description = 'Smash the nearest locked vehicle window',
+        label = 'SMASH WINDOW',
+        icon = 'smash-window',
+        priority = 111,
+        duration = 1150,
+        panelOffset = { x = 0.0, y = 0.0, z = 0.0 },
+    },
+    cloneKey = {
+        enabled = true,
+        key = 'K',
+        command = 'cortexVehicleCloneKey',
+        description = 'Clone a key for the nearest locked vehicle',
+        label = 'CLONE KEY',
+        icon = 'clone-key',
+        priority = 112,
+        duration = 6500,
+        qte = {
+            minRounds = 1,
+            maxRounds = 4,
+            roundDuration = 980,
+            targetPhase = 0.74,
+            hitWindow = 0.14,
+            introDuration = 320,
+            interRoundDelay = 240,
+            completionDelay = 150,
+        },
+        animation = {
+            dict = 'cellphone@',
+            clip = 'cellphone_text_read_base',
+            flags = 49,
+        },
+        prop = {
+            model = 'prop_phone_ing',
+            bone = 28422,
+            pos = { x = 0.0, y = 0.0, z = 0.0 },
+            rot = { x = 0.0, y = 0.0, z = 0.0 },
+        },
+        provider = 'auto', -- auto, qbx_vehiclekeys, qb-vehiclekeys, standalone
+        allowStandalone = true,
+        panelOffset = { x = 0.0, y = 0.0, z = 0.0 },
+    },
 }
 -- Indicator strip: forecast from Dynamic_weather (requires resource + HUD setting).
 Config.showDynamicWeather = false

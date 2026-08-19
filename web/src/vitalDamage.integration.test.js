@@ -1,0 +1,102 @@
+import React from 'react'
+import { readFileSync } from 'node:fs'
+import { describe, expect, test } from 'bun:test'
+import { renderToStaticMarkup } from 'react-dom/server'
+import HUD from './components/HUD.jsx'
+
+const BASE_HUD_PROPS = {
+  health: 100,
+  healthRecentlyDamaged: true,
+  armor: 58,
+  stamina: 100,
+  staminaRegenerating: false,
+  vehicleVisible: false,
+  playerInVehicle: false,
+  speedUnit: 'mph',
+  speed: 0,
+  rpm: 0,
+  currentGear: 'N',
+  fuel: 100,
+  hasFuelProvider: false,
+  engineHealth: 100,
+  cruiseActive: false,
+  cruiseSpeed: 0,
+  belt: false,
+  harness: false,
+  useSeatbelt: true,
+  nosVisible: false,
+  nosAmount: 0,
+  nosActive: false,
+  hunger: 100,
+  thirst: 100,
+  stress: 0,
+  oxygen: 100,
+  underwater: false,
+  inWater: false,
+  voipTalking: false,
+  voipRange: 'normal',
+  voipConnected: false,
+  voipProximity: 0,
+  radioChannel: 0,
+  radioTalking: false,
+  hungerThreshold: 25,
+  thirstThreshold: 25,
+  stressThreshold: 75,
+  oxygenThreshold: 25,
+  statusIconShape: 'bar',
+  resolvedStatusIconShape: 'bar',
+  statusRingWidth: 46,
+  statusRingHeight: 46,
+  showVoip: false,
+  framework: 'standalone',
+  standaloneVoipHudEnabled: false,
+  speedometerPos: null,
+  editMode: false,
+  onDrag: () => {},
+  ammoEditMode: false,
+  onAmmoDrag: () => {},
+  colors: {},
+  theme: {},
+  layout: {},
+  fuelDisplayStyle: 'bar',
+  waypointDist: -1,
+  waypointUnit: '',
+  ammoClip: -1,
+  ammoReserve: -1,
+  ammoPos: null,
+  ammoColor: '#ffffff',
+  ammoPositionPreset: 'bottom-right',
+  isArmed: false,
+  weaponType: 'none',
+  weaponIcon: null,
+  weaponName: '',
+  weaponUsesCharge: false,
+  weaponChargeReady: true,
+  weaponChargeProgress: 100,
+  gta6HudEnabled: true,
+  gta6AuthenticWeaponHud: true,
+  gta6ShowWeaponName: false,
+  sectionedBars: false,
+  oxygenDisplayLocation: 'statusCluster',
+}
+
+describe('armor damage HUD contract', () => {
+  test('the game polling boundary treats armor loss as recent damage', () => {
+    const hudThread = readFileSync(
+      new URL('../../modules/threads/client/hud.lua', import.meta.url),
+      'utf8',
+    )
+
+    expect(hudThread).toMatch(
+      /lastHealth\s*>=\s*0\s*and\s*\(\s*health\s*<\s*lastHealth\s*or\s*armor\s*<\s*lastArmor\s*\)/,
+    )
+  })
+
+  test('the GTA 6 damage strip renders equipped armor over health', () => {
+    const markup = renderToStaticMarkup(React.createElement(HUD, BASE_HUD_PROPS))
+
+    expect(markup).toContain('aria-label="Armor"')
+    expect(markup).toContain('gta6-vital-fill--armor')
+    expect(markup).toContain('width:58%')
+  })
+})

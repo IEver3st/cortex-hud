@@ -8,6 +8,9 @@ local entityExists = true
 local pedExists = true
 local playerCoords = { x = 0.0, y = 0.0, z = 0.0 }
 local vehicleCoords = { x = 1.0, y = 0.0, z = 0.0 }
+local vehicleSpeed = 0.0
+local vehicleLockStatus = 2
+local lockMutation = nil
 
 lib = {
     require = function(path)
@@ -18,6 +21,31 @@ lib = {
                 requestCooldown = 220,
                 panelCooldown = 280,
                 serverMaxDistance = 8.0,
+            },
+            VehicleAccessInteractions = {
+                enabled = true,
+                onlyLocked = true,
+                serverMaxDistance = 8.0,
+                maxVehicleSpeed = 1.0,
+                requestCooldown = 700,
+                actionCooldown = 1200,
+                smash = { enabled = true },
+                cloneKey = {
+                    enabled = true,
+                    duration = 1500,
+                    qte = {
+                        minRounds = 1,
+                        maxRounds = 1,
+                        roundDuration = 800,
+                        targetPhase = 0.70,
+                        hitWindow = 0.14,
+                        introDuration = 200,
+                        interRoundDelay = 100,
+                        completionDelay = 100,
+                    },
+                    provider = 'auto',
+                    allowStandalone = true,
+                },
             },
         }
     end,
@@ -62,13 +90,39 @@ function NetworkGetEntityOwner()
     return 77
 end
 
-function TriggerClientEvent(name, target, networkId, door, shouldOpen)
+function GetEntitySpeed()
+    return vehicleSpeed
+end
+
+function GetVehicleDoorLockStatus()
+    return vehicleLockStatus
+end
+
+function GetResourceState()
+    return 'missing'
+end
+
+function GetPlayerRoutingBucket()
+    return 0
+end
+
+function GetEntityRoutingBucket()
+    return 0
+end
+
+function SetVehicleDoorsLocked(entity, state)
+    lockMutation = { entity = entity, state = state }
+    vehicleLockStatus = state
+end
+
+function TriggerClientEvent(name, target, networkId, door, shouldOpen, challenge)
     triggered[#triggered + 1] = {
         name = name,
         target = target,
         networkId = networkId,
         door = door,
         shouldOpen = shouldOpen,
+        challenge = challenge,
     }
 end
 
@@ -118,5 +172,68 @@ entityExists = false
 now = now + 300
 request(41, 0, true)
 assert(#triggered == 2, 'missing entity reached the owner client')
+
+entityExists = true
+local smashRequest = assert(registeredEvents['cortex-hud:server:smashVehicleWindow'])
+local beginClone = assert(registeredEvents['cortex-hud:server:beginVehicleKeyClone'])
+local finishClone = assert(registeredEvents['cortex-hud:server:finishVehicleKeyClone'])
+
+smashRequest('41', 0)
+smashRequest(41, 0.5)
+smashRequest(41, 4)
+assert(#triggered == 2, 'malformed smash payload reached an owner client')
+
+vehicleCoords = { x = 20.0, y = 0.0, z = 0.0 }
+smashRequest(41, 0)
+assert(#triggered == 2, 'distant smash request reached an owner client')
+
+vehicleCoords = { x = 1.0, y = 0.0, z = 0.0 }
+vehicleSpeed = 2.0
+smashRequest(41, 0)
+assert(#triggered == 2, 'moving-vehicle smash request reached an owner client')
+
+vehicleSpeed = 0.0
+vehicleLockStatus = 1
+smashRequest(41, 0)
+assert(#triggered == 2, 'unlocked-vehicle smash request reached an owner client')
+
+vehicleLockStatus = 2
+now = now + 800
+smashRequest(41, 0)
+assert(#triggered == 3, 'valid smash request was not forwarded')
+assert(triggered[3].name == 'cortex-hud:client:smashVehicleWindow')
+assert(triggered[3].target == 77 and triggered[3].networkId == 41 and triggered[3].door == 0)
+
+now = now + 800
+beginClone(41)
+assert(#triggered == 4, 'valid clone request did not start a server session')
+assert(triggered[4].name == 'cortex-hud:client:vehicleKeyCloneBegin')
+local firstToken = triggered[4].door
+assert(type(firstToken) == 'string' and firstToken ~= '')
+assert(type(triggered[4].challenge) == 'table' and triggered[4].challenge.rounds == 1)
+
+finishClone(firstToken, 41)
+assert(#triggered == 5 and triggered[5].name == 'cortex-hud:client:vehicleKeyCloneRejected')
+assert(triggered[5].door == 'expired', 'early clone completion was not rejected')
+assert(lockMutation == nil, 'early clone completion unlocked the vehicle')
+
+now = now + 800
+beginClone(41)
+assert(#triggered == 6 and triggered[6].name == 'cortex-hud:client:vehicleKeyCloneBegin')
+local secondToken = triggered[6].door
+
+finishClone('forged-token', 41)
+assert(#triggered == 7 and triggered[7].name == 'cortex-hud:client:vehicleKeyCloneRejected')
+assert(lockMutation == nil, 'forged clone token unlocked the vehicle')
+
+now = now + 1500
+finishClone(secondToken, 41)
+assert(#triggered == 8 and triggered[8].name == 'cortex-hud:client:vehicleKeyCloned')
+assert(triggered[8].door == 'standalone', 'standalone provider was not reported')
+assert(lockMutation and lockMutation.entity == 501 and lockMutation.state == 1)
+
+finishClone(secondToken, 41)
+assert(#triggered == 9 and triggered[9].name == 'cortex-hud:client:vehicleKeyCloneRejected')
+assert(triggered[9].door == 'expired', 'completed clone session was replayable')
 
 print('server interaction boundary tests passed')

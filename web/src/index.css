@@ -188,3 +188,45 @@ body {
   z-index: 9999;
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
 }
+
+.gta6-crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 9999;
+  width: calc(24px * var(--es-ui-scale));
+  height: calc(16px * var(--es-ui-scale));
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  opacity: 0.38;
+  filter: drop-shadow(0 calc(1px * var(--es-ui-scale)) calc(1px * var(--es-ui-scale)) rgba(0, 0, 0, 0.82));
+}
+
+.gta6-crosshair-arm {
+  position: absolute;
+  display: block;
+  background: rgba(218, 220, 221, 0.82);
+}
+
+.gta6-crosshair-arm--left,
+.gta6-crosshair-arm--right {
+  top: calc(5px * var(--es-ui-scale));
+  width: calc(8px * var(--es-ui-scale));
+  height: calc(1px * var(--es-ui-scale));
+}
+
+.gta6-crosshair-arm--left {
+  left: calc(1px * var(--es-ui-scale));
+}
+
+.gta6-crosshair-arm--right {
+  right: calc(1px * var(--es-ui-scale));
+}
+
+.gta6-crosshair-arm--stem {
+  top: calc(8px * var(--es-ui-scale));
+  left: 50%;
+  width: calc(1px * var(--es-ui-scale));
+  height: calc(5px * var(--es-ui-scale));
+  transform: translateX(-50%);
+}

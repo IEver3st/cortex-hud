@@ -10,11 +10,14 @@ import AmmoIcon from '../assets/machine-gun-magazine.svg'
 import { resolveAnchorStyle } from './layout'
 import StatusOxygenHex from './StatusOxygenHex'
 import SlidingNumber from './SlidingNumber'
+import { shouldShowWeaponOverlay } from '../hudVisibility.js'
 import {
   usePresence,
   useOneShot,
   useDeltaFlash,
   useBreakAway,
+  useArmorApplied,
+  useArmorBypass,
   useReloadPulse,
 } from '../hooks/hudMotion'
 
@@ -36,109 +39,6 @@ const Gta6WeaponIcon = ({ weaponIcon, onError }) => (
     onError={() => onError(weaponIcon)}
   />
 )
-
-const Gta6Interactions = ({ items, layout }) => {
-  const interactions = Array.isArray(items) ? items : []
-  if (interactions.length === 0) return null
-
-  const screenWidth = Number(layout?.screenWidth) || 1920
-  const screenHeight = Number(layout?.screenHeight) || 1080
-  const scale = clamp(Math.min(screenWidth / 1920, screenHeight / 1080), 0.75, 1.5)
-  const style = {
-    '--gta6-interaction-safe-right': `${Math.max(0, Number(layout?.insetRight) || 0)}px`,
-    '--gta6-interaction-safe-bottom': `${Math.max(0, Number(layout?.insetBottom) || 0)}px`,
-    '--gta6-interaction-scale': scale,
-  }
-
-  return (
-    <div className="gta6-interactions" style={style} role="list" aria-label="Available actions">
-      {interactions.map((interaction) => (
-        <div
-          className="gta6-interaction"
-          key={`${interaction.owner}:${interaction.id}`}
-          role="listitem"
-        >
-          <span className="gta6-interaction-label">{interaction.label}</span>
-          <span
-            className={`gta6-interaction-key${interaction.key.length > 3 ? ' is-wide' : ''}`}
-            aria-label={`Press ${interaction.key}`}
-          >
-            {interaction.key}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-const Gta6WorldInteractions = () => {
-  const [interactions, setInteractions] = useState([])
-
-  useEffect(() => {
-    const handleMessage = (event) => {
-      const data = event.data
-      if (!data || data.action !== 'interaction:world') return
-
-      const nextItems = Array.isArray(data.items)
-        ? data.items
-            .filter((item) => (
-              item
-              && typeof item.label === 'string'
-              && typeof item.key === 'string'
-              && Number.isFinite(Number(item.x))
-              && Number.isFinite(Number(item.y))
-            ))
-            .slice(0, 4)
-            .map((item, index) => ({
-              id: typeof item.id === 'string' ? item.id : `world-interaction-${index}`,
-              owner: typeof item.owner === 'string' ? item.owner : 'unknown',
-              label: item.label.trim().slice(0, 96),
-              key: item.key.trim().slice(0, 16),
-              x: clamp(Number(item.x), 0, 1),
-              y: clamp(Number(item.y), 0, 1),
-              distance: clamp(Number(item.distance) || 0, 0, 25),
-            }))
-        : []
-
-      setInteractions(nextItems)
-    }
-
-    window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
-  }, [])
-
-  if (interactions.length === 0) return null
-
-  return (
-    <div className="gta6-world-interactions" role="list" aria-label="Nearby world actions">
-      {interactions.map((interaction) => {
-        const scale = clamp(1.035 - (interaction.distance * 0.025), 0.96, 1.02)
-        const style = {
-          '--gta6-world-x': `${clamp(interaction.x, 0, 1) * 100}vw`,
-          '--gta6-world-y': `${clamp(interaction.y, 0, 1) * 100}vh`,
-          '--gta6-world-scale': scale,
-        }
-
-        return (
-          <div
-            className="gta6-world-interaction"
-            key={`${interaction.owner}:${interaction.id}`}
-            style={style}
-            role="listitem"
-          >
-            <span className="gta6-world-interaction-label">{interaction.label}</span>
-            <span
-              className={`gta6-world-interaction-key${interaction.key.length > 3 ? ' is-wide' : ''}`}
-              aria-label={`Press ${interaction.key} to ${interaction.label.toLowerCase()}`}
-            >
-              {interaction.key}
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 function getBarSectionWidths(value) {
   const v = clamp(value, 0, 100)
@@ -243,6 +143,7 @@ const HUD = React.memo(({
   stamina,
   staminaRegenerating,
   vehicleVisible,
+  playerInVehicle,
   speedUnit,
   speed,
   rpm,
@@ -305,15 +206,15 @@ const HUD = React.memo(({
   weaponChargeReady,
   weaponChargeProgress,
   gta6HudEnabled,
+  gta6AuthenticWeaponHud,
   gta6ShowWeaponName,
-  interactions,
-  interactionLayout,
   sectionedBars,
   oxygenDisplayLocation,
 }) => {
   const showAmmo = ammoClip >= 0 || ammoEditMode
   const showWaypoint = waypointDist > 0
   const gta6Health = clamp(Number(health) || 0, 0, 100)
+  const armorValue = clamp(Number(armor) || 0, 0, 100)
   const gta6Stamina = clamp(Number(stamina) || 0, 0, 100)
   const gta6Oxygen = clamp(Number(oxygen) || 0, 0, 100)
   const gta6SecondaryValue = inWater ? gta6Oxygen : gta6Stamina
@@ -321,16 +222,24 @@ const HUD = React.memo(({
 
   const speedoPresence = usePresence(vehicleVisible, 220)
   const ammoPresence = usePresence(showAmmo, 240)
-  const gta6WeaponPresence = usePresence(gta6HudEnabled && isArmed && !ammoEditMode, 220)
-  const gta6HealthPresence = usePresence(gta6HudEnabled && healthRecentlyDamaged, 320)
+  const gta6WeaponPresence = usePresence(shouldShowWeaponOverlay({
+    gta6HudEnabled,
+    isArmed,
+    ammoEditMode,
+    playerInVehicle,
+  }), 220)
+  const armorApplied = useArmorApplied(armorValue, 6000)
+  const gta6HealthPresence = usePresence(gta6HudEnabled && (healthRecentlyDamaged || armorApplied), 320)
   const gta6StaminaPresence = usePresence(
     gta6HudEnabled && (inWater || gta6Stamina < 99.5),
     380,
   )
   const waypointPresence = usePresence(showWaypoint, 260)
 
-  const healthFlash = useDeltaFlash(health, 420)
-  const armorBreak = useBreakAway(Math.max(armor, 0), 480)
+  const healthFlash = useDeltaFlash(gta6Health, 420)
+  const armorFlash = useDeltaFlash(armorValue, 420)
+  const armorBreak = useBreakAway(armorValue, 480)
+  const armorBypassed = useArmorBypass(gta6Health, armorValue, 1100)
   const gearTick = useOneShot(currentGear, 300)
   const cruisePop = useOneShot(cruiseActive ? `on-${cruiseSpeed}` : null, 420)
   const reloadPulse = useReloadPulse(ammoClip, ammoReserve, 440)
@@ -344,7 +253,7 @@ const HUD = React.memo(({
   const ammoEmpty = displayClip === 0
   const gta6WeaponName = String(weaponName || weaponType || 'Weapon').trim().slice(0, 48)
   const isMeleeWeapon = weaponType === 'melee'
-  const showGta6WeaponName = gta6ShowWeaponName !== false
+  const showGta6WeaponName = gta6ShowWeaponName !== false && !gta6AuthenticWeaponHud
   const showGta6WeaponDetails = showGta6WeaponName || !isMeleeWeapon
   const gta6WeaponChargeProgress = clamp(Number(weaponChargeProgress) || 0, 0, 100)
   const [failedWeaponIcon, setFailedWeaponIcon] = useState(null)
@@ -638,10 +547,10 @@ const HUD = React.memo(({
   }, [ammoPos, ammoPositionPreset, layout, ammoEditMode])
 
   const healthColorClass = useMemo(() => {
-    if (health <= 20) return 'critical health-heartbeat'
-    if (health <= 40) return 'low'
+    if (gta6Health <= 20) return 'critical health-heartbeat'
+    if (gta6Health <= 40) return 'low'
     return ''
-  }, [health])
+  }, [gta6Health])
 
   const healthFlashClass = healthFlash === 'damage'
     ? 'flash-damage'
@@ -649,8 +558,9 @@ const HUD = React.memo(({
       ? 'flash-heal'
       : ''
 
-  const healthSectionWidths = useMemo(() => getBarSectionWidths(health), [health])
-  const armorSectionWidths = useMemo(() => getBarSectionWidths(Math.max(armor, 0)), [armor])
+  const healthSectionWidths = useMemo(() => getBarSectionWidths(gta6Health), [gta6Health])
+  const armorSectionWidths = useMemo(() => getBarSectionWidths(armorValue), [armorValue])
+  const showArmorOverlay = armorBreak.show || armorBreak.breaking
 
   const rpmPercent = useMemo(() => clamp(rpm / 100, 0, 1), [rpm])
   const rpmColor = useMemo(() => {
@@ -944,14 +854,30 @@ const HUD = React.memo(({
               <FaHeart />
             </div>
             <div
-              className="gta6-vital-track"
-              role="progressbar"
-              aria-label="Health"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              aria-valuenow={Math.round(gta6Health)}
+              className={`gta6-vital-track${armorValue > 0 ? ' has-armor' : ''}`}
+              role="group"
+              aria-label="Health and armor"
             >
-              <div className="gta6-vital-fill" style={{ width: `${gta6Health}%` }} />
+              <div
+                className="gta6-vital-fill gta6-vital-fill--health"
+                style={{ width: `${gta6Health}%` }}
+                role="progressbar"
+                aria-label="Health"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow={Math.round(gta6Health)}
+              />
+              {armorValue > 0 && (
+                <div
+                  className="gta6-vital-fill gta6-vital-fill--armor"
+                  style={{ width: `${armorValue}%` }}
+                  role="progressbar"
+                  aria-label="Armor"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow={Math.round(armorValue)}
+                />
+              )}
             </div>
           </div>
           )}
@@ -986,16 +912,11 @@ const HUD = React.memo(({
         </div>
       )}
 
-      {gta6HudEnabled && (
-        <Gta6Interactions items={interactions} layout={interactionLayout} />
-      )}
-
-      {gta6HudEnabled && <Gta6WorldInteractions />}
-
       {gta6WeaponPresence.mounted && (
         <div
           className={[
             'gta6-weapon',
+            gta6AuthenticWeaponHud ? 'gta6-weapon--authentic' : '',
             gta6WeaponPresence.visible ? 'hud-presence-in' : 'hud-presence-out',
             !isMeleeWeapon && !weaponUsesCharge && ammoLow ? 'ammo-low' : '',
             !isMeleeWeapon && !weaponUsesCharge && ammoEmpty ? 'ammo-empty' : '',
@@ -1008,12 +929,60 @@ const HUD = React.memo(({
             ? `Active ${gta6WeaponName}`
             : `Active ${gta6WeaponName} ammunition`}
         >
-          {hasGta6WeaponIcon && (
-            <div className="gta6-weapon-art">
-              <Gta6WeaponIcon weaponIcon={weaponIcon} onError={setFailedWeaponIcon} />
-            </div>
+          {gta6AuthenticWeaponHud ? (
+            <>
+              {!isMeleeWeapon && !weaponUsesCharge && (
+                <div
+                  className="gta6-authentic-ammo"
+                  aria-label={`${displayClip} rounds loaded, ${displayReserve} in reserve`}
+                >
+                  <span className="gta6-authentic-ammo-value" aria-hidden="true">
+                    <SlidingNumber value={displayClip} minDigits={2} durationMs={180} />
+                  </span>
+                  <span className="gta6-authentic-ammo-value gta6-authentic-ammo-value--reserve" aria-hidden="true">
+                    <SlidingNumber value={displayReserve} minDigits={2} durationMs={240} />
+                  </span>
+                </div>
+              )}
+              {hasGta6WeaponIcon && (
+                <div className="gta6-weapon-art">
+                  <Gta6WeaponIcon weaponIcon={weaponIcon} onError={setFailedWeaponIcon} />
+                </div>
+              )}
+              {!isMeleeWeapon && weaponUsesCharge && (
+                <div
+                  className={`gta6-charge${weaponChargeReady ? ' is-ready' : ' is-charging'}`}
+                >
+                  <span className="gta6-charge-label" role="status" aria-live="polite">
+                    {weaponChargeReady ? 'READY' : 'CHARGING'}
+                  </span>
+                  <span
+                    className="gta6-charge-track"
+                    role="progressbar"
+                    aria-label="Weapon charge"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow={Math.round(gta6WeaponChargeProgress)}
+                  >
+                    <span
+                      className="gta6-charge-fill"
+                      style={{ width: `${gta6WeaponChargeProgress}%` }}
+                      aria-hidden="true"
+                    />
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {hasGta6WeaponIcon && (
+                <div className="gta6-weapon-art">
+                  <Gta6WeaponIcon weaponIcon={weaponIcon} onError={setFailedWeaponIcon} />
+                </div>
+              )}
+            </>
           )}
-          {showGta6WeaponDetails && (
+          {!gta6AuthenticWeaponHud && showGta6WeaponDetails && (
             <>
               {hasGta6WeaponIcon && <div className="gta6-weapon-divider" aria-hidden="true" />}
               <div className="gta6-weapon-info">
@@ -1109,33 +1078,30 @@ const HUD = React.memo(({
               <div
                 className={[
                   'hud-bar',
-                  'armor-bar',
-                  armorBreak.show || armorBreak.breaking ? '' : 'is-hidden',
+                  'health-bar',
+                  'vital-overlay-bar',
+                  healthColorClass,
+                  healthFlashClass,
+                  showArmorOverlay ? 'has-armor' : '',
+                  armorFlash === 'damage' ? 'armor-hit' : '',
                   armorBreak.breaking ? 'armor-breaking' : '',
+                  armorBypassed ? 'armor-bypassed' : '',
                 ].filter(Boolean).join(' ')}
+                role="group"
+                aria-label={`Health ${Math.round(gta6Health)}, armor ${Math.round(armorValue)}${armorBypassed ? ', health damage bypassed armor' : ''}`}
               >
-                <div className="bar-icon"><IoShieldHalf /></div>
-                <div className="bar-value">{Math.max(armor, 0)}</div>
-                <div className={`bar-track${sectionedBars ? ' bar-track--sectioned' : ''}`}>
-                  {sectionedBars ? (
-                    armorSectionWidths.map((w, i) => (
-                      <div key={`a-${i}`} className="bar-chunk">
-                        <div className="bar-chunk-fill armor-fill" style={{ width: `${w}%` }}>
-                          <div className="bar-glow" />
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <>
-                      <div className="bar-fill armor-fill" style={{ width: `${Math.max(armor, 0)}%` }}><div className="bar-glow" /></div>
-                      <div className="bar-segments" />
-                    </>
+                <div className="bar-icon vital-overlay-icon" aria-hidden="true">
+                  <span className="vital-overlay-layer vital-overlay-health"><FaHeart /></span>
+                  {showArmorOverlay && (
+                    <span className="vital-overlay-layer vital-overlay-armor"><IoShieldHalf /></span>
                   )}
                 </div>
-              </div>
-              <div className={`hud-bar health-bar ${healthColorClass} ${healthFlashClass}`.trim()}>
-                <div className="bar-icon"><FaHeart /></div>
-                <div className="bar-value">{health}</div>
+                <div className="bar-value vital-overlay-value" aria-hidden="true">
+                  <span className="vital-overlay-layer vital-overlay-health">{Math.round(gta6Health)}</span>
+                  {showArmorOverlay && (
+                    <span className="vital-overlay-layer vital-overlay-armor">{Math.round(armorValue)}</span>
+                  )}
+                </div>
                 <div className={`bar-track${sectionedBars ? ' bar-track--sectioned' : ''}`}>
                   {sectionedBars ? (
                     healthSectionWidths.map((w, i) => (
@@ -1143,11 +1109,19 @@ const HUD = React.memo(({
                         <div className="bar-chunk-fill health-fill" style={{ width: `${w}%` }}>
                           <div className="bar-glow" />
                         </div>
+                        {showArmorOverlay && (
+                          <div className="bar-chunk-fill armor-fill" style={{ width: `${armorSectionWidths[i]}%` }}>
+                            <div className="bar-glow" />
+                          </div>
+                        )}
                       </div>
                     ))
                   ) : (
                     <>
-                      <div className="bar-fill health-fill" style={{ width: `${health}%` }}><div className="bar-glow" /></div>
+                      <div className="bar-fill health-fill" style={{ width: `${gta6Health}%` }}><div className="bar-glow" /></div>
+                      {showArmorOverlay && (
+                        <div className="bar-fill armor-fill" style={{ width: `${armorValue}%` }}><div className="bar-glow" /></div>
+                      )}
                       <div className="bar-segments" />
                     </>
                   )}

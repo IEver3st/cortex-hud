@@ -27,6 +27,7 @@ A lightweight, customizable FiveM HUD built with React + Vite on the NUI side an
 - **Cinematic mode** — hides the HUD and radar for clean screenshots/recordings.
 - **Settings UI** — open with `/hudsettings` (`I`) to switch layout/color presets, shape styles, blur/opacity, and move speedometer/ammo via drag.
 - **World-space vehicle doors** — the nearest unlocked, intact door presents one grounded `OPEN`/`CLOSE` action at its physical bone while GTA 6 HUD mode is active.
+- **Locked-vehicle access actions** — nearby locked side windows present stacked `CLONE KEY` and `SMASH WINDOW` actions. Cloning uses a movement-safe phone animation and a 1 to 4 round white-ring/pink-sweep timing challenge while the server retains proximity, token, minimum-time, lock-state, and key-provider authority.
 - **Visibility reason system** — multiple independent reasons (`user`, `external`, `polcam`, `cinematic`, `framework`, `qbxCharacter`, `qbxSpawn`) all must be true for the HUD to show, making it easy for external scripts to hide/show the HUD safely.
 
 ---
@@ -35,10 +36,11 @@ A lightweight, customizable FiveM HUD built with React + Vite on the NUI side an
 
 | Resource | Required | Notes |
 |----------|----------|-------|
-| **cortex-lib** | **Yes** | Must start before `cortex-hud`; provides settings, notifications, and progress bars. |
+| **cortex-lib** | **Yes** | Must start before `cortex-hud`; provides settings, notifications, progress bars, and interaction prompts. |
 | nearest-postal | Optional | Enables postal code/distance in the location strip. |
 | polcam | Optional | Auto-detected; hides HUD when active. |
 | Dynamic_weather / dynamic_weather | Optional | Enables the weather forecast strip and warnings. |
+| qbx_vehiclekeys / qb-vehiclekeys | Optional | Receives cloned keys when running; otherwise the built-in runtime-session standalone access fallback is used. |
 | ox_fuel / ps-fuel / cdn-fuel / LegacyFuel / qb-fuel / esx_fuel / etc. | Optional | Provides accurate fuel values; falls back to native fuel. |
 | pma-voice / saltychat / mumble-voip / tokovoip_script / zerio-radio | Optional | Enables VOIP/radio status. |
 
@@ -90,6 +92,8 @@ bun run build
 | `/cinematicmode` (`F7` by default) | Toggle cinematic mode (hides HUD + radar). |
 | `/cortex_hud_cruise` (`Y` by default) | Toggle cruise control while driving. |
 | `E` | Open or close the nearest eligible vehicle door while its world prompt is visible. |
+| `G` | Smash the nearest eligible locked vehicle window after the hammer animation. |
+| `K` | Clone a key for the nearest eligible locked vehicle after the phone hacking sequence. |
 | `B` | Toggle seatbelt (when enabled in config). |
 | `H` | Toggle racing harness (when enabled in config). |
 
@@ -151,6 +155,10 @@ All tuning is in `config/shared.lua`.
 | `Config.showDynamicWeather` | `false` | Show the Dynamic_weather forecast strip. |
 | `Config.VehicleDoorInteractions.enabled` | `true` | Enable the validated world-space vehicle door action. |
 | `Config.VehicleDoorInteractions.panelOffsets` | See config | Fine-tune front door, rear door, hood, and trunk prompts in vehicle-local metres. Positive Y is forward and negative Y is rearward. |
+| `Config.VehicleAccessInteractions.enabled` | `true` | Enable locked-vehicle key cloning and window smashing actions. |
+| `Config.VehicleAccessInteractions.cloneKey.provider` | `'auto'` | Prefer `qbx_vehiclekeys`, then `qb-vehiclekeys`, then the runtime-session standalone fallback. |
+| `Config.VehicleAccessInteractions.cloneKey.allowStandalone` | `true` | Permit standalone cloned access when no supported key resource is running. |
+| `Config.VehicleAccessInteractions.cloneKey.qte` | See config | Bound the clone challenge to 1 to 4 rounds and tune spin time, target window, intro, and between-round timing. |
 | `Config.defaultHudPreset` | `'classic'` | Default layout preset. |
 
 ### Layout presets
@@ -182,7 +190,7 @@ cortex-hud/
 │   ├── fuel/client.lua         # Fuel provider detection and alerts
 │   ├── harness/client.lua      # Racing harness apply/remove
 │   ├── integrations/client/dynamic_weather.lua  # Weather resource integration
-│   ├── interactions/             # Interaction projection plus vehicle-door client/server checks
+│   ├── interactions/             # Vehicle door/access gameplay and server checks; cortex-lib renders prompts
 │   ├── seatbelt/client.lua     # Seatbelt logic
 │   ├── settings/client.lua     # Settings UI, persistence, presets
 │   ├── stall/client.lua        # Engine stall/breakdown logic

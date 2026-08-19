@@ -57,6 +57,7 @@ local KEY_MAP = {
     hud_ammoPositionPreset = 'ammoPositionPreset',
     hud_showCrosshair = 'showCrosshair',
     hud_gta6HudEnabled = 'gta6HudEnabled',
+    hud_gta6AuthenticWeaponHud = 'gta6AuthenticWeaponHud',
     hud_gta6ShowWeaponName = 'gta6ShowWeaponName',
     hud_gta6VehicleIdentification = 'gta6VehicleIdentification',
     hud_sectionedBars = 'sectionedBars',
@@ -282,6 +283,7 @@ local function buildDefaultSettings()
         ammoPositionPreset = 'preset',
         showCrosshair = config.showCrosshair == true,
         gta6HudEnabled = config.gta6HudEnabled == true,
+        gta6AuthenticWeaponHud = config.gta6AuthenticWeaponHud == true,
         gta6ShowWeaponName = config.gta6ShowWeaponName ~= false,
         gta6VehicleIdentification = config.gta6VehicleIdentification ~= false,
         showDynamicWeather = config.showDynamicWeather == true,
@@ -465,6 +467,13 @@ local function getSettingsDefinition()
                 label = 'GTA 6 Weapon Name',
                 description = 'Show the active weapon name beside its icon in GTA 6 HUD mode',
                 default = config.gta6ShowWeaponName ~= false,
+            },
+            {
+                key = 'hud_gta6AuthenticWeaponHud',
+                type = 'toggle',
+                label = 'Authentic GTA 6 Weapon HUD',
+                description = 'Use the compact ammo-over-weapon layout and minimal firearm reticle',
+                default = config.gta6AuthenticWeaponHud == true,
             },
             {
                 key = 'hud_gta6VehicleIdentification',
@@ -713,7 +722,7 @@ local function getSettingsDefinition()
         },
         sections = {
             { label = 'Appearance', keys = { 'hud_backdropBlur', 'hud_panelOpacity' } },
-            { label = 'HUD Style', keys = { 'hud_gta6HudEnabled', 'hud_gta6ShowWeaponName' } },
+            { label = 'HUD Style', keys = { 'hud_gta6HudEnabled', 'hud_gta6AuthenticWeaponHud', 'hud_gta6ShowWeaponName' } },
             { label = 'Speedometer', keys = { 'hud_speedUnit', 'hud_fuelDisplayStyle', 'hud_disableSpeedometer', 'hud_cruiseAutoThrottle', 'hud_speedometerActions' } },
             { label = 'Postal', keys = { 'hud_showPostal', 'hud_showPostalDistance' } },
             { label = 'Weather', keys = { 'hud_showDynamicWeather', 'hud_showFlashFloodWarning', 'hud_showHurricaneWarning' } },
@@ -915,8 +924,10 @@ local function pushResolvedHud(data)
         ammoPositionPreset = data.ammoPositionPreset or 'preset',
         resolvedAmmoPositionPreset = presentation.resolvedAmmoPositionPreset,
         ammoPos = presentation.ammoPos,
+        disableSpeedometer = config.disableSpeedometer == true,
         showCrosshair = config.showCrosshair,
         gta6HudEnabled = config.gta6HudEnabled == true,
+        gta6AuthenticWeaponHud = config.gta6AuthenticWeaponHud == true,
         gta6ShowWeaponName = config.gta6ShowWeaponName ~= false,
         gta6VehicleIdentification = config.gta6VehicleIdentification ~= false,
         sectionedBars = data.sectionedBars == true,
@@ -955,6 +966,7 @@ function Settings.apply(data, options)
     config.StatusIcons.colors = copyTable(presentation.colors)
     config.showCrosshair = toBoolean(data.showCrosshair, config.showCrosshair == true)
     config.gta6HudEnabled = toBoolean(data.gta6HudEnabled, config.gta6HudEnabled == true)
+    config.gta6AuthenticWeaponHud = toBoolean(data.gta6AuthenticWeaponHud, config.gta6AuthenticWeaponHud == true)
     config.gta6ShowWeaponName = toBoolean(data.gta6ShowWeaponName, config.gta6ShowWeaponName ~= false)
     config.gta6VehicleIdentification = toBoolean(data.gta6VehicleIdentification, config.gta6VehicleIdentification ~= false)
     config.showDynamicWeather = toBoolean(data.showDynamicWeather, config.showDynamicWeather == true)
@@ -1026,6 +1038,9 @@ local function persistSettingsData(data)
                 v = math_floor(v * 100 + 0.5)
             end
             if libKey == 'hud_gta6HudEnabled' then
+                v = toBoolean(v, false)
+            end
+            if libKey == 'hud_gta6AuthenticWeaponHud' then
                 v = toBoolean(v, false)
             end
             if libKey == 'hud_gta6ShowWeaponName' then
@@ -1104,6 +1119,7 @@ function Settings.get()
     data.backdropBlur = normalizeBackdropBlur(data.backdropBlur) or 1.0
     data.panelOpacity = normalizePanelOpacity(data.panelOpacity) or 1.0
     data.gta6HudEnabled = toBoolean(data.gta6HudEnabled, false)
+    data.gta6AuthenticWeaponHud = toBoolean(data.gta6AuthenticWeaponHud, false)
     data.gta6ShowWeaponName = toBoolean(data.gta6ShowWeaponName, true)
     data.gta6VehicleIdentification = toBoolean(data.gta6VehicleIdentification, true)
 

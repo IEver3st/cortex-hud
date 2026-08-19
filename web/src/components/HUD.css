@@ -161,6 +161,7 @@
 .gta6-vital-track::after {
   position: absolute;
   inset: 0;
+  z-index: 2;
   content: '';
   background: linear-gradient(
     90deg,
@@ -173,6 +174,8 @@
 }
 
 .gta6-vital-fill {
+  position: relative;
+  z-index: 0;
   height: 100%;
   min-width: 0;
   transition: width 0.18s linear;
@@ -180,8 +183,15 @@
   will-change: width;
 }
 
-.gta6-vital--health .gta6-vital-fill {
+.gta6-vital--health .gta6-vital-fill--health {
   background: #d996aa;
+}
+
+.gta6-vital--health .gta6-vital-fill--armor {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  background: #78a8d9;
 }
 
 .gta6-vital--stamina .gta6-vital-fill {
@@ -353,7 +363,8 @@
 }
 
 .gta6-ammo-clip,
-.gta6-ammo-reserve {
+.gta6-ammo-reserve,
+.gta6-authentic-ammo-value {
   display: inline-flex;
   align-items: center;
   font-family: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
@@ -362,7 +373,8 @@
   line-height: 1;
 }
 
-.gta6-ammo-clip {
+.gta6-ammo-clip,
+.gta6-authentic-ammo-value:not(.gta6-authentic-ammo-value--reserve) {
   min-width: calc(38.25px * var(--es-ui-scale));
   color: rgba(244, 241, 243, 0.98);
   font-size: calc(34px * var(--es-ui-scale));
@@ -379,7 +391,8 @@
   background: rgba(224, 219, 224, 0.36);
 }
 
-.gta6-ammo-reserve {
+.gta6-ammo-reserve,
+.gta6-authentic-ammo-value--reserve {
   color: rgba(207, 204, 208, 0.42);
   font-size: calc(22.95px * var(--es-ui-scale));
   font-weight: 800;
@@ -387,11 +400,13 @@
   text-shadow: 0 calc(1.7px * var(--es-ui-scale)) calc(2.55px * var(--es-ui-scale)) rgba(0, 0, 0, 0.76);
 }
 
-.gta6-ammo-clip .sliding-digit {
+.gta6-ammo-clip .sliding-digit,
+.gta6-authentic-ammo-value:not(.gta6-authentic-ammo-value--reserve) .sliding-digit {
   width: 0.52em;
 }
 
-.gta6-ammo-reserve .sliding-digit {
+.gta6-ammo-reserve .sliding-digit,
+.gta6-authentic-ammo-value--reserve .sliding-digit {
   width: 0.49em;
 }
 
@@ -449,202 +464,6 @@
   100% { background: rgba(224, 219, 224, 0.36); transform: scaleY(1); }
 }
 
-.gta6-interactions {
-  position: fixed;
-  right: calc(
-    var(--gta6-interaction-safe-right, 0px)
-    + (24px * var(--gta6-interaction-scale, 1))
-  );
-  bottom: calc(
-    var(--gta6-interaction-safe-bottom, 0px)
-    + (24px * var(--gta6-interaction-scale, 1))
-  );
-  z-index: 1003;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: calc(7px * var(--gta6-interaction-scale, 1));
-  max-width: min(46vw, calc(420px * var(--gta6-interaction-scale, 1)));
-  pointer-events: none;
-}
-
-.gta6-interaction {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: calc(8px * var(--gta6-interaction-scale, 1));
-  min-height: calc(38px * var(--gta6-interaction-scale, 1));
-  animation: gta6-interaction-enter 0.18s cubic-bezier(0.2, 0, 0, 1) both;
-}
-
-.gta6-interaction-label {
-  overflow: hidden;
-  color: rgba(245, 243, 239, 0.98);
-  font-family: 'Barlow Condensed', Impact, sans-serif;
-  font-size: calc(22px * var(--gta6-interaction-scale, 1));
-  font-weight: 800;
-  font-synthesis: none;
-  line-height: 0.94;
-  letter-spacing: calc(0.5px * var(--gta6-interaction-scale, 1));
-  padding: calc(2px * var(--gta6-interaction-scale, 1));
-  margin: calc(-2px * var(--gta6-interaction-scale, 1));
-  text-align: right;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  -webkit-text-stroke: calc(1.15px * var(--gta6-interaction-scale, 1)) rgba(20, 19, 20, 0.98);
-  paint-order: stroke fill;
-  text-shadow:
-    calc(1px * var(--gta6-interaction-scale, 1)) calc(1px * var(--gta6-interaction-scale, 1)) 0 rgba(12, 11, 12, 0.96),
-    calc(-1px * var(--gta6-interaction-scale, 1)) calc(1px * var(--gta6-interaction-scale, 1)) 0 rgba(12, 11, 12, 0.96),
-    0 calc(2px * var(--gta6-interaction-scale, 1)) calc(2px * var(--gta6-interaction-scale, 1)) rgba(0, 0, 0, 0.88);
-  white-space: nowrap;
-}
-
-.gta6-interaction-key {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: calc(38px * var(--gta6-interaction-scale, 1));
-  height: calc(38px * var(--gta6-interaction-scale, 1));
-  border: calc(3px * var(--gta6-interaction-scale, 1)) solid rgba(43, 42, 42, 0.86);
-  border-radius: 50%;
-  background: #e5e3df;
-  box-shadow:
-    0 calc(1px * var(--gta6-interaction-scale, 1)) calc(3px * var(--gta6-interaction-scale, 1)) rgba(0, 0, 0, 0.7),
-    inset 0 0 0 calc(2px * var(--gta6-interaction-scale, 1)) rgba(255, 255, 255, 0.5);
-  color: #201f20;
-  font-family: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
-  font-size: calc(13px * var(--gta6-interaction-scale, 1));
-  font-weight: 900;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.gta6-interaction-key.is-wide {
-  font-size: calc(8px * var(--gta6-interaction-scale, 1));
-  letter-spacing: calc(-0.2px * var(--gta6-interaction-scale, 1));
-}
-
-.gta6-world-interactions {
-  position: fixed;
-  inset: 0;
-  z-index: 1004;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.gta6-world-interaction {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: calc(42px * var(--es-ui-scale));
-  height: calc(42px * var(--es-ui-scale));
-  transform:
-    translate3d(var(--gta6-world-x, 50vw), var(--gta6-world-y, 50vh), 0)
-    translate3d(-50%, -50%, 0)
-    scale(var(--gta6-world-scale, 1));
-  transform-origin: center;
-  will-change: transform;
-}
-
-.gta6-world-interaction-label {
-  position: absolute;
-  top: 50%;
-  right: calc(52px * var(--es-ui-scale));
-  max-width: min(34vw, calc(320px * var(--es-ui-scale)));
-  overflow: hidden;
-  color: rgba(245, 243, 239, 0.98);
-  font-family: 'Barlow Condensed', Impact, sans-serif;
-  font-size: calc(23px * var(--es-ui-scale));
-  font-weight: 800;
-  font-synthesis: none;
-  line-height: 0.94;
-  letter-spacing: calc(0.5px * var(--es-ui-scale));
-  padding: calc(2px * var(--es-ui-scale));
-  text-align: right;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  transform: translateY(-50%);
-  -webkit-text-stroke: calc(1.15px * var(--es-ui-scale)) rgba(20, 19, 20, 0.98);
-  paint-order: stroke fill;
-  text-shadow:
-    calc(1px * var(--es-ui-scale)) calc(1px * var(--es-ui-scale)) 0 rgba(12, 11, 12, 0.96),
-    calc(-1px * var(--es-ui-scale)) calc(1px * var(--es-ui-scale)) 0 rgba(12, 11, 12, 0.96),
-    0 calc(2px * var(--es-ui-scale)) calc(2px * var(--es-ui-scale)) rgba(0, 0, 0, 0.88);
-  white-space: nowrap;
-  animation: gta6-world-label-enter 0.18s cubic-bezier(0.2, 0, 0, 1) both;
-}
-
-.gta6-world-interaction-key {
-  position: relative;
-  display: flex;
-  width: calc(42px * var(--es-ui-scale));
-  height: calc(42px * var(--es-ui-scale));
-  align-items: center;
-  justify-content: center;
-  border: calc(3px * var(--es-ui-scale)) solid rgba(36, 35, 35, 0.9);
-  border-radius: 50%;
-  background: #e6e4df;
-  box-shadow:
-    0 calc(2px * var(--es-ui-scale)) calc(4px * var(--es-ui-scale)) rgba(0, 0, 0, 0.72),
-    inset 0 0 0 calc(2px * var(--es-ui-scale)) rgba(255, 255, 255, 0.52);
-  color: #201f20;
-  font-family: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
-  font-size: calc(14px * var(--es-ui-scale));
-  font-weight: 900;
-  line-height: 1;
-  text-transform: uppercase;
-  animation: gta6-world-key-enter 0.18s cubic-bezier(0.2, 0, 0, 1) both;
-}
-
-.gta6-world-interaction-key::before {
-  position: absolute;
-  inset: calc(-6px * var(--es-ui-scale));
-  border: calc(1px * var(--es-ui-scale)) solid rgba(232, 229, 223, 0.86);
-  border-radius: 50%;
-  content: '';
-  filter: drop-shadow(0 calc(1px * var(--es-ui-scale)) calc(1px * var(--es-ui-scale)) rgba(0, 0, 0, 0.82));
-}
-
-.gta6-world-interaction-key.is-wide {
-  font-size: calc(9px * var(--es-ui-scale));
-  letter-spacing: calc(-0.2px * var(--es-ui-scale));
-}
-
-@keyframes gta6-world-label-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(calc(6px * var(--es-ui-scale)), -50%, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, -50%, 0);
-  }
-}
-
-@keyframes gta6-world-key-enter {
-  from {
-    opacity: 0;
-    transform: scale(0.88);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes gta6-interaction-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(calc(8px * var(--gta6-interaction-scale, 1)), 0, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
 @keyframes gta6-heartbeat {
   0%, 36%, 100% { transform: scale(1); }
   10% { transform: scale(1.14); }
@@ -666,9 +485,6 @@
 @media (prefers-reduced-motion: reduce) {
   .gta6-vital-badge--heart svg,
   .gta6-vital--stamina.is-regenerating .gta6-vital-fill,
-  .gta6-interaction,
-  .gta6-world-interaction-label,
-  .gta6-world-interaction-key,
   .gta6-weapon.ammo-low .gta6-ammo-clip,
   .gta6-weapon.ammo-empty .gta6-ammo-clip,
   .gta6-weapon.ammo-reload .gta6-ammo-clip,
@@ -709,6 +525,62 @@
 .waypoint-distance.hud-presence-out {
   opacity: 0;
   transform: translate3d(0, calc(6px * var(--es-ui-scale)), 0) scale(0.97);
+}
+
+.gta6-weapon.gta6-weapon--authentic {
+  top: calc(31px * var(--es-ui-scale));
+  right: calc(31px * var(--es-ui-scale));
+  display: flex;
+  flex-direction: column;
+  gap: calc(4px * var(--es-ui-scale));
+  width: calc(98.6px * var(--es-ui-scale));
+  min-height: 0;
+  color: rgba(206, 207, 209, 0.92);
+  transform: translate3d(calc(5px * var(--es-ui-scale)), 0, 0);
+}
+
+.gta6-weapon.gta6-weapon--authentic.hud-presence-in {
+  transform: translate3d(0, 0, 0);
+}
+
+.gta6-weapon.gta6-weapon--authentic.hud-presence-out {
+  transform: translate3d(calc(4px * var(--es-ui-scale)), 0, 0);
+}
+
+.gta6-authentic-ammo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: calc(90px * var(--es-ui-scale));
+  margin-inline: auto;
+}
+
+.gta6-authentic-ammo-value {
+  justify-content: center;
+}
+
+.gta6-authentic-ammo-value--reserve {
+  color: rgba(166, 168, 172, 0.72);
+  transform: translateX(calc(6px * var(--es-ui-scale)));
+}
+
+.gta6-weapon.gta6-weapon--authentic .gta6-weapon-art {
+  width: calc(72px * var(--es-ui-scale));
+  height: calc(39px * var(--es-ui-scale));
+  margin-inline: auto;
+}
+
+.gta6-weapon.gta6-weapon--authentic .gta6-weapon-art img {
+  opacity: 0.72;
+  filter:
+    drop-shadow(calc(1px * var(--es-ui-scale)) 0 0 rgba(0, 0, 0, 0.78))
+    drop-shadow(calc(-1px * var(--es-ui-scale)) 0 0 rgba(0, 0, 0, 0.78))
+    drop-shadow(0 calc(2px * var(--es-ui-scale)) calc(2px * var(--es-ui-scale)) rgba(0, 0, 0, 0.78));
+}
+
+.gta6-weapon.gta6-weapon--authentic .gta6-charge {
+  width: calc(76px * var(--es-ui-scale));
+  margin-inline: auto;
 }
 
 .waypoint-distance--gta6 {
@@ -867,14 +739,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-.hud-bar-deck .armor-bar .bar-value {
+.hud-bar-deck .vital-overlay-armor {
   color: var(--armor-color);
   text-shadow:
     0 0 calc(10px * var(--es-ui-scale)) var(--armor-glow),
     0 0 calc(16px * var(--es-ui-scale)) var(--armor-color);
 }
 
-.hud-bar-deck .health-bar .bar-value {
+.hud-bar-deck .vital-overlay-health {
   color: var(--health-color);
   text-shadow:
     0 0 calc(10px * var(--es-ui-scale)) var(--health-glow),
@@ -982,10 +854,6 @@
   height: 100%;
 }
 
-.armor-bar.is-hidden {
-  visibility: hidden;
-}
-
 .bar-value {
   font-family: var(--font-hud);
   font-size: calc(12px * var(--es-ui-scale));
@@ -1069,12 +937,74 @@
   z-index: 1;
 }
 
+.vital-overlay-icon,
+.vital-overlay-value {
+  display: grid;
+  place-items: center;
+}
+
+.vital-overlay-value {
+  justify-items: end;
+}
+
+.vital-overlay-layer {
+  grid-area: 1 / 1;
+  transition:
+    opacity 0.2s cubic-bezier(0.2, 0, 0, 1),
+    transform 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.32s ease;
+}
+
+.vital-overlay-icon .vital-overlay-layer {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.vital-overlay-bar.has-armor:not(.armor-bypassed) .vital-overlay-health {
+  opacity: 0;
+  transform: translate3d(0, calc(2px * var(--es-ui-scale)), 0) scale(0.82);
+}
+
+.vital-overlay-bar .vital-overlay-armor {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.vital-overlay-bar.armor-bypassed .vital-overlay-armor {
+  opacity: 0;
+  transform: translate3d(0, calc(-3px * var(--es-ui-scale)), 0) scale(0.82);
+  filter: blur(calc(1px * var(--es-ui-scale)));
+}
+
+.vital-overlay-bar .health-fill {
+  z-index: 1;
+}
+
+.vital-overlay-bar .armor-fill {
+  z-index: 2;
+  transform-origin: left center;
+  transition:
+    width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.16s cubic-bezier(0.2, 0, 0, 1),
+    transform 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.26s ease;
+}
+
+.vital-overlay-bar.armor-bypassed .armor-fill {
+  opacity: 0;
+  transform: scaleY(0.72);
+  filter: blur(calc(1px * var(--es-ui-scale)));
+}
+
 .hud-container--sectioned-bars .health-bar .bar-value {
   color: var(--health-color);
   text-shadow: 0 0 calc(8px * var(--es-ui-scale)) var(--health-glow);
 }
 
-.hud-container--sectioned-bars .armor-bar .bar-value {
+.hud-container--sectioned-bars .vital-overlay-armor {
   color: var(--armor-color);
   text-shadow: 0 0 calc(8px * var(--es-ui-scale)) var(--armor-glow);
 }
@@ -2200,12 +2130,19 @@
   animation: bar-flash-heal 0.42s cubic-bezier(0.2, 0, 0, 1);
 }
 
-.hud-bar.health-bar.health-heartbeat .bar-icon,
-.hud-bar.health-bar.health-heartbeat .bar-value {
+.hud-bar.health-bar.health-heartbeat:not(.has-armor) .bar-icon,
+.hud-bar.health-bar.health-heartbeat:not(.has-armor) .bar-value,
+.hud-bar.health-bar.health-heartbeat.armor-bypassed .bar-icon,
+.hud-bar.health-bar.health-heartbeat.armor-bypassed .bar-value {
   animation: health-heartbeat 1.05s ease-in-out infinite;
 }
 
-.hud-bar.armor-bar.armor-breaking {
+.hud-bar.vital-overlay-bar.armor-hit .bar-track,
+.hud-bar.vital-overlay-bar.armor-hit .vital-overlay-armor {
+  animation: armor-overlay-hit 0.42s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.hud-bar.vital-overlay-bar.armor-breaking .vital-overlay-armor {
   animation: armor-break 0.48s cubic-bezier(0.2, 0, 0, 1) forwards;
 }
 
@@ -2221,6 +2158,12 @@
   100% { filter: brightness(1); }
 }
 
+@keyframes armor-overlay-hit {
+  0% { filter: brightness(1); }
+  34% { filter: brightness(1.5) drop-shadow(0 0 calc(9px * var(--es-ui-scale)) var(--armor-glow)); }
+  100% { filter: brightness(1); }
+}
+
 @keyframes health-heartbeat {
   0%, 100% { transform: scale(1); opacity: 1; }
   15% { transform: scale(1.08); opacity: 0.9; }
@@ -2232,6 +2175,18 @@
 /* Status health heartbeat when critical (hex/circle tray) */
 .status-tray-item.status-health.critical .status-meter-icon {
   animation: health-heartbeat 1.05s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vital-overlay-layer,
+  .vital-overlay-bar .bar-icon,
+  .vital-overlay-bar .bar-value,
+  .vital-overlay-bar .bar-track,
+  .vital-overlay-bar .bar-fill,
+  .vital-overlay-bar .bar-chunk-fill {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* VOIP tray talk ramp */

@@ -4,6 +4,7 @@ import AircraftHUD from './components/AircraftHUD'
 import Indicator from './components/Indicator'
 import Gta6Navigation from './components/Gta6Navigation'
 import VehicleIdentification from './components/VehicleIdentification'
+import VehicleCloneQte from './components/VehicleCloneQte'
 import SniperScope from './components/SniperScope'
 import SettingsModal from './components/SettingsModal'
 import HudDevPanel from './components/HudDevPanel'
@@ -11,6 +12,7 @@ import { isHudDevBrowser, loadDevPlayfieldColor, saveDevPlayfieldColor } from '.
 import { applyDevSettingsSave } from './hudDevApply'
 import { postNui } from './nui'
 import { normalizeVehicleIdentity } from './vehicleIdentity.js'
+import { shouldShowSpeedometer } from './hudVisibility.js'
 
 function App() {
   const [devPlayfieldColor, setDevPlayfieldColor] = useState(() =>
@@ -37,6 +39,7 @@ function App() {
     postal: '',
     postalDist: 0,
     vehicleVisible: false,
+    disableSpeedometer: false,
     speedUnit: 'mph',
     speed: 0,
     rpm: 0,
@@ -134,6 +137,7 @@ function App() {
     speedometerPos: null,
     showCrosshair: false,
     gta6HudEnabled: false,
+    gta6AuthenticWeaponHud: false,
     gta6ShowWeaponName: true,
     gta6VehicleIdentification: true,
     vehicleIdentity: null,
@@ -152,12 +156,11 @@ function App() {
     weaponUsesCharge: false,
     weaponChargeReady: true,
     weaponChargeProgress: 100,
-    interactions: [],
     interactionLayout: {
       insetRight: 0,
       insetBottom: 0,
-      screenWidth: 1920,
-      screenHeight: 1080,
+      screenWidth: isHudDevBrowser ? window.innerWidth : 1920,
+      screenHeight: isHudDevBrowser ? window.innerHeight : 1080,
     },
     radarVisible: true,
 
@@ -191,6 +194,9 @@ function App() {
   const [ammoEditMode, setAmmoEditMode] = useState(false)
   const [ammoDragPos, setAmmoDragPos] = useState(null)
   const ammoDragPosRef = useRef(null)
+  const [cloneQte, setCloneQte] = useState(null)
+  const [cloneQtePressNonce, setCloneQtePressNonce] = useState(0)
+  const cloneQteRef = useRef(null)
 
   useEffect(() => {
     editModeRef.current = editMode
@@ -199,6 +205,42 @@ function App() {
   useEffect(() => {
     hudDataRef.current = hudData
   }, [hudData])
+
+  useEffect(() => {
+    if (!isHudDevBrowser) return undefined
+
+    let frame = 0
+    const syncDevViewport = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        const screenWidth = window.innerWidth
+        const screenHeight = window.innerHeight
+        setHudData((prev) => {
+          if (
+            prev.interactionLayout.screenWidth === screenWidth
+            && prev.interactionLayout.screenHeight === screenHeight
+          ) {
+            return prev
+          }
+          return {
+            ...prev,
+            interactionLayout: {
+              ...prev.interactionLayout,
+              screenWidth,
+              screenHeight,
+            },
+          }
+        })
+      })
+    }
+
+    syncDevViewport()
+    window.addEventListener('resize', syncDevViewport)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('resize', syncDevViewport)
+    }
+  }, [])
 
   useEffect(() => {
     const raw = Number(hudData.theme?.backdropBlur)
@@ -221,8 +263,32 @@ function App() {
 
   const handleMessage = useCallback((event) => {
     const data = event.data
+    if (!data || typeof data !== 'object') return
 
     switch (data.action) {
+      case 'vehicleCloneQte:start': {
+        const next = data.data && typeof data.data === 'object' ? data.data : null
+        if (!next || typeof next.nonce !== 'string' || !next.nonce || next.nonce.length > 96) break
+        cloneQteRef.current = next
+        setCloneQte(next)
+        setCloneQtePressNonce(0)
+        break
+      }
+      case 'vehicleCloneQte:press': {
+        const nonce = data.data?.nonce
+        if (cloneQteRef.current && nonce === cloneQteRef.current.nonce) {
+          setCloneQtePressNonce((current) => current + 1)
+        }
+        break
+      }
+      case 'vehicleCloneQte:cancel': {
+        const nonce = data.data?.nonce
+        if (cloneQteRef.current && (!nonce || nonce === cloneQteRef.current.nonce)) {
+          cloneQteRef.current = null
+          setCloneQte(null)
+        }
+        break
+      }
       case 'nos:update':
         setHudData((prev) => ({
           ...prev,
@@ -290,9 +356,15 @@ function App() {
           resolvedAmmoPositionPreset:
             data.resolvedAmmoPositionPreset ?? data.ammoPositionPreset ?? prev.resolvedAmmoPositionPreset,
           showCrosshair: data.showCrosshair ?? prev.showCrosshair,
+          disableSpeedometer: Object.prototype.hasOwnProperty.call(data, 'disableSpeedometer')
+            ? data.disableSpeedometer === true
+            : prev.disableSpeedometer,
           gta6HudEnabled: Object.prototype.hasOwnProperty.call(data, 'gta6HudEnabled')
             ? data.gta6HudEnabled === true
             : prev.gta6HudEnabled,
+          gta6AuthenticWeaponHud: Object.prototype.hasOwnProperty.call(data, 'gta6AuthenticWeaponHud')
+            ? data.gta6AuthenticWeaponHud === true
+            : prev.gta6AuthenticWeaponHud,
           gta6ShowWeaponName: Object.prototype.hasOwnProperty.call(data, 'gta6ShowWeaponName')
             ? data.gta6ShowWeaponName !== false
             : prev.gta6ShowWeaponName,
@@ -432,22 +504,6 @@ function App() {
           weaponChargeProgress: Number.isFinite(Number(data.weaponChargeProgress))
             ? Math.min(100, Math.max(0, Math.round(Number(data.weaponChargeProgress))))
             : prev.weaponChargeProgress,
-        }))
-        break
-      case 'interaction:update':
-        setHudData((prev) => ({
-          ...prev,
-          interactions: Array.isArray(data.items)
-            ? data.items
-                .filter((item) => item && typeof item.label === 'string' && typeof item.key === 'string')
-                .slice(0, 8)
-                .map((item, index) => ({
-                  id: typeof item.id === 'string' ? item.id : `interaction-${index}`,
-                  owner: typeof item.owner === 'string' ? item.owner : 'unknown',
-                  label: item.label,
-                  key: item.key,
-                }))
-            : [],
         }))
         break
       case 'interaction:layout': {
@@ -644,6 +700,10 @@ function App() {
   }, [])
 
   const handleStartMoveSpeedometer = useCallback(() => {
+    if (hudData.disableSpeedometer || hudData.gta6HudEnabled) {
+      return
+    }
+
     if (!isHudDevBrowser) {
       postNui('speedometer:startEdit').catch(() => {})
     }
@@ -652,7 +712,7 @@ function App() {
     const startPos = hudData.speedometerPos || null
     dragPosRef.current = startPos
     setDragPos(startPos)
-  }, [hudData.speedometerPos])
+  }, [hudData.disableSpeedometer, hudData.gta6HudEnabled, hudData.speedometerPos])
 
   const handleDrag = useCallback((nextPos) => {
     dragPosRef.current = nextPos
@@ -773,6 +833,20 @@ function App() {
     setCinematicMode(Boolean(enabled))
   }, [])
 
+  const handleCloneQteComplete = useCallback((result) => {
+    const active = cloneQteRef.current
+    if (!active || result?.nonce !== active.nonce) return
+
+    cloneQteRef.current = null
+    setCloneQte(null)
+    if (!isHudDevBrowser) {
+      postNui('vehicleCloneQte:complete', {
+        nonce: result.nonce,
+        success: result.success === true,
+      }).catch(() => {})
+    }
+  }, [])
+
   useEffect(() => {
     if (!editMode) {
       return undefined
@@ -809,7 +883,8 @@ function App() {
     !settingsOpen &&
     !cinematicMode &&
     !editMode &&
-    !ammoEditMode
+    !ammoEditMode &&
+    !cloneQte
 
   if (appUiEmpty && !isHudDevBrowser) {
     return null
@@ -825,6 +900,7 @@ function App() {
   const showAircraftHud = hudData.aircraftVisible
     && (hudData.visible || hudData.forceAircraftHud)
     && !editMode
+  const playerInVehicle = Boolean(hudData.vehicleVisible || hudData.aircraftVisible)
 
   return (
     <div
@@ -841,7 +917,24 @@ function App() {
         range={hudData.sniperScopeRange}
         steadiness={hudData.sniperScopeSteadiness}
       />
-      {hudData.showCrosshair && hudData.isArmed && !showSniperScope && <div className="crosshair-dot" />}
+      <VehicleCloneQte
+        key={cloneQte?.nonce || 'vehicle-clone-idle'}
+        challenge={cloneQte}
+        pressNonce={cloneQtePressNonce}
+        layout={hudData.interactionLayout}
+        onComplete={handleCloneQteComplete}
+      />
+      {!playerInVehicle && hudData.isArmed && hudData.weaponType !== 'melee' && !showSniperScope && (
+        hudData.gta6HudEnabled && hudData.gta6AuthenticWeaponHud
+          ? (
+              <div className="gta6-crosshair" aria-hidden="true">
+                <span className="gta6-crosshair-arm gta6-crosshair-arm--left" />
+                <span className="gta6-crosshair-arm gta6-crosshair-arm--right" />
+                <span className="gta6-crosshair-arm gta6-crosshair-arm--stem" />
+              </div>
+            )
+          : hudData.showCrosshair && <div className="crosshair-dot" aria-hidden="true" />
+      )}
       {editMode && (
         <div className="edit-mode-overlay">
           <div className="edit-mode-header">
@@ -925,7 +1018,13 @@ function App() {
             armor={hudData.armor}
             stamina={hudData.stamina}
             staminaRegenerating={hudData.staminaRegenerating}
-            vehicleVisible={hudData.vehicleVisible || editMode}
+            vehicleVisible={shouldShowSpeedometer({
+              vehicleVisible: hudData.vehicleVisible,
+              editMode,
+              disableSpeedometer: hudData.disableSpeedometer,
+              gta6HudEnabled: hudData.gta6HudEnabled,
+            })}
+            playerInVehicle={playerInVehicle}
             speedUnit={hudData.speedUnit}
             speed={hudData.speed}
             rpm={hudData.rpm}
@@ -993,9 +1092,8 @@ function App() {
             weaponChargeReady={hudData.weaponChargeReady}
             weaponChargeProgress={hudData.weaponChargeProgress}
             gta6HudEnabled={hudData.gta6HudEnabled}
+            gta6AuthenticWeaponHud={hudData.gta6AuthenticWeaponHud}
             gta6ShowWeaponName={hudData.gta6ShowWeaponName}
-            interactions={hudData.interactions}
-            interactionLayout={hudData.interactionLayout}
             ammoEditMode={ammoEditMode}
             onAmmoDrag={handleAmmoDrag}
             layout={hudData.layout}

@@ -59,7 +59,6 @@ local publishedTarget = nil
 local started = false
 local stopping = false
 local actionLocked = false
-local interactionHud = nil
 local ownerResource = nil
 
 local function distanceSquared(left, right)
@@ -235,10 +234,6 @@ local function hidePrompt()
     selectedDoor = nil
     publishedTarget = nil
     lib.hideInteraction(INTERACTION_ID)
-
-    if interactionHud and type(interactionHud.clearWorldInteraction) == 'function' then
-        interactionHud.clearWorldInteraction(ownerResource, INTERACTION_ID)
-    end
 end
 
 local function publishPrompt(candidate, forcedOpenState)
@@ -273,10 +268,6 @@ local function publishPrompt(candidate, forcedOpenState)
         },
     }
 
-    if interactionHud and type(interactionHud.setWorldInteraction) == 'function' then
-        interactionHud.setWorldInteraction(interaction)
-    end
-
     local ok = lib.showInteraction(interaction)
 
     if ok then
@@ -284,10 +275,6 @@ local function publishPrompt(candidate, forcedOpenState)
     else
         selectedDoor = nil
         publishedTarget = nil
-
-        if interactionHud and type(interactionHud.clearWorldInteraction) == 'function' then
-            interactionHud.clearWorldInteraction(ownerResource, INTERACTION_ID)
-        end
     end
 end
 
@@ -382,14 +369,13 @@ local function handleAction()
     end)
 end
 
-function VehicleDoorInteractions.start(config, worldInteractionHud)
+function VehicleDoorInteractions.start(config)
     if started then return end
 
     rootConfig = config
     activeConfig = config and config.VehicleDoorInteractions or nil
     if not activeConfig or activeConfig.enabled ~= true then return end
 
-    interactionHud = worldInteractionHud
     ownerResource = GetCurrentResourceName()
     started = true
 
@@ -438,10 +424,6 @@ function VehicleDoorInteractions.start(config, worldInteractionHud)
         if resourceName ~= GetCurrentResourceName() then return end
         stopping = true
         lib.hideInteraction(INTERACTION_ID)
-
-        if interactionHud and type(interactionHud.clearWorldInteraction) == 'function' then
-            interactionHud.clearWorldInteraction(ownerResource, INTERACTION_ID)
-        end
     end)
 end
 

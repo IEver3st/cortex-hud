@@ -3,6 +3,7 @@
  * state from prop transitions (enter/exit, damage flash, reload bounce).
  */
 import { useEffect, useRef, useState } from 'react'
+import { isArmorAppliedTransition, isArmorBypassTransition } from '../vitalsOverlay.js'
 
 /**
  * Keep a node mounted through exit so CSS can play leave transitions.
@@ -110,6 +111,57 @@ export function useBreakAway(value, breakMs = 480) {
   }, [value, breakMs])
 
   return { show, breaking }
+}
+
+/**
+ * Expose health briefly when it falls without equipped armor being consumed.
+ * Repeated bypass damage restarts the hold so damage-over-time stays readable.
+ */
+export function useArmorBypass(health, armor, holdMs = 1100) {
+  const previousRef = useRef({ health, armor })
+  const [active, setActive] = useState(false)
+
+  useEffect(() => {
+    const previous = previousRef.current
+    const current = { health, armor }
+    previousRef.current = current
+
+    if (!isArmorBypassTransition(previous, current)) {
+      setActive(false)
+      return undefined
+    }
+
+    setActive(true)
+    const timer = window.setTimeout(() => setActive(false), holdMs)
+    return () => window.clearTimeout(timer)
+  }, [health, armor, holdMs])
+
+  return active
+}
+
+/**
+ * Show the GTA 6 health strip briefly when armor is equipped or increased.
+ * Repeated applications restart the hold so sequential pickups stay readable.
+ */
+export function useArmorApplied(armor, holdMs = 5000) {
+  const previousRef = useRef({ armor })
+  const [active, setActive] = useState(false)
+
+  useEffect(() => {
+    const previous = previousRef.current
+    const current = { armor }
+    previousRef.current = current
+
+    if (!isArmorAppliedTransition(previous, current)) {
+      return undefined
+    }
+
+    setActive(true)
+    const timer = window.setTimeout(() => setActive(false), holdMs)
+    return () => window.clearTimeout(timer)
+  }, [armor, holdMs])
+
+  return active
 }
 
 /**

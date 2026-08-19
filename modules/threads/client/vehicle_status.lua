@@ -386,7 +386,7 @@ function VehicleStatusThread:start()
                     })
                 end
             else
-                if config.disableSpeedometer == true then
+                if config.disableSpeedometer == true or config.gta6HudEnabled == true then
                     if lastVehicleState.visible then
                         lastVehicleState.visible = false
                         SendNUIMessage({
