@@ -1,5 +1,4 @@
 local config = lib.require("config.shared")
-local libSettings = lib.settings
 local Nui = lib.require("modules.nui.client")
 
 local Settings = {}
@@ -1016,7 +1015,7 @@ end
 
 local function setLibSetting(key, value)
     pcall(function()
-        libSettings.setSetting(key, value)
+        exports['cortex-lib']:setSetting(key, value)
     end)
 end
 
@@ -1109,7 +1108,7 @@ function Settings.get()
 
     pcall(function()
         for libKey, hudKey in pairs(KEY_MAP) do
-            local value = libSettings.getSetting(libKey)
+            local value = exports['cortex-lib']:getSetting(libKey)
             if value ~= nil then
                 data[hudKey] = value
             end
@@ -1259,10 +1258,10 @@ RegisterNUICallback('settings:close', function(_, cb)
 end)
 
 RegisterCommand('hudsettings', function()
-    Settings.open()
+    exports['cortex-lib']:openSettingsMenu()
 end, false)
 
-RegisterKeyMapping('hudsettings', 'Open HUD Settings', 'keyboard', 'I')
+RegisterKeyMapping('hudsettings', 'Open Cortex Settings', 'keyboard', 'I')
 
 AddEventHandler('cortex-lib:settingChanged', function(key, value)
     local hudKey = KEY_MAP[key]

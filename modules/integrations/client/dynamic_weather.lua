@@ -1,6 +1,5 @@
 local CANDIDATE_WEATHER_RES = { 'Dynamic_weather', 'dynamic_weather' }
 local config = lib.require('config.shared')
-local libSettings = lib.settings
 local SendNUIMessage = lib.require('modules.nui.client').send
 local PlayerPedId = PlayerPedId
 local GetEntityCoords = GetEntityCoords
@@ -101,7 +100,7 @@ end
 local function settingFromLib(keys)
     for _, key in ipairs(keys) do
         local ok, v = pcall(function()
-            return libSettings.getSetting(key)
+            return exports['cortex-lib']:getSetting(key)
         end)
         if ok and v ~= nil then
             return truthySetting(v)
