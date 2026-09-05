@@ -11,6 +11,7 @@ local math_floor = math.floor
 local cinematicMode = false
 local cinematicCommandRegistered = false
 local cinematicKeyRegisteredKey = nil
+local initialized = false
 
 local DEFAULT_PRESET_ORDER = { 'classic', 'street', 'dispatch', 'ghost' }
 
@@ -30,6 +31,7 @@ local KEY_MAP = {
     hud_disableSpeedometer = 'disableSpeedometer',
     hud_showPostal = 'showPostal',
     hud_showPostalDistance = 'showPostalDistance',
+    hud_locationDisplayStyle = 'locationDisplayStyle',
     hud_statusIconShape = 'statusIconShape',
     hud_hungerThreshold = 'hungerThreshold',
     hud_thirstThreshold = 'thirstThreshold',
@@ -59,10 +61,11 @@ local KEY_MAP = {
     hud_gta6AuthenticWeaponHud = 'gta6AuthenticWeaponHud',
     hud_gta6ShowWeaponName = 'gta6ShowWeaponName',
     hud_gta6VehicleIdentification = 'gta6VehicleIdentification',
+    hud_customWeaponWheel = 'customWeaponWheel',
+    hud_customRadioUi = 'customRadioUi',
     hud_sectionedBars = 'sectionedBars',
     hud_sectionedIndicator = 'sectionedIndicator',
     hud_backdropBlur = 'backdropBlur',
-    hud_panelOpacity = 'panelOpacity',
     hud_oxygenDisplayLocation = 'oxygenDisplayLocation',
     hud_cruiseAutoThrottle = 'cruiseAutoThrottle',
     hud_showDynamicWeather = 'showDynamicWeather',
@@ -130,6 +133,28 @@ local function toBoolean(value, default)
     end
 
     return default == true
+end
+
+local function normalizeLocationDisplayStyle(value)
+    if value == 'off' then
+        return 'off'
+    end
+
+    if value == 'gta6' then
+        return 'gta6'
+    end
+
+    return 'current'
+end
+
+local function customRadioUiDefault()
+    return type(config.Radio) == 'table'
+        and config.Radio.enabled ~= false
+        and config.Radio.replaceDefaultWheel ~= false
+end
+
+local function customWeaponWheelDefault()
+    return type(config.WeaponWheel) == 'table' and config.WeaponWheel.enabled == true
 end
 
 local function cruiseModeFullDefault()
@@ -203,30 +228,6 @@ end
 local BACKDROP_BLUR_MIN = 0.25
 local BACKDROP_BLUR_MAX = 3.0
 
-local PANEL_OPACITY_MIN = 0.15
-local PANEL_OPACITY_MAX = 1.0
-
-local function normalizePanelOpacity(value)
-    local n = tonumber(value)
-    if not n then
-        return nil
-    end
-
-    if n >= 15 and n <= 100 then
-        n = n / 100
-    end
-
-    if n < PANEL_OPACITY_MIN then
-        return PANEL_OPACITY_MIN
-    end
-
-    if n > PANEL_OPACITY_MAX then
-        return PANEL_OPACITY_MAX
-    end
-
-    return n
-end
-
 local function normalizeBackdropBlur(value)
     local n = tonumber(value)
     if not n then
@@ -256,6 +257,7 @@ local function buildDefaultSettings()
         disableSpeedometer = config.disableSpeedometer == true,
         showPostal = config.EnablePostal ~= false,
         showPostalDistance = config.ShowPostalDistance == true,
+        locationDisplayStyle = normalizeLocationDisplayStyle(config.locationDisplayStyle),
         statusIconShape = 'preset',
         hungerThreshold = config.StatusIcons.hungerThreshold or 100,
         thirstThreshold = config.StatusIcons.thirstThreshold or 100,
@@ -285,13 +287,14 @@ local function buildDefaultSettings()
         gta6AuthenticWeaponHud = config.gta6AuthenticWeaponHud == true,
         gta6ShowWeaponName = config.gta6ShowWeaponName ~= false,
         gta6VehicleIdentification = config.gta6VehicleIdentification ~= false,
+        customWeaponWheel = customWeaponWheelDefault(),
+        customRadioUi = customRadioUiDefault(),
         showDynamicWeather = config.showDynamicWeather == true,
         showFlashFloodWarning = config.showFlashFloodWarning ~= false,
         showHurricaneWarning = config.showHurricaneWarning ~= false,
         sectionedBars = config.sectionedBars == true,
         sectionedIndicator = config.sectionedIndicator == true,
         backdropBlur = normalizeBackdropBlur(config.backdropBlur) or 1.0,
-        panelOpacity = normalizePanelOpacity(config.panelOpacity) or 1.0,
         oxygenDisplayLocation = config.oxygenDisplayLocation or 'statusCluster',
         cruiseAutoThrottle = cruiseModeFullDefault(),
     }
@@ -306,6 +309,43 @@ local COLOR_OPTIONS = {
     { value = '#ef4444', label = 'Red' },
     { value = '#8b5cf6', label = 'Violet' },
 }
+
+local function buildColorOptions(...)
+    local options = {}
+    local seen = {}
+
+    local function append(value, label)
+        if type(value) ~= 'string' or value == '' or seen[value] then
+            return
+        end
+
+        seen[value] = true
+        options[#options + 1] = {
+            value = value,
+            label = label or value,
+        }
+    end
+
+    for _, option in ipairs(COLOR_OPTIONS) do
+        append(option.value, option.label)
+    end
+
+    local presetColorKeys = { 'health', 'armor', 'hunger', 'thirst', 'stress', 'oxygen', 'ammo' }
+    for _, color in ipairs({ ... }) do
+        append(color)
+    end
+
+    for _, preset in pairs(config.HudPresets or {}) do
+        local theme = type(preset) == 'table' and preset.theme or nil
+        if type(theme) == 'table' then
+            for _, key in ipairs(presetColorKeys) do
+                append(theme[key])
+            end
+        end
+    end
+
+    return options
+end
 
 local SHAPE_OPTIONS = {
     { value = 'hexagon', label = 'Hexagon' },
@@ -323,6 +363,12 @@ local OXYGEN_DISPLAY_OPTIONS = {
     { value = 'indicator', label = 'Indicator Bar' },
 }
 
+local LOCATION_DISPLAY_OPTIONS = {
+    { value = 'off', label = 'Off' },
+    { value = 'current', label = 'Current' },
+    { value = 'gta6', label = 'Leonida' },
+}
+
 local AMMO_POSITION_OPTIONS = {
     { value = 'preset', label = 'HUD Preset' },
     { value = 'custom', label = 'Custom (Drag)' },
@@ -331,26 +377,6 @@ local AMMO_POSITION_OPTIONS = {
     { value = 'top-left', label = 'Top Left' },
     { value = 'bottom-center', label = 'Bottom Middle' },
 }
-
-local function isDynamicWeatherResourceReady()
-    for _, resName in ipairs({ 'Dynamic_weather', 'dynamic_weather' }) do
-        if GetResourceState(resName) == 'started' then
-            local ex = nil
-            pcall(function()
-                ex = exports[resName]
-            end)
-            if type(ex) == 'table' then
-                if type(ex.getHudWeatherSnapshot) == 'function' then
-                    return true
-                end
-                if type(ex.getPlayerWeather) == 'function' or type(ex.getCurrentWeather) == 'function' then
-                    return true
-                end
-            end
-        end
-    end
-    return false
-end
 
 local function getSettingsDefinition()
     local defaultShape = config.StatusIcons.iconShape
@@ -380,7 +406,16 @@ local function getSettingsDefinition()
         defaultAmmoPosition = 'preset'
     end
 
-    local isDyn = isDynamicWeatherResourceReady()
+    local colorOptions = buildColorOptions(
+        defaultHealthColor,
+        defaultArmorColor,
+        defaultHungerColor,
+        defaultThirstColor,
+        defaultStressColor,
+        defaultOxygenColor,
+        defaultAmmoColor
+    )
+
     local res = {
         label = 'HUD',
         settings = {
@@ -395,22 +430,11 @@ local function getSettingsDefinition()
             {
                 key = 'hud_backdropBlur',
                 type = 'slider',
-                label = 'Glass blur',
-                description = 'Frost strength (rim + fill density). Real backdrop-filter blur breaks in FiveM CEF (black rects); this simulates glass with tint.',
+                label = 'Glass Blur',
+                description = 'Control the background blur behind translucent HUD surfaces.',
                 default = math.floor((normalizeBackdropBlur(config.backdropBlur) or 1.0) * 100 + 0.5),
                 min = 25,
                 max = 300,
-                step = 5,
-                suffix = '%',
-            },
-            {
-                key = 'hud_panelOpacity',
-                type = 'slider',
-                label = 'Panel opacity',
-                description = 'Multiplies glass fill. Floor at 15% so panels never go fully see-through; combine with Glass blur for readability.',
-                default = math.floor((normalizePanelOpacity(config.panelOpacity) or 1.0) * 100 + 0.5),
-                min = 15,
-                max = 100,
                 step = 5,
                 suffix = '%',
             },
@@ -433,17 +457,25 @@ local function getSettingsDefinition()
                 default = config.disableSpeedometer == true,
             },
             {
+                key = 'hud_locationDisplayStyle',
+                type = 'select',
+                label = 'Location Display Style',
+                description = 'Turn location announcements off or choose the Current or Leonida presentation.',
+                default = normalizeLocationDisplayStyle(config.locationDisplayStyle),
+                options = LOCATION_DISPLAY_OPTIONS,
+            },
+            {
                 key = 'hud_showPostal',
                 type = 'toggle',
                 label = 'Show Postal',
-                description = 'Display nearest postal code',
+                description = 'Display nearest postal code in the Current location style',
                 default = config.EnablePostal ~= false,
             },
             {
                 key = 'hud_showPostalDistance',
                 type = 'toggle',
                 label = 'Postal Distance',
-                description = 'Show distance to nearest postal',
+                description = 'Show distance to nearest postal in the Current location style',
                 default = config.ShowPostalDistance == true,
             },
             {
@@ -456,31 +488,67 @@ local function getSettingsDefinition()
             {
                 key = 'hud_gta6HudEnabled',
                 type = 'toggle',
-                label = 'GTA 6 HUD',
-                description = 'Use contextual vitals, an active weapon display, and brief GTA V place discoveries',
+                label = 'Leonida UI',
+                description = 'Use contextual vitals, a compact weapon display, and Leonida interaction styling.',
                 default = config.gta6HudEnabled == true,
             },
             {
                 key = 'hud_gta6ShowWeaponName',
                 type = 'toggle',
-                label = 'GTA 6 Weapon Name',
-                description = 'Show the active weapon name beside its icon in GTA 6 HUD mode',
+                label = 'Show Weapon Name',
+                description = 'Show the active weapon name beside its icon when Leonida UI is enabled.',
                 default = config.gta6ShowWeaponName ~= false,
             },
             {
                 key = 'hud_gta6AuthenticWeaponHud',
                 type = 'toggle',
-                label = 'Authentic GTA 6 Weapon HUD',
-                description = 'Use the compact ammo-over-weapon layout and minimal firearm reticle',
+                label = 'Compact Weapon HUD',
+                description = 'Use the compact ammo-over-weapon layout and minimal firearm reticle.',
                 default = config.gta6AuthenticWeaponHud == true,
             },
             {
                 key = 'hud_gta6VehicleIdentification',
                 type = 'toggle',
-                label = 'GTA 6 Vehicle Introduction',
-                description = 'Show brand, model, engine health, and fuel when entering a vehicle',
+                label = 'Vehicle Introduction',
+                description = 'Show the vehicle brand, model, engine health, and fuel when you enter a vehicle.',
                 default = config.gta6VehicleIdentification ~= false,
-                hidden = true,
+            },
+            {
+                key = 'hud_customWeaponWheel',
+                type = 'toggle',
+                label = 'Custom Weapon Wheel',
+                description = 'Use the eight-station Cortex selector while on foot',
+                default = customWeaponWheelDefault(),
+            },
+            {
+                key = 'hud_customRadioUi',
+                type = 'toggle',
+                label = 'Custom Radio UI',
+                description = 'Use the Cortex radio selector instead of the base GTA radio wheel',
+                default = customRadioUiDefault(),
+            },
+            -- Weather forecast and hazard segments. Always registered so the
+            -- schema is stable regardless of Dynamic_weather start order.
+            {
+                key = 'hud_showDynamicWeather',
+                type = 'toggle',
+                label = 'Dynamic Weather (indicator)',
+                description = 'Forecast icons and rain ETA in the top bar when Dynamic_weather is running',
+                default = config.showDynamicWeather == true,
+            },
+            {
+                key = 'hud_showFlashFloodWarning',
+                type = 'toggle',
+                label = 'Flash flood warning (indicator)',
+                description = 'Shows the flash flood segment in the location bar when Dynamic_weather reports an active flood',
+                default = config.showFlashFloodWarning ~= false,
+            },
+            {
+                key = 'hud_showHurricaneWarning',
+                type = 'toggle',
+                label = 'Hurricane warning (indicator)',
+                description = 'Shows the hurricane segment when Dynamic_weather reports an active hurricane',
+                default = config.showHurricaneWarning ~= false,
             },
             {
                 key = 'hud_statusIconShape',
@@ -501,7 +569,7 @@ local function getSettingsDefinition()
                 key = 'hud_sectionedIndicator',
                 type = 'toggle',
                 label = 'Segmented top bar',
-                description = 'Location strip as separate rounded capsules with gaps (same vibe as sectioned bars)',
+                description = 'Current location strip as separate rounded capsules with gaps',
                 default = config.sectionedIndicator == true,
             },
             {
@@ -565,7 +633,7 @@ local function getSettingsDefinition()
                 label = 'Health Bar Color',
                 description = 'Choose the health bar color',
                 default = defaultHealthColor,
-                options = COLOR_OPTIONS,
+                options = colorOptions,
             },
             {
                 key = 'hud_color_armor',
@@ -573,7 +641,7 @@ local function getSettingsDefinition()
                 label = 'Armor Bar Color',
                 description = 'Choose the armor bar color',
                 default = defaultArmorColor,
-                options = COLOR_OPTIONS,
+                options = colorOptions,
             },
             {
                 key = 'hud_color_hunger',
@@ -581,7 +649,7 @@ local function getSettingsDefinition()
                 label = 'Hunger Bar Color',
                 description = 'Choose the hunger bar color',
                 default = defaultHungerColor,
-                options = COLOR_OPTIONS,
+                options = colorOptions,
             },
             {
                 key = 'hud_color_thirst',
@@ -589,7 +657,7 @@ local function getSettingsDefinition()
                 label = 'Thirst Bar Color',
                 description = 'Choose the thirst bar color',
                 default = defaultThirstColor,
-                options = COLOR_OPTIONS,
+                options = colorOptions,
             },
             {
                 key = 'hud_color_stress',
@@ -597,7 +665,7 @@ local function getSettingsDefinition()
                 label = 'Stress Bar Color',
                 description = 'Choose the stress bar color',
                 default = defaultStressColor,
-                options = COLOR_OPTIONS,
+                options = colorOptions,
             },
             {
                 key = 'hud_color_oxygen',
@@ -605,7 +673,7 @@ local function getSettingsDefinition()
                 label = 'Oxygen Bar Color',
                 description = 'Choose the oxygen bar color',
                 default = defaultOxygenColor,
-                options = COLOR_OPTIONS,
+                options = colorOptions,
             },
             {
                 key = 'hud_color_ammo',
@@ -613,7 +681,7 @@ local function getSettingsDefinition()
                 label = 'Ammo Counter Color',
                 description = 'Choose the ammo counter color',
                 default = defaultAmmoColor,
-                options = COLOR_OPTIONS,
+                options = colorOptions,
             },
             {
                 key = 'hud_cinematicKey',
@@ -636,28 +704,28 @@ local function getSettingsDefinition()
             },
             {
                 key = 'hud_minimapOnlyInVehicle',
-                type = 'checkbox',
+                type = 'toggle',
                 label = 'Show Minimap Only In Vehicle',
                 description = 'Hide minimap when on foot',
                 default = config.minimapOnlyInVehicle == true,
             },
             {
                 key = 'hud_mapNotifications',
-                type = 'checkbox',
+                type = 'toggle',
                 label = 'Map Notifications Enabled',
                 description = 'Show notifications on the map',
                 default = config.mapNotifications ~= false,
             },
             {
                 key = 'hud_lowFuelAlert',
-                type = 'checkbox',
+                type = 'toggle',
                 label = 'Low Fuel Alert Enabled',
                 description = 'Show alert when fuel is low',
                 default = config.lowFuelAlert ~= false,
             },
             {
                 key = 'hud_cinematicNotifications',
-                type = 'checkbox',
+                type = 'toggle',
                 label = 'Cinematic Mode Notifications',
                 description = 'Show notification when toggling cinematic mode',
                 default = config.cinematicNotifications ~= false,
@@ -680,6 +748,50 @@ local function getSettingsDefinition()
                 default = 0,
                 min = 0,
                 max = 10000,
+                hidden = true,
+            },
+            -- Hidden persistence for keys in KEY_MAP that have no visible
+            -- control. Hidden entries still seed KVP defaults so setSetting
+            -- resolves instead of silently failing.
+            {
+                key = 'hud_speedometerPositionMode',
+                type = 'select',
+                label = 'Speedometer Position Mode',
+                description = 'internal',
+                default = 'preset',
+                options = {
+                    { value = 'preset', label = 'Preset' },
+                    { value = 'custom', label = 'Custom' },
+                },
+                hidden = true,
+            },
+            {
+                key = 'hud_ammoPosX',
+                type = 'slider',
+                label = 'Ammo X',
+                description = 'internal',
+                default = 0,
+                min = 0,
+                max = 10000,
+                hidden = true,
+            },
+            {
+                key = 'hud_ammoPosY',
+                type = 'slider',
+                label = 'Ammo Y',
+                description = 'internal',
+                default = 0,
+                min = 0,
+                max = 10000,
+                hidden = true,
+            },
+            {
+                key = 'hud_layoutPreset',
+                type = 'select',
+                label = 'Layout Preset',
+                description = 'internal',
+                default = getDefaultPresetName(),
+                options = buildPresetOptions(),
                 hidden = true,
             },
             {
@@ -720,55 +832,18 @@ local function getSettingsDefinition()
             },
         },
         sections = {
-            { label = 'Appearance', keys = { 'hud_backdropBlur', 'hud_panelOpacity' } },
-            { label = 'HUD Style', keys = { 'hud_gta6HudEnabled', 'hud_gta6AuthenticWeaponHud', 'hud_gta6ShowWeaponName' } },
-            { label = 'Speedometer', keys = { 'hud_speedUnit', 'hud_fuelDisplayStyle', 'hud_disableSpeedometer', 'hud_cruiseAutoThrottle', 'hud_speedometerActions' } },
-            { label = 'Postal', keys = { 'hud_showPostal', 'hud_showPostalDistance' } },
+            { label = 'HUD Style', keys = { 'hud_colorPreset', 'hud_backdropBlur', 'hud_locationDisplayStyle', 'hud_gta6HudEnabled', 'hud_gta6AuthenticWeaponHud', 'hud_gta6ShowWeaponName', 'hud_gta6VehicleIdentification' } },
+            { label = 'Weapon Wheel', keys = { 'hud_customWeaponWheel' } },
+            { label = 'Vehicle Radio', keys = { 'hud_customRadioUi' } },
+            { label = 'Speedometer & Fuel', keys = { 'hud_speedUnit', 'hud_disableSpeedometer', 'hud_fuelDisplayStyle', 'hud_cruiseAutoThrottle', 'hud_speedometerActions' } },
+            { label = 'Location & Minimap', keys = { 'hud_showPostal', 'hud_showPostalDistance', 'hud_sectionedIndicator', 'hud_minimapOnlyInVehicle' } },
             { label = 'Weather', keys = { 'hud_showDynamicWeather', 'hud_showFlashFloodWarning', 'hud_showHurricaneWarning' } },
-            { label = 'Status Icons', keys = { 'hud_statusIconShape', 'hud_sectionedBars', 'hud_sectionedIndicator', 'hud_hungerThreshold', 'hud_thirstThreshold', 'hud_stressThreshold', 'hud_oxygenThreshold', 'hud_oxygenDisplayLocation' } },
-            { label = 'Colors', keys = { 'hud_colorPreset', 'hud_color_health', 'hud_color_armor', 'hud_color_hunger', 'hud_color_thirst', 'hud_color_stress', 'hud_color_oxygen', 'hud_color_ammo' } },
-            { label = 'Minimap', keys = { 'hud_minimapOnlyInVehicle' } },
-            { label = 'Notifications', keys = { 'hud_mapNotifications', 'hud_lowFuelAlert', 'hud_cinematicNotifications' } },
-            { label = 'Cinematic Mode', keys = { 'hud_cinematicKey' } },
-            { label = 'Ammo', keys = { 'hud_ammoPositionPreset', 'hud_ammoActions' } },
+            { label = 'Status Icons', keys = { 'hud_statusIconShape', 'hud_sectionedBars', 'hud_hungerThreshold', 'hud_thirstThreshold', 'hud_stressThreshold', 'hud_oxygenThreshold', 'hud_oxygenDisplayLocation' } },
+            { label = 'Colors', keys = { 'hud_color_health', 'hud_color_armor', 'hud_color_hunger', 'hud_color_thirst', 'hud_color_stress', 'hud_color_oxygen', 'hud_color_ammo' } },
+            { label = 'Ammo & Crosshair', keys = { 'hud_showCrosshair', 'hud_ammoPositionPreset', 'hud_ammoActions' } },
+            { label = 'Notifications & Cinematic', keys = { 'hud_mapNotifications', 'hud_lowFuelAlert', 'hud_cinematicNotifications', 'hud_cinematicKey' } },
         },
     }
-
-    if isDyn then
-        for i, e in ipairs(res.settings) do
-            if e.key == 'hud_statusIconShape' then
-                table.insert(res.settings, i, {
-                    key = 'hud_showDynamicWeather',
-                    type = 'toggle',
-                    label = 'Dynamic Weather (indicator)',
-                    description = 'Forecast icons and rain ETA in the top bar when Dynamic_weather is running',
-                    default = config.showDynamicWeather == true,
-                })
-                table.insert(res.settings, i + 1, {
-                    key = 'hud_showFlashFloodWarning',
-                    type = 'toggle',
-                    label = 'Flash flood warning (indicator)',
-                    description = 'Shows the flash flood segment in the location bar when Dynamic_weather reports an active flood',
-                    default = config.showFlashFloodWarning ~= false,
-                })
-                table.insert(res.settings, i + 2, {
-                    key = 'hud_showHurricaneWarning',
-                    type = 'toggle',
-                    label = 'Hurricane warning (indicator)',
-                    description = 'Shows the hurricane segment when Dynamic_weather reports an active hurricane',
-                    default = config.showHurricaneWarning ~= false,
-                })
-                break
-            end
-        end
-    else
-        for i, sec in ipairs(res.sections) do
-            if sec.label == 'Weather' then
-                table.remove(res.sections, i)
-                break
-            end
-        end
-    end
 
     return res
 end
@@ -878,7 +953,6 @@ local function resolveHudPresentation(data)
     theme.stress = colors.stress
     theme.oxygen = colors.oxygen
     theme.backdropBlur = normalizeBackdropBlur(data.backdropBlur) or normalizeBackdropBlur(config.backdropBlur) or 1.0
-    theme.panelOpacity = normalizePanelOpacity(data.panelOpacity) or normalizePanelOpacity(config.panelOpacity) or 1.0
 
     return {
         layoutPreset = layoutPresetName,
@@ -929,6 +1003,8 @@ local function pushResolvedHud(data)
         gta6AuthenticWeaponHud = config.gta6AuthenticWeaponHud == true,
         gta6ShowWeaponName = config.gta6ShowWeaponName ~= false,
         gta6VehicleIdentification = config.gta6VehicleIdentification ~= false,
+        customWeaponWheel = customWeaponWheelDefault(),
+        locationDisplayStyle = normalizeLocationDisplayStyle(data.locationDisplayStyle or config.locationDisplayStyle),
         sectionedBars = data.sectionedBars == true,
         sectionedIndicator = data.sectionedIndicator == true,
         oxygenDisplayLocation = data.oxygenDisplayLocation or config.oxygenDisplayLocation or 'statusCluster',
@@ -968,6 +1044,11 @@ function Settings.apply(data, options)
     config.gta6AuthenticWeaponHud = toBoolean(data.gta6AuthenticWeaponHud, config.gta6AuthenticWeaponHud == true)
     config.gta6ShowWeaponName = toBoolean(data.gta6ShowWeaponName, config.gta6ShowWeaponName ~= false)
     config.gta6VehicleIdentification = toBoolean(data.gta6VehicleIdentification, config.gta6VehicleIdentification ~= false)
+    config.WeaponWheel = config.WeaponWheel or {}
+    config.WeaponWheel.enabled = toBoolean(data.customWeaponWheel, customWeaponWheelDefault())
+    config.Radio = config.Radio or {}
+    config.Radio.replaceDefaultWheel = toBoolean(data.customRadioUi, customRadioUiDefault())
+    config.locationDisplayStyle = normalizeLocationDisplayStyle(data.locationDisplayStyle or config.locationDisplayStyle)
     config.showDynamicWeather = toBoolean(data.showDynamicWeather, config.showDynamicWeather == true)
     if not config.showDynamicWeather then
         SendNUIMessage({
@@ -1002,7 +1083,6 @@ function Settings.apply(data, options)
     config.cinematicKey = data.cinematicKey or config.cinematicKey
     config.minimapOnlyInVehicle = toBoolean(data.minimapOnlyInVehicle, config.minimapOnlyInVehicle == true)
     config.backdropBlur = normalizeBackdropBlur(data.backdropBlur) or normalizeBackdropBlur(config.backdropBlur) or 1.0
-    config.panelOpacity = normalizePanelOpacity(data.panelOpacity) or normalizePanelOpacity(config.panelOpacity) or 1.0
     config.fuelDisplayStyle = presentation.resolvedFuelDisplayStyle
     config.ammoColor = presentation.ammoColor
     config.ammoPositionPreset = data.ammoPositionPreset or config.ammoPositionPreset or 'preset'
@@ -1033,9 +1113,6 @@ local function persistSettingsData(data)
             if libKey == 'hud_backdropBlur' and type(v) == 'number' and v <= 3 then
                 v = math_floor(v * 100 + 0.5)
             end
-            if libKey == 'hud_panelOpacity' and type(v) == 'number' and v <= 1 then
-                v = math_floor(v * 100 + 0.5)
-            end
             if libKey == 'hud_gta6HudEnabled' then
                 v = toBoolean(v, false)
             end
@@ -1047,6 +1124,9 @@ local function persistSettingsData(data)
             end
             if libKey == 'hud_gta6VehicleIdentification' then
                 v = toBoolean(v, true)
+            end
+            if libKey == 'hud_locationDisplayStyle' then
+                v = normalizeLocationDisplayStyle(v)
             end
             setLibSetting(libKey, v)
         end
@@ -1116,11 +1196,13 @@ function Settings.get()
     end)
 
     data.backdropBlur = normalizeBackdropBlur(data.backdropBlur) or 1.0
-    data.panelOpacity = normalizePanelOpacity(data.panelOpacity) or 1.0
     data.gta6HudEnabled = toBoolean(data.gta6HudEnabled, false)
     data.gta6AuthenticWeaponHud = toBoolean(data.gta6AuthenticWeaponHud, false)
     data.gta6ShowWeaponName = toBoolean(data.gta6ShowWeaponName, true)
     data.gta6VehicleIdentification = toBoolean(data.gta6VehicleIdentification, true)
+    data.customWeaponWheel = toBoolean(data.customWeaponWheel, customWeaponWheelDefault())
+    data.customRadioUi = toBoolean(data.customRadioUi, customRadioUiDefault())
+    data.locationDisplayStyle = normalizeLocationDisplayStyle(data.locationDisplayStyle)
 
     local speedometerPosX = tonumber(data.speedometerPosX) or 0
     local speedometerPosY = tonumber(data.speedometerPosY) or 0
@@ -1155,6 +1237,28 @@ function Settings.get()
     data.resolvedAmmoPositionPreset = presentation.resolvedAmmoPositionPreset
 
     return data
+end
+
+function Settings.initialize()
+    if initialized then
+        return true
+    end
+
+    local callOk, registered, registerError = pcall(function()
+        return exports['cortex-lib']:registerSettingsScript('cortex-hud', getSettingsDefinition())
+    end)
+
+    if not callOk then
+        return false, tostring(registered)
+    end
+
+    if registered ~= true then
+        return false, tostring(registerError or 'registration_rejected')
+    end
+
+    initialized = true
+    Settings.apply(Settings.get(), { refreshMinimap = false })
+    return true
 end
 
 function Settings.isCinematicMode()
@@ -1348,11 +1452,6 @@ RegisterNUICallback('ammo:endEdit', function(data, cb)
     end
 
     cb('ok')
-end)
-
-CreateThread(function()
-    Wait(2000)
-    Settings.apply(Settings.get())
 end)
 
 return Settings

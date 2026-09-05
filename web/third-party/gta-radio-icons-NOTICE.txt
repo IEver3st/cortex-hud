@@ -1,0 +1,46 @@
+GTA V radio station icon notice
+================================
+
+The radio station names, logos, branding, and game artwork in
+web/public/radio-icons are owned by Rockstar Games, Take-Two Interactive,
+and/or their respective rights holders. They are included for identification
+inside a Grand Theft Auto V / FiveM modification. cortex-hud is not affiliated
+with or endorsed by Rockstar Games or Take-Two Interactive.
+
+Primary collection source:
+  GTA-V-Radio by Thomas (jtaomas)
+  https://github.com/jtaomas/GTA-V-Radio
+  Pinned commit: 1262633a78e33b28ae796d04ff9fc4d669427530
+  Project code/license: MIT, Copyright (c) 2025 thomas
+
+Additional original-resolution files:
+  Self Radio logo
+  https://gta.fandom.com/wiki/File:SelfRadio-GTAV-Logo.svg
+
+  Media Player HUD icon
+  https://gta.fandom.com/wiki/File:MediaPlayer-GTAO-HUDIcon.png
+
+The upstream MIT license applies to the GTA-V-Radio project source and does
+not transfer ownership of Rockstar/Take-Two trademarks or game artwork.
+
+MIT License
+
+Copyright (c) 2025 thomas
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

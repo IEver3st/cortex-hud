@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getDefaultOpenSettingsPayload } from '../hudDevApply.js'
+import { LOCATION_DISPLAY_OPTIONS } from '../locationDisplayStyle.js'
 import {
   applyHudDevScenario,
   createDevVehicleIdentity,
@@ -114,6 +115,9 @@ const HudDevPanel = ({
   hudData,
   setHudData,
   onOpenSettingsModal,
+  onPreviewHitmarker,
+  weaponWheelVisible,
+  onToggleWeaponWheelPreview,
   onToggleCinematic,
   cinematicMode,
   playfieldColor,
@@ -240,9 +244,11 @@ const HudDevPanel = ({
       patch({
         isArmed: false,
         weaponType: 'none',
+        weaponReticleType: 'none',
         weaponIcon: null,
         weaponName: '',
         weaponUsesCharge: false,
+        weaponAiming: false,
         ammoClip: -1,
         ammoReserve: -1,
       })
@@ -252,9 +258,11 @@ const HudDevPanel = ({
       patch({
         isArmed: true,
         weaponType: 'melee',
+        weaponReticleType: 'none',
         weaponIcon: 'weapon_knife',
         weaponName: 'Knife',
         weaponUsesCharge: false,
+        weaponAiming: false,
         ammoClip: -1,
         ammoReserve: -1,
       })
@@ -264,11 +272,13 @@ const HudDevPanel = ({
       patch({
         isArmed: true,
         weaponType: 'firearm',
+        weaponReticleType: 'single',
         weaponIcon: 'weapon_raypistol',
         weaponName: 'Up-n-Atomizer',
         weaponUsesCharge: true,
         weaponChargeReady: false,
         weaponChargeProgress: 48,
+        weaponAiming: false,
         ammoClip: -1,
         ammoReserve: -1,
       })
@@ -276,10 +286,13 @@ const HudDevPanel = ({
     }
     patch({
       isArmed: true,
-      weaponType: 'firearm',
+      weaponType: 'rifle',
+      weaponReticleType: 'automatic',
       weaponIcon: 'weapon_carbinerifle',
       weaponName: 'Carbine Rifle',
       weaponUsesCharge: false,
+      weaponBloom: Number.isFinite(Number(hudData.weaponBloom)) ? hudData.weaponBloom : 0,
+      weaponAiming: Boolean(hudData.weaponAiming),
       ammoClip: hudData.ammoClip >= 0 ? hudData.ammoClip : 24,
       ammoReserve: hudData.ammoReserve >= 0 ? hudData.ammoReserve : 120,
     })
@@ -317,7 +330,7 @@ const HudDevPanel = ({
         </div>
         {open && (
           <div className="hud-dev-runtime" role="status" aria-live="polite">
-            <span>{hudData.gta6HudEnabled ? 'GTA 6' : 'CLASSIC'}</span>
+            <span>{hudData.gta6HudEnabled ? 'LEONIDA' : 'CLASSIC'}</span>
             <span>{currentContext}</span>
           </div>
         )}
@@ -413,11 +426,11 @@ const HudDevPanel = ({
               <>
                 <Section
                   eyebrow="Current feature set"
-                  title="GTA 6 presentation"
+                  title="Leonida presentation"
                   description="Drive the navigation, contextual vitals, weapon lockup, and vehicle introduction modes."
                 >
-                  <ToggleControl id="huddev-gta6" label="GTA 6 HUD" checked={hudData.gta6HudEnabled} onChange={(value) => patch({ gta6HudEnabled: value })} />
-                  <ToggleControl id="huddev-gta6-auth" label="Authentic weapon HUD" description="Compact ammo-over-weapon layout and minimal reticle." checked={hudData.gta6AuthenticWeaponHud} onChange={(value) => patch({ gta6AuthenticWeaponHud: value })} disabled={!hudData.gta6HudEnabled} />
+                  <ToggleControl id="huddev-gta6" label="Leonida UI" checked={hudData.gta6HudEnabled} onChange={(value) => patch({ gta6HudEnabled: value })} />
+                  <ToggleControl id="huddev-gta6-auth" label="Compact weapon HUD" description="Compact ammo-over-weapon layout and minimal reticle." checked={hudData.gta6AuthenticWeaponHud} onChange={(value) => patch({ gta6AuthenticWeaponHud: value })} disabled={!hudData.gta6HudEnabled} />
                   <ToggleControl id="huddev-gta6-name" label="Weapon name" checked={hudData.gta6ShowWeaponName} onChange={(value) => patch({ gta6ShowWeaponName: value })} disabled={!hudData.gta6HudEnabled || hudData.gta6AuthenticWeaponHud} />
                   <ToggleControl id="huddev-gta6-vehicle-id" label="Vehicle introduction" checked={hudData.gta6VehicleIdentification} onChange={(value) => patch({ gta6VehicleIdentification: value })} disabled={!hudData.gta6HudEnabled} />
                 </Section>
@@ -432,12 +445,25 @@ const HudDevPanel = ({
                     <RangeControl id="huddev-stress" label="Stress" value={hudData.stress} onChange={(value) => patch({ stress: value })} />
                     <RangeControl id="huddev-oxygen" label="Oxygen" value={hudData.oxygen} onChange={(value) => patch({ oxygen: value })} />
                   </div>
-                  <ToggleControl id="huddev-damaged" label="Recently damaged" description="Keeps the GTA 6 health bar visible." checked={hudData.healthRecentlyDamaged} onChange={(value) => patch({ healthRecentlyDamaged: value })} />
+                  <ToggleControl id="huddev-damaged" label="Recently damaged" description="Keeps the Leonida health bar visible." checked={hudData.healthRecentlyDamaged} onChange={(value) => patch({ healthRecentlyDamaged: value })} />
                   <ToggleControl id="huddev-stamina-regen" label="Stamina regenerating" checked={hudData.staminaRegenerating} onChange={(value) => patch({ staminaRegenerating: value })} />
                   <ToggleControl id="huddev-water" label="Underwater" description="Switches the contextual stamina meter to oxygen." checked={hudData.underwater} onChange={(value) => patch({ underwater: value, inWater: value })} />
                 </Section>
 
                 <Section eyebrow="Combat" title="Weapon and scope">
+                  <ToggleControl
+                    id="huddev-custom-weapon-wheel"
+                    label="Custom weapon wheel setting"
+                    checked={hudData.customWeaponWheel}
+                    onChange={(value) => patch({ customWeaponWheel: value })}
+                  />
+                  <ToggleControl
+                    id="huddev-weapon-wheel-preview"
+                    label="Weapon wheel preview"
+                    description="Preview the eight-station layout without FiveM input."
+                    checked={weaponWheelVisible}
+                    onChange={onToggleWeaponWheelPreview}
+                  />
                   <SelectControl
                     id="huddev-weapon-mode"
                     label="Weapon state"
@@ -451,11 +477,49 @@ const HudDevPanel = ({
                     ]}
                   />
                   <TextControl id="huddev-weapon-name" label="Weapon name" value={hudData.weaponName} onChange={(value) => patch({ weaponName: value })} disabled={!hudData.isArmed} />
+                  {hudData.isArmed && hudData.weaponType !== 'melee' && (
+                    <SelectControl
+                      id="huddev-reticle-type"
+                      label="Reticle profile"
+                      value={hudData.weaponReticleType}
+                      onChange={(value) => patch({ weaponReticleType: value })}
+                      options={[
+                        { value: 'none', label: 'None' },
+                        { value: 'automatic', label: 'Automatic (ring)' },
+                        { value: 'single', label: 'Semi-auto (three-line)' },
+                        { value: 'shotgun', label: 'Shotgun (wide ring)' },
+                        { value: 'tazer', label: 'Tazer (hitmarker X)' },
+                        { value: 'rpg', label: 'RPG (thin ring)' },
+                        { value: 'homing', label: 'Homing (vanilla lock-on)' },
+                      ]}
+                    />
+                  )}
                   {hudData.isArmed && hudData.weaponType !== 'melee' && !hudData.weaponUsesCharge && (
-                    <div className="hud-dev-metric-grid">
-                      <RangeControl id="huddev-clip" label="Clip" value={Math.max(0, hudData.ammoClip)} min={0} max={100} onChange={(value) => patch({ ammoClip: value, isArmed: true })} />
-                      <RangeControl id="huddev-reserve" label="Reserve" value={Math.max(0, hudData.ammoReserve)} min={0} max={300} onChange={(value) => patch({ ammoReserve: value, isArmed: true })} />
-                    </div>
+                    <>
+                      <div className="hud-dev-metric-grid">
+                        <RangeControl id="huddev-clip" label="Clip" value={Math.max(0, hudData.ammoClip)} min={0} max={100} onChange={(value) => patch({ ammoClip: value, isArmed: true })} />
+                        <RangeControl id="huddev-reserve" label="Reserve" value={Math.max(0, hudData.ammoReserve)} min={0} max={300} onChange={(value) => patch({ ammoReserve: value, isArmed: true })} />
+                        {hudData.weaponReticleType !== 'none' && (
+                          <>
+                            <RangeControl id="huddev-bloom" label="Bloom" value={hudData.weaponBloom} onChange={(value) => patch({ weaponBloom: value })} format={(value) => `${Math.round(value)}%`} />
+                            <ToggleControl id="huddev-ads" label="Aim down sights" checked={Boolean(hudData.weaponAiming)} onChange={(value) => patch({ weaponAiming: value })} />
+                          </>
+                        )}
+                      </div>
+                      <div className="hud-dev-hitmarker-row" aria-label="Preview hitmarkers">
+                        <span>Hitmarker</span>
+                        {[
+                          ['regular', 'Regular'],
+                          ['knockout', 'Knockout'],
+                          ['critical', 'Critical'],
+                          ['vehicle', 'Vehicle'],
+                        ].map(([kind, label]) => (
+                          <button key={kind} type="button" onClick={() => onPreviewHitmarker?.(kind)}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
                   {hudData.weaponUsesCharge && (
                     <>
@@ -463,7 +527,7 @@ const HudDevPanel = ({
                       <ToggleControl id="huddev-charge-ready" label="Charge ready" checked={hudData.weaponChargeReady} onChange={(value) => patch({ weaponChargeReady: value, weaponChargeProgress: value ? 100 : hudData.weaponChargeProgress })} />
                     </>
                   )}
-                  <ToggleControl id="huddev-crosshair" label="Classic crosshair" description="GTA 6 authentic mode supplies its own reticle." checked={hudData.showCrosshair} onChange={(value) => patch({ showCrosshair: value })} />
+                  <ToggleControl id="huddev-crosshair" label="Classic crosshair" description="Leonida compact mode supplies its own reticle." checked={hudData.showCrosshair} onChange={(value) => patch({ showCrosshair: value })} />
                   <ToggleControl id="huddev-scope" label="Sniper scope" checked={hudData.sniperScopeVisible} onChange={(value) => mutate((previous) => ({ ...previous, sniperScopeVisible: value, isArmed: value || previous.isArmed, vehicleVisible: value ? false : previous.vehicleVisible, aircraftVisible: value ? false : previous.aircraftVisible, forceAircraftHud: value ? false : previous.forceAircraftHud }))} />
                   {hudData.sniperScopeVisible && (
                     <div className="hud-dev-metric-grid">
@@ -492,10 +556,10 @@ const HudDevPanel = ({
               <>
                 <Section eyebrow="Ground vehicle" title="Driving state">
                   <ToggleControl id="huddev-vehicle" label="Vehicle occupied" checked={hudData.vehicleVisible} onChange={toggleVehicle} />
-                  <ToggleControl id="huddev-disable-speedo" label="Disable speedometer" description={hudData.gta6HudEnabled ? 'GTA 6 mode suppresses it automatically.' : undefined} checked={hudData.disableSpeedometer || hudData.gta6HudEnabled} onChange={(value) => patch({ disableSpeedometer: value })} disabled={hudData.gta6HudEnabled} />
+                  <ToggleControl id="huddev-disable-speedo" label="Disable speedometer" description={hudData.gta6HudEnabled ? 'Leonida UI hides it automatically.' : undefined} checked={hudData.disableSpeedometer || hudData.gta6HudEnabled} onChange={(value) => patch({ disableSpeedometer: value })} disabled={hudData.gta6HudEnabled} />
                   <button type="button" className="hud-dev-action" onClick={replayVehicleIntro}>
-                    <span>Replay GTA 6 vehicle intro</span>
-                    <small>Enables GTA 6 mode and creates a fresh entry event.</small>
+                    <span>Replay Leonida vehicle intro</span>
+                    <small>Enables Leonida UI and creates a fresh entry event.</small>
                   </button>
                   <div className="hud-dev-field-pair">
                     <TextControl id="huddev-vehicle-brand" label="Brand" value={hudData.vehicleIdentity?.brand || 'Vapid'} onChange={(value) => mutate((previous) => ({ ...previous, vehicleIdentity: previous.vehicleIdentity ? { ...previous.vehicleIdentity, brand: value } : previous.vehicleIdentity }))} disabled={!hudData.vehicleIdentity} />
@@ -545,6 +609,13 @@ const HudDevPanel = ({
             {activeTab === 'world' && (
               <>
                 <Section eyebrow="Location" title="Navigation context">
+                  <SelectControl
+                    id="huddev-location-style"
+                    label="Display style"
+                    value={hudData.locationDisplayStyle || 'current'}
+                    onChange={(value) => patch({ locationDisplayStyle: value })}
+                    options={LOCATION_DISPLAY_OPTIONS}
+                  />
                   <div className="hud-dev-field-pair">
                     <TextControl id="huddev-street" label="Street" value={hudData.street} onChange={(value) => patch({ street: value })} placeholder="Street" />
                     <TextControl id="huddev-zone" label="Zone" value={hudData.zone} onChange={(value) => patch({ zone: value })} placeholder="Zone" />

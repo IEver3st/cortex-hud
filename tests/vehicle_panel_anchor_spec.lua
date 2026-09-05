@@ -4,6 +4,13 @@ local published = nil
 local threads = {}
 
 lib = {
+    require = function(path)
+        assert(path == 'modules.interactions.vehicle_pool')
+        return {
+            get = function() return GetGamePool('CVehicle') end,
+            getCoords = function(vehicle) return GetEntityCoords(vehicle) end,
+        }
+    end,
     showInteraction = function(interaction)
         published = interaction
         return true
@@ -53,6 +60,9 @@ function GetGamePool(pool)
 end
 function GetEntityType(entity)
     return entity == 501 and 2 or 1
+end
+function IsVehicleDriveable()
+    return true
 end
 function GetIsDoorValid(entity, door)
     return entity == 501 and door == activeDoor

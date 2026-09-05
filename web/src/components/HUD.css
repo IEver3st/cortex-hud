@@ -1,16 +1,29 @@
+@font-face {
+  font-family: 'Pricedown Local';
+  src:
+    local('Pricedown Black'),
+    local('Pricedown Bl'),
+    local('Pricedown');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
 :root {
   --hud-color: #ffffff;
   --hud-glow: rgba(255, 255, 255, 0.4);
   --hud-dim: rgba(200, 200, 200, 0.8);
   --font-hud: 'Share Tech Mono', 'Courier New', monospace;
+  --font-ammo: 'Pricedown Local', 'Pricedown Black', 'Pricedown Bl', 'Pricedown', 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
   --es-success: #10b981;
   --es-error: #ff4444;
   --es-warning: #ffaa00;
   --es-ui-scale: 1;
   --es-backdrop-blur: 1;
   --es-backdrop-norm: 0.2727;
-  --es-panel-opacity: 1;
-  --es-glass-fill-alpha: 0.35;
+  --es-glass-fill-alpha: 0.42;
+  --es-glass-blur: calc(12px * var(--es-ui-scale) * var(--es-backdrop-blur));
+  --es-glass-filter: blur(var(--es-glass-blur)) saturate(1.12);
   --es-radius: calc(2px * var(--es-ui-scale));
   --es-border: rgba(255, 255, 255, 0.15);
   --health-color: #10b981;
@@ -54,7 +67,7 @@
   pointer-events: none;
 }
 
-/* GTA 6-inspired compact corner HUD. Kept CEF-safe: no backdrop-filter. */
+/* Leonida-inspired compact corner HUD. */
 .gta6-vitals {
   position: fixed;
   top: calc(28px * var(--es-ui-scale));
@@ -125,6 +138,10 @@
   color: #d9f2ee;
 }
 
+.gta6-vital-badge--oxygen {
+  color: #78d5c3;
+}
+
 .gta6-vital-o2 {
   display: inline-flex;
   align-items: baseline;
@@ -160,16 +177,14 @@
 
 .gta6-vital-track::after {
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 50%;
   z-index: 2;
+  width: calc(1px * var(--es-ui-scale));
   content: '';
-  background: linear-gradient(
-    90deg,
-    transparent 49.65%,
-    rgba(27, 24, 29, 0.55) 49.65%,
-    rgba(27, 24, 29, 0.55) 50.35%,
-    transparent 50.35%
-  );
+  background: rgba(27, 24, 29, 0.55);
+  transform: translateX(-50%);
   pointer-events: none;
 }
 
@@ -202,8 +217,31 @@
   width: 60%;
 }
 
-.gta6-vital--stamina .gta6-vital-track::after {
+.gta6-vital--stamina .gta6-vital-track::after,
+.gta6-vital--oxygen .gta6-vital-track::after {
   content: none;
+}
+
+.gta6-vital--oxygen {
+  grid-template-columns: calc(27px * var(--es-ui-scale)) auto;
+  width: max-content;
+}
+
+.gta6-vital--oxygen .gta6-vital-track {
+  width: calc(92px * var(--es-ui-scale));
+  transition: width 0.24s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.gta6-vital--oxygen.has-extended-oxygen .gta6-vital-track {
+  width: calc(220px * var(--es-ui-scale));
+}
+
+.gta6-vital--oxygen .gta6-vital-fill {
+  background: #78d5c3;
+}
+
+.gta6-vital--oxygen.is-draining .gta6-vital-o2 {
+  animation: gta6-oxygen-drain-flash 0.42s ease-in-out;
 }
 
 .gta6-vital--stamina.is-regenerating .gta6-vital-fill {
@@ -367,10 +405,12 @@
 .gta6-authentic-ammo-value {
   display: inline-flex;
   align-items: center;
-  font-family: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
+  font-family: var(--font-ammo);
+  font-weight: 400;
   font-synthesis: none;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  text-transform: uppercase;
 }
 
 .gta6-ammo-clip,
@@ -378,9 +418,10 @@
   min-width: calc(38.25px * var(--es-ui-scale));
   color: rgba(244, 241, 243, 0.98);
   font-size: calc(34px * var(--es-ui-scale));
-  font-weight: 800;
-  letter-spacing: calc(-0.935px * var(--es-ui-scale));
+  font-weight: 400;
+  letter-spacing: calc(0.5px * var(--es-ui-scale));
   text-shadow: 0 calc(1.7px * var(--es-ui-scale)) calc(2.55px * var(--es-ui-scale)) rgba(0, 0, 0, 0.82);
+  -webkit-text-stroke: calc(0.4px * var(--es-ui-scale)) rgba(0, 0, 0, 0.6);
 }
 
 .gta6-ammo-separator {
@@ -395,9 +436,10 @@
 .gta6-authentic-ammo-value--reserve {
   color: rgba(207, 204, 208, 0.42);
   font-size: calc(22.95px * var(--es-ui-scale));
-  font-weight: 800;
-  letter-spacing: calc(-0.4675px * var(--es-ui-scale));
+  font-weight: 400;
+  letter-spacing: calc(0.4px * var(--es-ui-scale));
   text-shadow: 0 calc(1.7px * var(--es-ui-scale)) calc(2.55px * var(--es-ui-scale)) rgba(0, 0, 0, 0.76);
+  -webkit-text-stroke: calc(0.35px * var(--es-ui-scale)) rgba(0, 0, 0, 0.55);
 }
 
 .gta6-ammo-clip .sliding-digit,
@@ -407,7 +449,7 @@
 
 .gta6-ammo-reserve .sliding-digit,
 .gta6-authentic-ammo-value--reserve .sliding-digit {
-  width: 0.49em;
+  width: 0.53em;
 }
 
 .gta6-weapon.ammo-low .gta6-ammo-clip {
@@ -442,7 +484,7 @@
   0% {
     color: rgba(244, 241, 243, 0.38);
     opacity: 0.45;
-    letter-spacing: calc(0.85px * var(--es-ui-scale));
+    letter-spacing: calc(2px * var(--es-ui-scale));
     transform: translate3d(0, calc(4.25px * var(--es-ui-scale)), 0);
   }
   52% {
@@ -453,7 +495,7 @@
   100% {
     color: rgba(244, 241, 243, 0.98);
     opacity: 1;
-    letter-spacing: calc(-0.935px * var(--es-ui-scale));
+    letter-spacing: calc(0.5px * var(--es-ui-scale));
     transform: translate3d(0, 0, 0);
   }
 }
@@ -482,14 +524,28 @@
   }
 }
 
+@keyframes gta6-oxygen-drain-flash {
+  0%, 55% {
+    color: #ff434d;
+  }
+  100% {
+    color: #78d5c3;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gta6-vital-badge--heart svg,
   .gta6-vital--stamina.is-regenerating .gta6-vital-fill,
+  .gta6-vital--oxygen.is-draining .gta6-vital-o2,
   .gta6-weapon.ammo-low .gta6-ammo-clip,
   .gta6-weapon.ammo-empty .gta6-ammo-clip,
   .gta6-weapon.ammo-reload .gta6-ammo-clip,
   .gta6-weapon.ammo-reload .gta6-ammo-separator {
     animation: none;
+  }
+
+  .gta6-vital--oxygen.is-draining .gta6-vital-o2 {
+    color: #ff434d;
   }
 
   .gta6-weapon .sliding-digit-strip {
@@ -507,8 +563,8 @@
   border-radius: calc(999px * var(--es-ui-scale));
   z-index: 1001;
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  backdrop-filter: var(--es-glass-filter);
+  -webkit-backdrop-filter: var(--es-glass-filter);
   opacity: 0;
   transform: translate3d(0, calc(8px * var(--es-ui-scale)), 0) scale(0.96);
   transition:
@@ -529,11 +585,11 @@
 
 .gta6-weapon.gta6-weapon--authentic {
   top: calc(31px * var(--es-ui-scale));
-  right: calc(31px * var(--es-ui-scale));
+  right: calc(24px * var(--es-ui-scale));
   display: flex;
   flex-direction: column;
-  gap: calc(4px * var(--es-ui-scale));
-  width: calc(98.6px * var(--es-ui-scale));
+  gap: calc(8px * var(--es-ui-scale));
+  width: calc(164px * var(--es-ui-scale));
   min-height: 0;
   color: rgba(206, 207, 209, 0.92);
   transform: translate3d(calc(5px * var(--es-ui-scale)), 0, 0);
@@ -548,30 +604,40 @@
 }
 
 .gta6-authentic-ammo {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
   align-items: baseline;
-  justify-content: space-between;
-  width: calc(90px * var(--es-ui-scale));
-  margin-inline: auto;
+  justify-content: end;
+  column-gap: calc(18px * var(--es-ui-scale));
+  width: 100%;
 }
 
-.gta6-authentic-ammo-value {
+.gta6-authentic-ammo .gta6-authentic-ammo-value {
   justify-content: center;
+  min-width: 0;
+  font-family: 'Pricedown Local', 'Pricedown Black', 'Pricedown Bl', 'Pricedown', 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
+  font-size: calc(23.8px * var(--es-ui-scale));
+  font-weight: 400;
+  letter-spacing: calc(0.5px * var(--es-ui-scale));
 }
 
 .gta6-authentic-ammo-value--reserve {
   color: rgba(166, 168, 172, 0.72);
-  transform: translateX(calc(6px * var(--es-ui-scale)));
+}
+
+.gta6-weapon.gta6-weapon--authentic .sliding-digit {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .gta6-weapon.gta6-weapon--authentic .gta6-weapon-art {
-  width: calc(72px * var(--es-ui-scale));
-  height: calc(39px * var(--es-ui-scale));
-  margin-inline: auto;
+  width: calc(106.5px * var(--es-ui-scale));
+  height: calc(37.5px * var(--es-ui-scale));
+  margin-left: auto;
 }
 
 .gta6-weapon.gta6-weapon--authentic .gta6-weapon-art img {
-  opacity: 0.72;
+  opacity: 0.82;
   filter:
     drop-shadow(calc(1px * var(--es-ui-scale)) 0 0 rgba(0, 0, 0, 0.78))
     drop-shadow(calc(-1px * var(--es-ui-scale)) 0 0 rgba(0, 0, 0, 0.78))
@@ -871,6 +937,8 @@
   border-radius: calc(3px * var(--es-ui-scale));
   overflow: hidden;
   border: 1px solid var(--es-glass-border);
+  backdrop-filter: var(--es-glass-filter);
+  -webkit-backdrop-filter: var(--es-glass-filter);
   transform: skewX(-12deg);
 }
 
@@ -1057,8 +1125,8 @@
   border: 1px solid rgba(255, 255, 255, calc(0.22 + var(--es-backdrop-norm, 0.27) * 0.28));
   border-radius: calc(14px * var(--es-ui-scale));
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  backdrop-filter: var(--es-glass-filter);
+  -webkit-backdrop-filter: var(--es-glass-filter);
 }
 
 .voip-content-modern {
@@ -1094,88 +1162,63 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: calc(3px * var(--es-ui-scale));
-  width: calc(40px * var(--es-ui-scale));
-  height: calc(24px * var(--es-ui-scale));
-  --voip-talk-y: 1.085;
-  --voip-talk-dur: 1.02s;
-  --voip-stagger: 0.052s;
-  --voip-talk-stagger: 0.036s;
-}
-
-.voip-viz-0 {
-  --voip-talk-dur: 1.08s;
-}
-
-.voip-viz-1 {
-  --voip-talk-y: 1.095;
-  --voip-talk-dur: 0.9s;
-  --voip-stagger: 0.06s;
-}
-
-.voip-viz-2 {
-  --voip-talk-y: 1.078;
-  --voip-talk-dur: 0.86s;
-  --voip-stagger: 0.044s;
-}
-
-.voip-viz-3 {
-  --voip-talk-y: 1.1;
-  --voip-talk-dur: 1.14s;
-  --voip-stagger: 0.05s;
-  --voip-talk-stagger: 0.042s;
+  gap: calc(2.2px * var(--es-ui-scale));
+  width: calc(42px * var(--es-ui-scale));
+  height: calc(26px * var(--es-ui-scale));
 }
 
 .voip-waveform-bar {
-  width: calc(3.5px * var(--es-ui-scale));
+  width: calc(2.7px * var(--es-ui-scale));
   flex-shrink: 0;
   align-self: center;
   height: var(--base-height);
-  border-radius: calc(1.75px * var(--es-ui-scale));
-  transform-origin: center bottom;
-  opacity: 0.82;
-  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: calc(1.35px * var(--es-ui-scale));
+  opacity: 0.78;
+  transform: translate3d(0, calc(var(--bar-shift) * var(--es-ui-scale)), 0) scaleY(0.92);
+  transform-origin: center;
+  transition:
+    background-color 0.22s cubic-bezier(0.2, 0, 0, 1),
+    opacity 0.18s ease,
+    transform 0.18s ease-out;
 }
 
 .voip-mode-talk .voip-waveform-bar {
-  animation: voip-talk-pulse var(--voip-talk-dur) cubic-bezier(0.4, 0, 0.25, 1) infinite;
-  animation-delay: calc(var(--bar-index) * var(--voip-talk-stagger));
+  animation: voip-signal var(--bar-duration) cubic-bezier(0.42, 0, 0.24, 1) var(--bar-delay) infinite;
+  opacity: 0.96;
   will-change: transform, opacity;
 }
 
-.voip-viz-1.voip-mode-talk .voip-waveform-bar {
-  animation-name: voip-talk-skip;
-  animation-timing-function: ease-in-out;
-}
+@keyframes voip-signal {
+  0% {
+    transform: translate3d(0, calc(var(--bar-shift) * var(--es-ui-scale)), 0) scaleY(var(--bar-rest));
+    opacity: 0.82;
+  }
 
-.voip-viz-3.voip-mode-talk .voip-waveform-bar:nth-child(odd) {
-  animation-duration: calc(var(--voip-talk-dur) * 1.05);
-}
-
-@keyframes voip-talk-pulse {
-  0%, 100% {
-    transform: scaleY(0.98);
+  27% {
+    transform: translate3d(0, calc(var(--bar-shift) * var(--es-ui-scale)), 0) scaleY(var(--bar-peak));
     opacity: 1;
   }
 
-  50% {
-    transform: scaleY(var(--voip-talk-y));
-    opacity: 0.96;
+  56% {
+    transform: translate3d(0, calc(var(--bar-shift) * var(--es-ui-scale)), 0) scaleY(var(--bar-mid));
+    opacity: 0.88;
+  }
+
+  78% {
+    transform: translate3d(0, calc(var(--bar-shift) * var(--es-ui-scale)), 0) scaleY(var(--bar-tail));
+    opacity: 0.97;
+  }
+
+  100% {
+    transform: translate3d(0, calc(var(--bar-shift) * var(--es-ui-scale)), 0) scaleY(var(--bar-rest));
+    opacity: 0.82;
   }
 }
 
-@keyframes voip-talk-skip {
-  0%, 100% {
-    transform: scaleY(0.99);
-    opacity: 1;
-  }
-
-  32% {
-    transform: scaleY(var(--voip-talk-y));
-  }
-
-  58% {
-    transform: scaleY(1.02);
+@media (prefers-reduced-motion: reduce) {
+  .voip-mode-talk .voip-waveform-bar {
+    animation: none;
+    transform: translate3d(0, calc(var(--bar-shift) * var(--es-ui-scale)), 0) scaleY(1);
   }
 }
 
@@ -1304,8 +1347,8 @@
   border: 1px solid rgba(255, 255, 255, calc(0.22 + var(--es-backdrop-norm, 0.27) * 0.28));
   overflow: hidden;
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  backdrop-filter: var(--es-glass-filter);
+  -webkit-backdrop-filter: var(--es-glass-filter);
 }
 
 .status-icon-fill {
@@ -2002,8 +2045,8 @@
   border: 1px solid rgba(255, 255, 255, calc(0.22 + var(--es-backdrop-norm, 0.27) * 0.28));
   border-radius: calc(999px * var(--es-ui-scale));
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  backdrop-filter: var(--es-glass-filter);
+  -webkit-backdrop-filter: var(--es-glass-filter);
 }
 
 .ammo-icon-box {
@@ -2035,19 +2078,28 @@
 }
 
 .ammo-clip {
-  font-size: calc(28px * var(--es-ui-scale));
-  font-weight: 500;
-  font-family: 'Share Tech Mono', monospace;
+  font-size: calc(30px * var(--es-ui-scale));
+  font-weight: 400;
+  font-family: var(--font-ammo);
+  font-synthesis: none;
   line-height: 1;
-  letter-spacing: -0.01em;
+  letter-spacing: calc(0.5px * var(--es-ui-scale));
+  text-transform: uppercase;
+  text-shadow: 0 calc(1.7px * var(--es-ui-scale)) calc(2.55px * var(--es-ui-scale)) rgba(0, 0, 0, 0.82);
+  -webkit-text-stroke: calc(0.4px * var(--es-ui-scale)) rgba(0, 0, 0, 0.6);
 }
 
 .ammo-reserve {
   color: var(--hud-muted-text);
-  font-size: calc(18px * var(--es-ui-scale));
-  font-weight: 600;
-  font-family: 'Share Tech Mono', monospace;
+  font-size: calc(19px * var(--es-ui-scale));
+  font-weight: 400;
+  font-family: var(--font-ammo);
+  font-synthesis: none;
   line-height: 1;
+  letter-spacing: calc(0.4px * var(--es-ui-scale));
+  text-transform: uppercase;
+  text-shadow: 0 calc(1.7px * var(--es-ui-scale)) calc(2.55px * var(--es-ui-scale)) rgba(0, 0, 0, 0.76);
+  -webkit-text-stroke: calc(0.35px * var(--es-ui-scale)) rgba(0, 0, 0, 0.55);
 }
 
 /* Gas-pump / odometer sliding digits */

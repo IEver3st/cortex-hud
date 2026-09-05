@@ -1,4 +1,5 @@
 import { HUD_LAYOUT_PRESETS } from './hudPresets.js'
+import { normalizeLocationDisplayStyle } from './locationDisplayStyle.js'
 
 const COLOR_KEYS = [
   ['colorHealth', 'health'],
@@ -66,7 +67,6 @@ export function applyDevSettingsSave(saved, prev) {
     speedometerAccent: colorPreset.theme.speedometerAccent,
     voipAccent: colorPreset.theme.voipAccent,
     backdropBlur: Number.isFinite(Number(saved.backdropBlur)) ? saved.backdropBlur : prev.theme?.backdropBlur ?? 1,
-    panelOpacity: Number.isFinite(Number(saved.panelOpacity)) ? saved.panelOpacity : prev.theme?.panelOpacity ?? 1,
   }
 
   return {
@@ -95,6 +95,8 @@ export function applyDevSettingsSave(saved, prev) {
     gta6VehicleIdentification: Object.prototype.hasOwnProperty.call(saved, 'gta6VehicleIdentification')
       ? saved.gta6VehicleIdentification !== false
       : prev.gta6VehicleIdentification,
+    customWeaponWheel: Boolean(saved.customWeaponWheel),
+    locationDisplayStyle: normalizeLocationDisplayStyle(saved.locationDisplayStyle),
     showDynamicWeather: Boolean(saved.showDynamicWeather),
     showHurricaneWarning: Object.prototype.hasOwnProperty.call(saved, 'showHurricaneWarning')
       ? Boolean(saved.showHurricaneWarning)
@@ -134,6 +136,8 @@ export function getDefaultOpenSettingsPayload(hudData = {}) {
     gta6AuthenticWeaponHud: hudData.gta6AuthenticWeaponHud === true,
     gta6ShowWeaponName: hudData.gta6ShowWeaponName !== false,
     gta6VehicleIdentification: hudData.gta6VehicleIdentification !== false,
+    customWeaponWheel: hudData.customWeaponWheel === true,
+    locationDisplayStyle: normalizeLocationDisplayStyle(hudData.locationDisplayStyle),
     showDynamicWeather: hudData.showDynamicWeather === true,
     showHurricaneWarning: hudData.showHurricaneWarning !== false,
     sectionedBars: hudData.sectionedBars === true,
@@ -141,6 +145,5 @@ export function getDefaultOpenSettingsPayload(hudData = {}) {
     statusIconShape: hudData.resolvedStatusIconShape || hudData.statusIconShape || 'bar',
     oxygenDisplayLocation: hudData.oxygenDisplayLocation || 'statusCluster',
     backdropBlur: theme.backdropBlur ?? 1,
-    panelOpacity: theme.panelOpacity ?? 1,
   }
 }

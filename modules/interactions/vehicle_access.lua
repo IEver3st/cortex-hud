@@ -1,4 +1,5 @@
 local VehicleAccessInteractions = {}
+local VehiclePool = lib.require('modules.interactions.vehicle_pool')
 
 -- Progress lives in cortex-lib's notify module, so load that module before
 -- capturing the progress helper.
@@ -28,6 +29,17 @@ local activeCloneNetworkId = nil
 local activeCloneQte = nil
 local clonePresentation = nil
 local clonedNetworkIds = {}
+local activeHold = nil
+
+local function cancelActionHold(id)
+    local hold = activeHold
+    if not hold or (id and hold.id ~= id) then return end
+
+    activeHold = nil
+    if type(lib.cancelInteractionHold) == 'function' then
+        lib.cancelInteractionHold(hold.id)
+    end
+end
 
 local function distanceSquared(left, right)
     local x = left.x - right.x
@@ -51,12 +63,32 @@ local function isFeatureEnabled()
     return true
 end
 
+local function isEnteringVehicle(ped)
+    -- Keep locked-vehicle prompts hidden while the enter animation plays.
+    -- IsPedInAnyVehicle(ped, false) still reports false mid-entry, so check
+    -- the atGetIn variant plus the trying-to-enter native.
+    if IsPedInAnyVehicle(ped, true) then return true end
+
+    if type(IsPedGettingIntoAVehicle) == 'function' then
+        local ok, gettingIn = pcall(IsPedGettingIntoAVehicle, ped)
+        if ok and gettingIn then return true end
+    end
+
+    if type(GetVehiclePedIsTryingToEnter) == 'function' then
+        local ok, vehicle = pcall(GetVehiclePedIsTryingToEnter, ped)
+        if ok and type(vehicle) == 'number' and vehicle ~= 0 then return true end
+    end
+
+    return false
+end
+
 local function canPlayerInteract(ped)
     return ped ~= 0
         and DoesEntityExist(ped)
         and not IsEntityDead(ped)
         and not IsPedRagdoll(ped)
         and not IsPedInAnyVehicle(ped, false)
+        and not isEnteringVehicle(ped)
         and not IsPedUsingAnyScenario(ped)
 end
 
@@ -96,6 +128,7 @@ end
 
 local function isAccessPointUsable(vehicle, definition)
     if not DoesEntityExist(vehicle) or GetEntityType(vehicle) ~= 2 then return false end
+    if not IsVehicleDriveable(vehicle, true) then return false end
     if definition.rear and activeConfig.includeRearWindows == false then return false end
     if not GetIsDoorValid(vehicle, definition.door) then return false end
     if GetEntitySpeed(vehicle) > (tonumber(activeConfig.maxVehicleSpeed) or 1.0) then return false end
@@ -129,14 +162,14 @@ local function findNearestWindow(ped)
     local pedCoords = GetEntityCoords(ped)
     local scanRadius = tonumber(activeConfig.scanRadius) or 6.0
     local scanRadiusSquared = scanRadius * scanRadius
-    local vehicles = GetGamePool('CVehicle')
+    local vehicles = VehiclePool.get()
     local nearest = nil
     local previous = nil
 
     for vehicleIndex = 1, #vehicles do
         local vehicle = vehicles[vehicleIndex]
         if DoesEntityExist(vehicle)
-            and distanceSquared(pedCoords, GetEntityCoords(vehicle)) <= scanRadiusSquared
+            and distanceSquared(pedCoords, VehiclePool.getCoords(vehicle)) <= scanRadiusSquared
         then
             for windowIndex = 1, #windowDefinitions do
                 local candidate = buildCandidate(ped, pedCoords, vehicle, windowDefinitions[windowIndex])
@@ -167,6 +200,7 @@ local function clearPrompt(id)
 end
 
 local function hidePrompts()
+    cancelActionHold()
     selectedWindow = nil
     if published[SMASH_INTERACTION_ID] then clearPrompt(SMASH_INTERACTION_ID) end
     if published[CLONE_INTERACTION_ID] then clearPrompt(CLONE_INTERACTION_ID) end
@@ -187,6 +221,9 @@ local function publishAction(id, actionConfig, candidate, baseOffset)
         label = actionConfig.label,
         key = actionConfig.key,
         priority = actionConfig.priority,
+        holdDuration = tonumber(actionConfig.holdDuration)
+            or tonumber(activeConfig.holdDuration)
+            or 220,
         anchor = {
             type = 'entity-bone',
             entity = candidate.vehicle,
@@ -206,6 +243,12 @@ local function publishPrompts(candidate)
     if not candidate then
         if selectedWindow or next(published) then hidePrompts() end
         return
+    end
+
+    if activeHold
+        and (candidate.vehicle ~= activeHold.vehicle or candidate.window ~= activeHold.window)
+    then
+        cancelActionHold()
     end
 
     selectedWindow = candidate
@@ -269,6 +312,46 @@ local function networkIdFor(vehicle)
     return networkId
 end
 
+local function beginActionHold(id, requireIntact, action)
+    if activeHold or actionLocked or pendingCloneNetworkId or stopping or not isFeatureEnabled() then return end
+    if not isInteractionActive(id) then return end
+
+    local target = validateSelectedWindow(PlayerPedId(), requireIntact)
+    local networkId = target and networkIdFor(target.vehicle) or nil
+    if not target or not networkId then
+        hidePrompts()
+        return
+    end
+
+    if type(lib.startInteractionHold) ~= 'function' then
+        CreateThread(function()
+            action({ vehicle = target.vehicle, window = target.window })
+        end)
+        return
+    end
+
+    local ok = lib.startInteractionHold(id)
+    if ok ~= true then return end
+
+    local token = {
+        id = id,
+        vehicle = target.vehicle,
+        window = target.window,
+    }
+    activeHold = token
+
+    local duration = math.floor(math.max(100, math.min(2000, tonumber(activeConfig.holdDuration) or 220)))
+    SetTimeout(duration, function()
+        if activeHold ~= token then return end
+        activeHold = nil
+        lib.cancelInteractionHold(id)
+
+        CreateThread(function()
+            action(token)
+        end)
+    end)
+end
+
 local function boundedNumber(value, fallback, minimum, maximum)
     value = tonumber(value)
     if not value or value ~= value or value == math.huge or value == -math.huge then value = fallback end
@@ -330,7 +413,15 @@ local function stopClonePresentation(hideQte)
     end
 
     if presentation.prop and DoesEntityExist(presentation.prop) then
-        DeleteEntity(presentation.prop)
+        -- Attached props must be detached before deletion, otherwise the
+        -- object stays stuck to the ped hand (window-smash hammer symptom).
+        if type(DetachEntity) == 'function' then
+            pcall(DetachEntity, presentation.prop, false, true)
+        end
+        pcall(DeleteEntity, presentation.prop)
+        if type(DeleteObject) == 'function' and DoesEntityExist(presentation.prop) then
+            pcall(DeleteObject, presentation.prop)
+        end
     end
 end
 
@@ -406,7 +497,34 @@ local function startClonePresentation(ped)
     return true
 end
 
-local function handleSmashAction()
+local function cleanupStraySmashProps(ped)
+    -- Belt-and-braces for progress providers that delete without detaching:
+    -- any hammer still attached to the ped after the smash must go, or it
+    -- stays stuck to the hand like in the report.
+    if type(GetGamePool) ~= 'function' or type(joaat) ~= 'function' then return end
+    local ok, hammerHash = pcall(joaat, 'prop_tool_hammer')
+    if not ok or type(hammerHash) ~= 'number' then return end
+    local poolOk, objects = pcall(GetGamePool, 'CObject')
+    if not poolOk or type(objects) ~= 'table' then return end
+    for index = 1, #objects do
+        local object = objects[index]
+        local existsOk, exists = pcall(DoesEntityExist, object)
+        if existsOk and exists then
+            local modelOk, model = pcall(GetEntityModel, object)
+            local attachedOk, attached = pcall(IsEntityAttachedToEntity, object, ped)
+            if modelOk and attachedOk and model == hammerHash and attached then
+                pcall(DetachEntity, object, false, true)
+                pcall(DeleteEntity, object)
+                if type(DeleteObject) == 'function' then
+                    local stillOk, still = pcall(DoesEntityExist, object)
+                    if stillOk and still then pcall(DeleteObject, object) end
+                end
+            end
+        end
+    end
+end
+
+local function handleSmashAction(expectedTarget)
     if actionLocked or stopping or not isFeatureEnabled() then return end
     if not isInteractionActive(SMASH_INTERACTION_ID) then return end
 
@@ -415,6 +533,11 @@ local function handleSmashAction()
     local networkId = target and networkIdFor(target.vehicle) or nil
     if not target or not networkId then
         hidePrompts()
+        return
+    end
+    if expectedTarget
+        and (target.vehicle ~= expectedTarget.vehicle or target.window ~= expectedTarget.window)
+    then
         return
     end
 
@@ -443,6 +566,12 @@ local function handleSmashAction()
     })
 
     target = validateSelectedWindow(ped, true)
+    -- progress() owns prop deletion, but older providers delete without a
+    -- prior detach and leave the hammer attached. Sweep unconditionally so a
+    -- cancelled, failed, or legacy progress run cannot stick a hammer to the
+    -- hand.
+    pcall(cleanupStraySmashProps, ped)
+    pcall(cleanupStraySmashProps, PlayerPedId())
     if completed and target and networkIdFor(target.vehicle) == networkId then
         TriggerServerEvent('cortex-hud:server:smashVehicleWindow', networkId, target.window)
     end
@@ -464,7 +593,7 @@ local cloneErrorMessages = {
     failed = 'The vehicle key could not be cloned.',
 }
 
-local function handleCloneAction()
+local function handleCloneAction(expectedTarget)
     if activeCloneQte then
         SendNUIMessage({
             action = 'vehicleCloneQte:press',
@@ -483,6 +612,11 @@ local function handleCloneAction()
         hidePrompts()
         return
     end
+    if expectedTarget
+        and (target.vehicle ~= expectedTarget.vehicle or target.window ~= expectedTarget.window)
+    then
+        return
+    end
 
     actionLocked = true
     pendingCloneNetworkId = networkId
@@ -496,6 +630,19 @@ local function handleCloneAction()
     end)
 end
 
+local function beginSmashHold()
+    beginActionHold(SMASH_INTERACTION_ID, true, handleSmashAction)
+end
+
+local function beginCloneHold()
+    if activeCloneQte then
+        handleCloneAction()
+        return
+    end
+
+    beginActionHold(CLONE_INTERACTION_ID, false, handleCloneAction)
+end
+
 function VehicleAccessInteractions.start(config)
     if started then return end
 
@@ -507,8 +654,10 @@ function VehicleAccessInteractions.start(config)
     started = true
 
     if activeConfig.smash and activeConfig.smash.enabled == true then
-        RegisterCommand('+' .. activeConfig.smash.command, handleSmashAction, false)
-        RegisterCommand('-' .. activeConfig.smash.command, function() end, false)
+        RegisterCommand('+' .. activeConfig.smash.command, beginSmashHold, false)
+        RegisterCommand('-' .. activeConfig.smash.command, function()
+            cancelActionHold(SMASH_INTERACTION_ID)
+        end, false)
         RegisterKeyMapping(
             '+' .. activeConfig.smash.command,
             activeConfig.smash.description,
@@ -518,8 +667,10 @@ function VehicleAccessInteractions.start(config)
     end
 
     if activeConfig.cloneKey and activeConfig.cloneKey.enabled == true then
-        RegisterCommand('+' .. activeConfig.cloneKey.command, handleCloneAction, false)
-        RegisterCommand('-' .. activeConfig.cloneKey.command, function() end, false)
+        RegisterCommand('+' .. activeConfig.cloneKey.command, beginCloneHold, false)
+        RegisterCommand('-' .. activeConfig.cloneKey.command, function()
+            cancelActionHold(CLONE_INTERACTION_ID)
+        end, false)
         RegisterKeyMapping(
             '+' .. activeConfig.cloneKey.command,
             activeConfig.cloneKey.description,
@@ -577,7 +728,11 @@ function VehicleAccessInteractions.start(config)
         if type(window) ~= 'number' or window < 0 or window > 3 or window % 1 ~= 0 then return end
 
         local vehicle = NetworkGetEntityFromNetworkId(networkId)
-        if vehicle ~= 0 and DoesEntityExist(vehicle) and GetEntityType(vehicle) == 2 then
+        if vehicle ~= 0
+            and DoesEntityExist(vehicle)
+            and GetEntityType(vehicle) == 2
+            and IsVehicleDriveable(vehicle, true)
+        then
             SmashVehicleWindow(vehicle, window)
         end
     end)
@@ -690,6 +845,7 @@ function VehicleAccessInteractions.start(config)
 
     AddEventHandler('onClientResourceStart', function(resourceName)
         if resourceName ~= 'cortex-lib' or not selectedWindow then return end
+        activeHold = nil
         published = {}
         publishPrompts(selectedWindow)
     end)
@@ -697,6 +853,7 @@ function VehicleAccessInteractions.start(config)
     AddEventHandler('onClientResourceStop', function(resourceName)
         if resourceName ~= GetCurrentResourceName() then return end
         stopping = true
+        cancelActionHold()
         stopClonePresentation(true)
         activeCloneQte = nil
         lib.hideInteraction(SMASH_INTERACTION_ID)

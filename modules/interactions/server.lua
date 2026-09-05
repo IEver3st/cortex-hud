@@ -37,6 +37,13 @@ local function rejectClone(src, networkId, reason)
     TriggerClientEvent('cortex-hud:client:vehicleKeyCloneRejected', src, networkId, reason)
 end
 
+local function isVehicleDestroyed(entity)
+    if type(GetVehicleEngineHealth) ~= 'function' then return false end
+
+    local health = tonumber(GetVehicleEngineHealth(entity))
+    return health ~= nil and health <= -3999.0
+end
+
 local function resolveAccessVehicle(src, networkId)
     if not isIntegerInRange(networkId, 1, 2147483647) then return nil, 'invalid_vehicle' end
 
@@ -44,6 +51,7 @@ local function resolveAccessVehicle(src, networkId)
     if entity == 0 or not DoesEntityExist(entity) or GetEntityType(entity) ~= 2 then
         return nil, 'invalid_vehicle'
     end
+    if isVehicleDestroyed(entity) then return nil, 'invalid_vehicle' end
 
     local ped = GetPlayerPed(src)
     if ped == 0 or not DoesEntityExist(ped) then return nil, 'invalid_vehicle' end
@@ -144,6 +152,27 @@ local function giveProviderKey(provider, src, entity)
     return false
 end
 
+local function hasVehicleAccess(src, entity)
+    if not isIntegerInRange(src, 1, 2147483647)
+        or type(entity) ~= 'number'
+        or entity == 0
+        or not DoesEntityExist(entity)
+        or GetEntityType(entity) ~= 2
+    then
+        return false
+    end
+
+    local ped = GetPlayerPed(src)
+    if ped == 0 or not DoesEntityExist(ped) then return false end
+
+    local provider = resolveKeyProvider()
+    return provider ~= nil and hasProviderKey(provider, src, entity) == true
+end
+
+-- Keep the standalone clone-key table private while allowing trusted server
+-- resources to ask the same provider-backed access question.
+exports('hasVehicleAccess', hasVehicleAccess)
+
 local function makeCloneToken(src, networkId, now)
     return ('%x:%x:%x:%x'):format(
         src,
@@ -208,6 +237,7 @@ RegisterNetEvent('cortex-hud:server:vehicleDoor', function(networkId, door, shou
 
     local entity = NetworkGetEntityFromNetworkId(networkId)
     if entity == 0 or not DoesEntityExist(entity) or GetEntityType(entity) ~= 2 then return end
+    if isVehicleDestroyed(entity) then return end
 
     local ped = GetPlayerPed(src)
     if ped == 0 or not DoesEntityExist(ped) then return end

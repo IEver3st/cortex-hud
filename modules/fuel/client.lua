@@ -40,6 +40,8 @@ local KNOWN_EXPORTS = {
 local cachedResource = nil
 local cachedGetter = nil
 local cacheChecked = false
+local nextDetectionAt = 0
+local PROVIDER_RECHECK_MS = 3000
 
 
 
@@ -80,23 +82,38 @@ local function detectExport(vehicle)
         cachedResource = nil
         cachedGetter = nil
         cacheChecked = false
+        nextDetectionAt = 0
     end
 
+    local now = GetGameTimer()
+    if cacheChecked and now >= 0 and now < nextDetectionAt then
+        return nil, nil
+    end
+
+    local checkedResource = nil
+    local checkedResourceStarted = false
     for i = 1, #KNOWN_EXPORTS do
         local entry = KNOWN_EXPORTS[i]
         local resName, getter = entry[1], entry[2]
-        if GetResourceState(resName) == "started" then
+        if resName ~= checkedResource then
+            checkedResource = resName
+            checkedResourceStarted = GetResourceState(resName) == "started"
+        end
+
+        if checkedResourceStarted then
             local result = callExport(resName, getter, vehicle)
             if type(result) == "number" then
                 cachedResource = resName
                 cachedGetter = getter
                 cacheChecked = true
+                nextDetectionAt = 0
                 return result, resName .. ":" .. getter
             end
         end
     end
 
     cacheChecked = true
+    nextDetectionAt = now + PROVIDER_RECHECK_MS
     return nil, nil
 end
 

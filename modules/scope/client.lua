@@ -25,6 +25,9 @@ local math_tan = math.tan
 local DEFAULT_CAMERA_FOV = 55.0
 local MAX_RANGE_METERS = 1200.0
 local RANGE_REFRESH_MS = 100
+local ACTIVE_REFRESH_MS = 50
+local IDLE_REFRESH_MS = 150
+local BASE_FOV_REFRESH_MS = 1000
 
 local SNIPER_WEAPONS = {
     [`WEAPON_SNIPERRIFLE`] = 'SNIPER',
@@ -100,17 +103,27 @@ function scope.start(isHudVisible)
         local lastSteadiness = nil
         local lastRangeRefreshAt = 0
         local rangeMeters = nil
+        local lastBaseFovRefreshAt = -BASE_FOV_REFRESH_MS
 
         while true do
+            local sleep = IDLE_REFRESH_MS
             local visible = false
-            local weaponLabel = lastWeapon
-            local currentFov = tonumber(GetGameplayCamFov()) or baseFov
+            local weaponLabel = nil
+            local currentFov = baseFov
+            local now = GetGameTimer()
 
             if canShowHud() and IsPlayerPlaying(playerId) then
                 local ped = PlayerPedId()
                 if ped ~= 0 and not IsEntityDead(ped) then
                     weaponLabel = SNIPER_WEAPONS[GetSelectedPedWeapon(ped)]
-                    visible = weaponLabel ~= nil and IsPlayerFreeAiming(playerId) == true
+                    if weaponLabel then
+                        sleep = ACTIVE_REFRESH_MS
+                        currentFov = tonumber(GetGameplayCamFov()) or baseFov
+                        visible = IsPlayerFreeAiming(playerId) == true
+                    elseif (now - lastBaseFovRefreshAt) >= BASE_FOV_REFRESH_MS then
+                        currentFov = tonumber(GetGameplayCamFov()) or baseFov
+                        lastBaseFovRefreshAt = now
+                    end
                 end
             end
 
@@ -125,7 +138,6 @@ function scope.start(isHudVisible)
                 zoomLevel = getZoomLevel(baseFov, currentFov)
                 steadiness = getSteadiness(playerId)
 
-                local now = GetGameTimer()
                 if not lastVisible or (now - lastRangeRefreshAt) >= RANGE_REFRESH_MS then
                     rangeMeters = getRangeMeters()
                     lastRangeRefreshAt = now
@@ -158,7 +170,7 @@ function scope.start(isHudVisible)
                 lastWeapon = weaponLabel
             end
 
-            Wait(50)
+            Wait(sleep)
         end
     end)
 

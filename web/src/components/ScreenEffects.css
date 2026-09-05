@@ -1,0 +1,120 @@
+.screen-effects {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+}
+
+.screen-effect {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+  animation-duration: var(--screen-effect-duration);
+  animation-fill-mode: both;
+  animation-timing-function: ease-out;
+}
+
+.screen-effect--damage {
+  --screen-effect-rim-blur: clamp(26.25px, 2.625vw, 51.25px);
+  --screen-effect-rim-spread: clamp(4.375px, 0.5vw, 10px);
+  --screen-effect-mid-blur: clamp(80px, 7.5vw, 152.5px);
+  --screen-effect-mid-spread: clamp(8.75px, 0.9375vw, 18.75px);
+  --screen-effect-far-blur: clamp(143.75px, 12.25vw, 250px);
+  --screen-effect-far-spread: clamp(3.125px, 0.4375vw, 8.75px);
+  box-shadow:
+    inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(224, 45, 38, 0),
+    inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(103, 0, 0, 0),
+    inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(72, 0, 0, 0);
+  animation-name: screen-effect-damage;
+}
+
+.screen-effect--kill,
+.screen-effect--stamina {
+  --screen-effect-rim-blur: clamp(28.75px, 3vw, 62.5px);
+  --screen-effect-rim-spread: clamp(5.625px, 0.65vw, 12.5px);
+  --screen-effect-mid-blur: clamp(97.5px, 9.1875vw, 190px);
+  --screen-effect-mid-spread: clamp(11.25px, 1.15vw, 22.5px);
+  --screen-effect-far-blur: clamp(172.5px, 15vw, 310px);
+  --screen-effect-far-spread: clamp(4.375px, 0.575vw, 11.25px);
+}
+
+.screen-effect--kill {
+  box-shadow:
+    inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(241, 49, 39, 0),
+    inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(119, 0, 0, 0),
+    inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(76, 0, 0, 0);
+  animation-name: screen-effect-kill;
+}
+
+.screen-effect--stamina {
+  box-shadow:
+    inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(246, 249, 250, 0),
+    inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(205, 220, 228, 0),
+    inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(172, 195, 207, 0);
+  animation-name: screen-effect-stamina;
+}
+
+@keyframes screen-effect-damage {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(224, 45, 38, 0),
+      inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(103, 0, 0, 0),
+      inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(72, 0, 0, 0);
+  }
+  18% {
+    box-shadow:
+      inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(224, 45, 38, var(--screen-effect-rim-alpha)),
+      inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(103, 0, 0, var(--screen-effect-mid-alpha)),
+      inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(72, 0, 0, var(--screen-effect-far-alpha));
+  }
+}
+
+@keyframes screen-effect-kill {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(241, 49, 39, 0),
+      inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(119, 0, 0, 0),
+      inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(76, 0, 0, 0);
+  }
+  14% {
+    box-shadow:
+      inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(241, 49, 39, var(--screen-effect-rim-alpha)),
+      inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(119, 0, 0, var(--screen-effect-mid-alpha)),
+      inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(76, 0, 0, var(--screen-effect-far-alpha));
+  }
+  42% {
+    box-shadow:
+      inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(241, 49, 39, var(--screen-effect-rim-fade-alpha)),
+      inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(119, 0, 0, var(--screen-effect-mid-fade-alpha)),
+      inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(76, 0, 0, var(--screen-effect-far-fade-alpha));
+  }
+}
+
+@keyframes screen-effect-stamina {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(246, 249, 250, 0),
+      inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(205, 220, 228, 0),
+      inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(172, 195, 207, 0);
+  }
+  14% {
+    box-shadow:
+      inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(246, 249, 250, var(--screen-effect-rim-alpha)),
+      inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(205, 220, 228, var(--screen-effect-mid-alpha)),
+      inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(172, 195, 207, var(--screen-effect-far-alpha));
+  }
+  42% {
+    box-shadow:
+      inset 0 0 var(--screen-effect-rim-blur) var(--screen-effect-rim-spread) rgba(246, 249, 250, var(--screen-effect-rim-fade-alpha)),
+      inset 0 0 var(--screen-effect-mid-blur) var(--screen-effect-mid-spread) rgba(205, 220, 228, var(--screen-effect-mid-fade-alpha)),
+      inset 0 0 var(--screen-effect-far-blur) var(--screen-effect-far-spread) rgba(172, 195, 207, var(--screen-effect-far-fade-alpha));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-effect {
+    animation-duration: 160ms !important;
+    animation-timing-function: linear;
+  }
+}

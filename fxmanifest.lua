@@ -9,13 +9,14 @@ dependency 'cortex-lib'
 
 files {
     'web/dist/index.html',
-    'web/dist/assets/index.js',
-    'web/dist/assets/index.css',
-    'web/dist/assets/*.woff',
-    'web/dist/assets/*.woff2',
+    'web/dist/assets/*',
     'web/third-party/barlow-condensed-OFL.txt',
+    'web/third-party/pricedown-NOTICE.txt',
     'web/dist/weapons/*.png',
     'web/dist/weapons/manifest.json',
+    'web/dist/radio-icons/*',
+    'data/radio_catalog.json',
+    'web/third-party/gta-radio-icons-NOTICE.txt',
     'config/shared.lua',
     'modules/**/*.lua',
 }
@@ -41,11 +42,11 @@ exports {
     'isHarnessOn',
     'toggleHarness',
     'isCruiseControlActive',
+    'triggerScreenEffect',
     'getSettingsDefinition',
     'setCharacterSelectionActive',
     'setSpawnSelectorActive',
 }
 
-lua54 'yes'
 use_experimental_fxv2_oal("yes")
 nui_callback_strict_mode("true")

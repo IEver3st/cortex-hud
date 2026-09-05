@@ -20,7 +20,7 @@ describe('speedometer visibility', () => {
     })).toBe(false)
   })
 
-  test('always hides in GTA 6 HUD mode', () => {
+  test('always hides in Leonida UI mode', () => {
     expect(shouldShowSpeedometer({
       vehicleVisible: true,
       editMode: true,
@@ -30,7 +30,7 @@ describe('speedometer visibility', () => {
   })
 })
 
-describe('GTA 6 weapon overlay visibility', () => {
+describe('Leonida weapon overlay visibility', () => {
   test('shows an equipped weapon while the player is on foot', () => {
     expect(shouldShowWeaponOverlay({
       gta6HudEnabled: true,

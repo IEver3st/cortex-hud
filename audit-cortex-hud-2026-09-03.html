@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Static audit of the cortex-hud FiveM resource: manifest, server authority, NUI discipline, packaging, tests, and remediation." />
+<title>cortex-hud — Static Audit Report — 2026-09-03</title>
+<style>
+:root {
+  --bg:#080908; --surface:#0d0f0e; --surface-2:#111412;
+  --line:#242825; --line-strong:#343a36;
+  --text:#f2f2ee; --muted:#919790; --muted-2:#696f69;
+  --good:#86b987; --warn:#d5b86f; --bad:#d97b7f; --info:#86a7c4;
+  --accent:#d7c56e;
+}
+*{box-sizing:border-box}
+html{background:var(--bg);color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.shell{width:min(1100px,calc(100% - 40px));margin:0 auto;padding:42px 0 64px}
+header{margin-bottom:24px}
+.eyebrow{font:600 11px/1.2 "SFMono-Regular","Cascadia Code",ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin-bottom:10px}
+h1{font-size:clamp(26px,3vw,34px);line-height:1.1;letter-spacing:-.03em;margin:0 0 9px;font-weight:720}
+.dek{margin:0;color:var(--muted);max-width:880px;font-size:15px;line-height:1.55}
+.meta{margin-top:14px;color:var(--muted-2);font-size:12.5px;line-height:1.6}
+.meta .mono{color:var(--muted)}
+.section{border-top:1px solid var(--line);padding-top:22px;margin-top:30px}
+.section-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-2);font-weight:650;margin-bottom:14px}
+h2{font-size:18px;letter-spacing:-.01em;margin:0 0 10px}
+h3{font-size:14px;margin:20px 0 8px}
+p,li{font-size:14px;line-height:1.6;color:var(--text)}
+.muted{color:var(--muted)}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:22px}
+.metric{border:1px solid var(--line);background:var(--surface);padding:18px 18px 16px;min-height:92px}
+.metric strong{display:block;font:650 24px/1 "SFMono-Regular","Cascadia Code",ui-monospace,monospace;margin-bottom:10px}
+.metric span{font-size:11px;text-transform:uppercase;letter-spacing:.075em;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;color:var(--muted-2);text-transform:uppercase;font-size:11px;letter-spacing:.065em;font-weight:650;padding:11px 10px;border-bottom:1px solid var(--line)}
+td{padding:13px 10px;border-bottom:1px solid #191c1a;vertical-align:top}
+tbody tr:hover{background:#0b0d0c}
+.mono{font-family:"SFMono-Regular","Cascadia Code",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.badge{display:inline-flex;align-items:center;min-height:24px;padding:3px 8px;border:1px solid var(--line-strong);font:650 11px/1 "SFMono-Regular","Cascadia Code",ui-monospace,monospace;letter-spacing:.045em;text-transform:uppercase;background:var(--surface-2);white-space:nowrap}
+.badge.good{color:var(--good);border-color:#203523;background:#0d180f}
+.badge.warn{color:var(--warn);border-color:#3a321c;background:#17150d}
+.badge.bad{color:var(--bad);border-color:#3a2224;background:#180e10}
+.badge.info{color:var(--info);border-color:#22303a;background:#0d1418}
+.confidence{display:flex;flex-direction:column;gap:6px;min-width:92px}
+.confidence .bar{height:3px;background:#202320;overflow:hidden}
+.confidence .bar>i{display:block;height:100%;background:var(--text)}
+.note{border-left:2px solid var(--line-strong);padding:2px 0 2px 14px;color:var(--muted);line-height:1.55;font-size:14px}
+.note strong{color:var(--text)}
+code,.code{font-family:"SFMono-Regular","Cascadia Code",ui-monospace,monospace;font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);padding:1px 6px;border-radius:4px}
+pre{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;overflow:auto;font-size:12.5px;line-height:1.6;color:var(--text)}
+pre code{background:none;border:none;padding:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.panel{border:1px solid var(--line);background:var(--surface);padding:16px 18px;border-radius:6px}
+.panel h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+ul.tight{margin:8px 0;padding-left:20px}
+ul.tight li{margin:4px 0}
+a{color:var(--info)}
+.skip{position:absolute;left:8px;top:-9999px;background:var(--surface-2);color:var(--text);padding:8px 12px}
+.skip:focus{top:8px}
+.table-wrap{overflow-x:auto;max-width:100%}
+footer{margin-top:36px;color:var(--muted-2);font-size:12.5px;line-height:1.6;border-top:1px solid var(--line);padding-top:16px}
+td .mono,.mono{overflow-wrap:anywhere}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+@media(max-width:700px){.shell{width:min(100% - 32px,1100px);padding-top:28px}.metrics{grid-template-columns:1fr 1fr}.hide-mobile{display:none}}
+@media(prefers-reduced-motion:no-preference){a,.metric,tbody tr{transition:background-color .16s ease,border-color .16s ease,opacity .16s ease}}
+</style>
+</head>
+<body>
+<a class="skip" href="#findings">Skip to findings</a>
+<main class="shell">
+  <header>
+    <div class="eyebrow">FiveM resource audit &middot; cortex-hud &middot; static only, no in-game run</div>
+    <h1>cortex-hud audit: strong server authority, packaging and contract drift to fix</h1>
+    <p class="dek">Verdict: the resource is well architected and safe to keep developing, but do not cut a release from this tree yet. Fix the standalone key store, the door-handler bucket check, the <span class="mono">node_modules</span> packaging failure, the radio-icon manifest drift, and the mid-rebuild <span class="mono">web/dist</span> state first. All gameplay, visual, restart, and performance claims below remain unverified in-game by design.</p>
+    <div class="meta mono">Scope: E:\txData\FiveMBasicServerCFXDefault_9B7823.base\resources\[eco]\cortex-hud &middot; Date: 2026-09-03 UTC &middot; Method: fivem-orchestrator inspect + validate-resource.ps1 + audit-nui-ui.ps1 + node --test + manual Lua/NUI/config review &middot; Runtime testing: explicitly NOT performed (belongs to server owner)</div>
+    <div class="metrics" aria-label="Summary metrics">
+      <div class="metric"><strong>29/31</strong><span>Node contract tests passing</span></div>
+      <div class="metric"><strong>3 / 4 / 10</strong><span>validate-resource errors / NUI errors / NUI warnings</span></div>
+      <div class="metric"><strong>3 high</strong><span>Findings needing fix before release</span></div>
+      <div class="metric"><strong>~30 vs 10</strong><span>Runtime exports vs manifest exports</span></div>
+      <div class="metric"><strong>0</strong><span>In-game checks claimed</span></div>
+    </div>
+  </header>
+
+  <section class="section" aria-label="What was checked">
+    <div class="section-label">Method and evidence</div>
+    <div class="grid2">
+      <div class="panel">
+        <h3>Inspected</h3>
+        <ul class="tight muted">
+          <li><span class="mono">fxmanifest.lua</span>, <span class="mono">init.lua</span>, <span class="mono">config/shared.lua</span> (565 lines), <span class="mono">shared/config.lua</span>, <span class="mono">.gitignore</span></li>
+          <li>Client: <span class="mono">hud.lua</span> (1,470 lines), <span class="mono">vehicle_status.lua</span>, <span class="mono">settings/client.lua</span> (1,457 lines), <span class="mono">nui/client.lua</span>, radio, weapons, effects, scope, layout, status, fuel, cruise, seatbelt, harness, stall, bridge, dynamic_weather</li>
+          <li>Server: <span class="mono">modules/interactions/server.lua</span> (426 lines), vehicle door/access clients</li>
+          <li>NUI: <span class="mono">web/src/App.jsx</span>, components, <span class="mono">vite.config.js</span>, <span class="mono">package.json</span> (React 19.2, Vite 7), <span class="mono">stream/squaremap.ytd</span> (833 bytes)</li>
+          <li><span class="mono">git status/log</span>, <span class="mono">tests/</span> (20 files), <span class="mono">scripts/generate-*.mjs</span>, <span class="mono">README.md</span>, <span class="mono">.github/workflows/release.yml</span></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Checks run</h3>
+        <ul class="tight muted">
+          <li><span class="mono">validate-resource.ps1</span>: <strong>failed</strong>, 498 files, 3 errors, all <span class="mono">node_modules</span> inside resource</li>
+          <li><span class="mono">audit-nui-ui.ps1</span> on <span class="mono">web/src</span>: 15 files, <strong>4 errors, 10 warnings</strong></li>
+          <li><span class="mono">node --test tests/*.test.mjs</span>: <strong>29 pass, 2 fail</strong> (icon size drift + <span class="mono">bun:</span> import crash under Node 25)</li>
+          <li>NUI callback audit: <span class="mono">nui:ready</span>, <span class="mono">settings:save/close</span>, <span class="mono">speedometer/ammo :startEdit/:endEdit</span>, <span class="mono">vehicleCloneQte:complete</span> all complete exactly once</li>
+          <li>Focus audit: <span class="mono">SetNuiFocus(false,false)</span> on every settings/QTE close path; no fullscreen tint found in HUD root</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note" style="margin-top:14px"><strong>What is solid.</strong> Manifest baseline is correct (<span class="mono">cerulean</span>, <span class="mono">gta5</span>, no deprecated <span class="mono">lua54</span> flag, <span class="mono">use_experimental_fxv2_oal</span> + strict NUI callbacks). Server handlers validate integer ranges, entity type, destroyed state, distance, cooldowns, lock state, clone sessions with token + time window + re-resolution at commit, and clean up on <span class="mono">playerDropped</span>. The NUI bridge queues up to 256 messages until <span class="mono">nui:ready</span> instead of dropping early state. Update intervals (HUD 200 ms, status 500 ms, VOIP 150 ms, scans 100/450 ms) stay off the frame boundary.</div>
+  </section>
+
+  <section class="section" id="findings" aria-label="Findings">
+    <div class="section-label">Primary findings</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Severity</th><th>Finding</th><th class="hide-mobile">Evidence</th><th>Confidence</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="mono">F-01</td>
+            <td><span class="badge bad">High</span></td>
+            <td><strong>Standalone clone-key store is keyed by recyclable server entity handle.</strong> <span class="muted">After the vehicle is deleted the handle can be reused and a different vehicle inherits access. Key by network ID or plate instead, and revalidate at use.</span></td>
+            <td class="mono hide-mobile">modules/interactions/server.lua:105-107, 131-135</td>
+            <td><div class="confidence mono"><span>90%</span><div class="bar"><i style="width:90%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-02</td>
+            <td><span class="badge bad">High</span></td>
+            <td><strong>Release packaging fails: <span class="mono">web/node_modules</span> ships inside the resource.</strong> <span class="muted">Validator reports 3 errors. Never ship or restart-test with dependencies installed in-tree; build on CI and package only <span class="mono">web/dist</span>.</span></td>
+            <td class="mono hide-mobile">validate-resource.ps1: node_modules x3</td>
+            <td><div class="confidence mono"><span>100%</span><div class="bar"><i style="width:100%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-03</td>
+            <td><span class="badge bad">High</span></td>
+            <td><strong><span class="mono">web/dist</span> is mid-rebuild and inconsistent.</strong> <span class="muted">Old hashed <span class="mono">assets/index.*</span> deleted, new hashed assets untracked, <span class="mono">dist/index.html</span> modified. Rebuild with Bun and commit or attach exactly one coherent artifact.</span></td>
+            <td class="mono hide-mobile">git status: D assets/index.css/js, ?? assets/index-*, M dist/index.html</td>
+            <td><div class="confidence mono"><span>95%</span><div class="bar"><i style="width:95%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-04</td>
+            <td><span class="badge warn">Medium</span></td>
+            <td><strong>Door handler lacks the routing-bucket check the access handler has.</strong> <span class="muted">Same distance/entity/destroyed validation, but no bucket equality test. Copy the <span class="mono">GetPlayerRoutingBucket vs GetEntityRoutingBucket</span> guard over.</span></td>
+            <td class="mono hide-mobile">server.lua:224-271 vs 47-77</td>
+            <td><div class="confidence mono"><span>90%</span><div class="bar"><i style="width:90%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-05</td>
+            <td><span class="badge warn">Medium</span></td>
+            <td><strong>Radio icon manifest drift.</strong> <span class="muted"><span class="mono">RADIO_19_USER.svg</span> on disk is 18,776 bytes vs 18,661 pinned. Regenerate or re-pin with <span class="mono">generate-radio-icons.mjs</span>; provenance file otherwise looks correct.</span></td>
+            <td class="mono hide-mobile">radio_icon_assets.test.mjs:44</td>
+            <td><div class="confidence mono"><span>100%</span><div class="bar"><i style="width:100%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-06</td>
+            <td><span class="badge warn">Medium</span></td>
+            <td><strong>Manifest exports list is stale.</strong> <span class="muted">10 names in <span class="mono">fxmanifest.lua</span> vs ~30 runtime exports actually registered (HUD visibility set, seatbelt, engine stall, radio mute/mode/station, etc.) and documented in README. Runtime still works, but consumers cannot trust the manifest.</span></td>
+            <td class="mono hide-mobile">fxmanifest.lua:38-49 vs hud.lua:1341-1449, radio/client.lua:1141-1145</td>
+            <td><div class="confidence mono"><span>95%</span><div class="bar"><i style="width:95%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-07</td>
+            <td><span class="badge warn">Medium</span></td>
+            <td><strong>Docs claim <span class="mono">web/dist</span> is git-ignored; it is not.</strong> <span class="muted"><span class="mono">.gitignore</span> ignores only <span class="mono">dist/*.map</span>, and <span class="mono">dist/index.html</span> is tracked. Decide: source-only repo + CI build, or tracked release artifact, and make README match.</span></td>
+            <td class="mono hide-mobile">.gitignore:14-20 vs README:84</td>
+            <td><div class="confidence mono"><span>100%</span><div class="bar"><i style="width:100%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-08</td>
+            <td><span class="badge warn">Medium</span></td>
+            <td><strong><span class="mono">stream/squaremap.ytd</span> is 833 bytes.</strong> <span class="muted">Implausibly small for a minimap texture dictionary; likely a placeholder. Confirm the square minimap renders in-game or disable <span class="mono">Minimap.textureReplacement</span> for external map packs.</span></td>
+            <td class="mono hide-mobile">stream/squaremap.ytd Length 833</td>
+            <td><div class="confidence mono"><span>80%</span><div class="bar"><i style="width:80%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-09</td>
+            <td><span class="badge info">Low</span></td>
+            <td><strong>4 authored-gradient audit errors are functional masks, not decoration.</strong> <span class="muted">Segment dividers, digit-reel fade, radio-rail edge fade. Either record a waiver with screenshots or replace with solid geometry; do not add color gradients elsewhere.</span></td>
+            <td class="mono hide-mobile">HUD.css:962,2123,2130; RadioSelector.css:104</td>
+            <td><div class="confidence mono"><span>95%</span><div class="bar"><i style="width:95%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-10</td>
+            <td><span class="badge info">Low</span></td>
+            <td><strong>10 <span class="mono">transition: all</span> warnings + no startup config validation.</strong> <span class="muted">Scope transitions to named properties; optionally reject out-of-range QTE, cooldown, and scan values at boot with actionable errors.</span></td>
+            <td class="mono hide-mobile">SettingsModal.css, index.css:100</td>
+            <td><div class="confidence mono"><span>85%</span><div class="bar"><i style="width:85%"></i></div></div></td>
+          </tr>
+          <tr>
+            <td class="mono">F-11</td>
+            <td><span class="badge info">Low</span></td>
+            <td><strong>Dirty tree + Node/Bun split.</strong> <span class="muted">100+ modified/untracked paths; <span class="mono">screen_effects_contract</span> needs Bun (<span class="mono">bun:</span> import crashes Node 25). Standardize test command on Bun and commit on a clean branch.</span></td>
+            <td class="mono hide-mobile">git status; ERR_UNSUPPORTED_ESM_URL_SCHEME</td>
+            <td><div class="confidence mono"><span>90%</span><div class="bar"><i style="width:90%"></i></div></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" aria-label="Security and lifecycle">
+    <div class="section-label">Security, NUI, and lifecycle notes</div>
+    <div class="grid2">
+      <div class="panel">
+        <h3>Passed</h3>
+        <ul class="tight muted">
+          <li>Server re-resolves <span class="mono">NetworkGetEntityFromNetworkId</span>, checks type 2, destroyed, lock, distance, speed, cooldowns, session token + <span class="mono">notBefore/expiresAt</span>, and entity identity at finish.</li>
+          <li>Clone QTE nonce binding, bounded rounds (1-4) and durations, cancel paths on move-away, every NUI callback answers exactly once.</li>
+          <li>No secrets in shared/client/NUI files; radio catalog pins its upstream commit; no remote <span class="mono">ui_page</span>.</li>
+          <li>Focus ownership is single-path: settings and move modes set and release <span class="mono">SetNuiFocus</span>; QTE never takes focus.</li>
+          <li>Stop cleanup restores <span class="mono">DisplayHud/DisplayRadar</span>, radio, weapons, minimap; server clears sessions on drop.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Watch items</h3>
+        <ul class="tight muted">
+          <li>Clone token uses <span class="mono">math.random</span> hex; acceptable inside a server-bound timed session, but prefer a longer nonce if tokens ever leave that binding.</li>
+          <li><span class="mono">Wait(200)</span> inside the <span class="mono">cortex-lib:settingsAction</span> handler blocks that event briefly during move-mode switch; harmless but move to a thread if more steps are added.</li>
+          <li>Client <span class="mono">smashVehicleWindow</span> trusts the owner to execute the smash; correct for ownership, but treat a non-replicating owner as a visual desync to re-request, not a security failure.</li>
+          <li>Framework surface is <span class="mono">standalone + qbx</span> only; ESX/QBCore need bridge work despite some legacy event listeners.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" aria-label="Remediation">
+    <div class="section-label">Remediation in order</div>
+    <h2>Fix these before release</h2>
+    <ol>
+      <li><strong>Key the standalone store by stable identity.</strong> Replace <span class="mono">standaloneKeys[src][entity]</span> with <span class="mono">networkId</span> (or plate + model), delete on finish/cancel/drop, and add a regression test that recycles the entity handle. <span class="muted">File: <span class="mono">modules/interactions/server.lua:105-153</span>.</span></li>
+      <li><strong>Add the bucket guard to the door handler.</strong> Mirror <span class="mono">resolveAccessVehicle</span> lines 59-63 in <span class="mono">cortex-hud:server:vehicleDoor</span>. <span class="muted">File: <span class="mono">server.lua:224-271</span>.</span></li>
+      <li><strong>Repair packaging.</strong> Remove <span class="mono">web/node_modules</span> from the resource tree, rebuild with <span class="mono">bun install --frozen-lockfile; bun run build</span>, re-run <span class="mono">validate-resource.ps1</span> to zero errors, and align README with the chosen dist policy.</li>
+      <li><strong>Re-pin the radio icon.</strong> Run <span class="mono">node scripts/generate-radio-icons.mjs</span>, verify <span class="mono">RADIO_19_USER.svg</span>, re-run <span class="mono">node --test tests/radio_icon_assets.test.mjs</span>. Run the full suite under <strong>Bun</strong>, not plain Node.</li>
+      <li><strong>Sync manifest exports.</strong> List every runtime <span class="mono">exports(...)</span> actually registered (HUD, seatbelt, stall, harness, cruise, radio, effects, settings) or deliberately narrow the public API and remove the rest from README.</li>
+      <li><strong>Verify the minimap asset in-game.</strong> Confirm <span class="mono">squaremap.ytd</span> replaces the mask; if a placeholder, replace it or document <span class="mono">textureReplacement.enabled = false</span>.</li>
+    </ol>
+    <div class="note"><strong>Gradient/transition findings:</strong> keep the four mask usages only with a recorded waiver and screenshots, otherwise rebuild dividers and fades from solid fills or SVG geometry. Scope the ten <span class="mono">transition: all</span> rules to named properties.</div>
+  </section>
+
+  <section class="section" aria-label="Validation">
+    <div class="section-label">Validation performed and remaining handoff</div>
+    <h3>Static validation (done)</h3>
+    <pre><code># from cortex-hud/
+&amp; "$env:USERPROFILE\.config\opencode\skills\fivem-orchestrator\scripts\validate-resource.ps1" -Path .
+# =&gt; failed: node_modules x3 (must be 0)
+
+&amp; "$env:USERPROFILE\.config\opencode\skills\fivem-orchestrator\scripts\audit-nui-ui.ps1" -Path .\web\src
+# =&gt; 15 files, 4 errors, 10 warnings (listed above)
+
+node --test tests/*.test.mjs
+# =&gt; 29 pass, 2 fail (icon size drift; bun: scheme crash under Node 25)</code></pre>
+    <h3>Runtime handoff (not performed, required)</h3>
+    <ul class="tight muted">
+      <li>Clean install: <span class="mono">ensure cortex-lib</span> then <span class="mono">ensure cortex-hud</span> on a test server; confirm no manifest or <span class="mono">cortex-lib is not loaded</span> errors.</li>
+      <li>Restart: start, restart mid-session, stop; HUD/radar restore, NUI settings reopen cleanly, no stuck focus.</li>
+      <li>Two-client: door open/close, window smash replication, clone-key grant for qbx/qb/standalone, cross-bucket denial.</li>
+      <li>Minimap: square mask on foot and in vehicle, big-map recovery, external map pack on/off.</li>
+      <li>Radio and weapon wheel on keyboard and gamepad; mute/mode labels follow active input; resmon idle and driving before/after.</li>
+    </ul>
+  </section>
+
+  <section class="section" aria-label="References">
+    <div class="section-label">References</div>
+    <p class="muted">Primary sources inspected: <span class="mono">fxmanifest.lua</span>, <span class="mono">init.lua</span>, <span class="mono">config/shared.lua</span>, <span class="mono">modules/interactions/server.lua</span>, <span class="mono">modules/settings/client.lua</span>, <span class="mono">modules/nui/client.lua</span>, <span class="mono">modules/threads/client/hud.lua</span>, <span class="mono">web/src</span> HUD/RadioSelector/SettingsModal CSS, <span class="mono">tests/</span> contracts, <span class="mono">scripts/generate-radio-*.mjs</span>, <span class="mono">README.md</span>, <span class="mono">.gitignore</span>. Doctrine: fivem-orchestrator resource-development, networking, security, NUI, performance, release references. No in-game, multiplayer, asset, performance, visual, or release validation is claimed.</p>
+  </section>
+
+  <footer>Generated 2026-09-03 UTC from static inspection only. Untested conditions: all in-game behavior, two-client replication, resmon numbers, CEF console output, and clean-install packaging after the fixes above.</footer>
+</main>
+</body>
+</html>

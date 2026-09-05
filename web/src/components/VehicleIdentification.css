@@ -1,17 +1,11 @@
 .vehicle-id-card {
   --vehicle-id-accent: #87b893;
-  --vehicle-id-left-inset: calc(0.25vw - 2px);
-  --vehicle-id-minimap-bottom: 5vh;
   --vehicle-id-card-height: 9.3vh;
   position: fixed;
-  left: calc(var(--hud-minimap-left) + var(--vehicle-id-left-inset));
-  bottom: calc(var(--vehicle-id-minimap-bottom) + var(--hud-minimap-height));
   z-index: 1003;
   display: grid;
   grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
-  width: calc(var(--hud-minimap-width) - var(--vehicle-id-left-inset));
   height: var(--vehicle-id-card-height);
-  max-width: calc(100vw - var(--hud-minimap-left) - 1.3vw);
   overflow: hidden;
   color: rgba(245, 244, 240, 0.98);
   border-radius: 0.4vh;

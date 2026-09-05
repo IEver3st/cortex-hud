@@ -2,17 +2,22 @@ import { describe, expect, test } from 'bun:test'
 import { applyHudDevScenario } from './hudDevScenarios.js'
 
 describe('HUD browser-dev scenarios', () => {
-  test('GTA 6 combat enables the authentic on-foot weapon presentation', () => {
+  test('Leonida combat enables the compact on-foot weapon presentation', () => {
     const state = applyHudDevScenario({ vehicleVisible: true }, 'gta6-combat')
 
     expect(state.gta6HudEnabled).toBe(true)
     expect(state.gta6AuthenticWeaponHud).toBe(true)
+    expect(state.locationDisplayStyle).toBe('gta6')
     expect(state.vehicleVisible).toBe(false)
     expect(state.isArmed).toBe(true)
+    expect(state.weaponType).toBe('rifle')
+    expect(state.weaponReticleType).toBe('automatic')
+    expect(state.weaponBloom).toBe(28)
+    expect(state.weaponAiming).toBe(true)
     expect(state.ammoClip).toBe(24)
   })
 
-  test('GTA 6 vehicle intro gets a fresh, valid identity entry', () => {
+  test('Leonida vehicle intro gets a fresh, valid identity entry', () => {
     const state = applyHudDevScenario({}, 'gta6-vehicle', 2048)
 
     expect(state.vehicleVisible).toBe(true)
@@ -35,7 +40,7 @@ describe('HUD browser-dev scenarios', () => {
     expect(state.sniperScopeVisible).toBe(false)
   })
 
-  test('classic scenario clears transient GTA 6 and warning state', () => {
+  test('classic scenario clears transient Leonida and warning state', () => {
     const state = applyHudDevScenario({
       gta6HudEnabled: true,
       floodWarningActive: true,
@@ -44,6 +49,7 @@ describe('HUD browser-dev scenarios', () => {
     }, 'classic-on-foot')
 
     expect(state.gta6HudEnabled).toBe(false)
+    expect(state.locationDisplayStyle).toBe('current')
     expect(state.floodWarningActive).toBe(false)
     expect(state.hurricaneWarningActive).toBe(false)
     expect(state.sniperScopeVisible).toBe(false)

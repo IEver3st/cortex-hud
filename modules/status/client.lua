@@ -5,6 +5,7 @@ local PlayerPedId = PlayerPedId
 local PlayerId = PlayerId
 local IsPedSwimming = IsPedSwimming
 local IsPedSwimmingUnderWater = IsPedSwimmingUnderWater
+local GetPedConfigFlag = GetPedConfigFlag
 local GetPlayerUnderwaterTimeRemaining = GetPlayerUnderwaterTimeRemaining
 local Wait = Wait
 local math_floor = math.floor
@@ -17,10 +18,12 @@ local lastHunger = -1
 local lastThirst = -1
 local lastStress = -1
 local lastOxygen = 100
+local lastOxygenExtended = false
 local lastUnderwater = false
 local lastInWater = false
 
 local breathMaxReference = 10.0
+local PED_CONFIG_FLAG_IS_SCUBA = 135
 
 local lastVoipTalking = nil
 local lastVoipRange = nil
@@ -36,13 +39,12 @@ local cachedRadioChannel = 0
 local cachedRadioTalking = false
 local radioActiveEventState = false
 
+local VOIP_RESOURCES = { 'pma-voice', 'saltychat', 'mumble-voip', 'tokovoip_script', 'zerio-radio' }
+
 local config = lib.require("config.shared")
 
-local function getRangeFromProximityState()
-    local ok, result = pcall(function()
-        return LocalPlayer.state['proximity']
-    end)
-    if not ok or result == nil then
+local function getRangeFromProximityState(result)
+    if result == nil then
         return nil
     end
 
@@ -86,11 +88,8 @@ local function getRangeFromProximityState()
     return nil
 end
 
-local function getVoipProximityFraction(range)
-    local ok, result = pcall(function()
-        return LocalPlayer.state['proximity']
-    end)
-    if ok and type(result) == 'table' then
+local function getVoipProximityFraction(range, result)
+    if type(result) == 'table' then
         local index = result.index
         if type(index) == 'number' then
             if index <= 1 then
@@ -104,7 +103,7 @@ local function getVoipProximityFraction(range)
         if type(distance) == 'number' and distance >= 0 then
             return math_max(0.08, math_min(1, distance / 45.0))
         end
-    elseif ok and type(result) == 'number' and result >= 0 then
+    elseif type(result) == 'number' and result >= 0 then
         return math_max(0.08, math_min(1, result / 45.0))
     end
 
@@ -116,11 +115,8 @@ local function getVoipProximityFraction(range)
     return 0.62
 end
 
-local function getRadioChannelFromState()
-    local ok, result = pcall(function()
-        return LocalPlayer.state.radioChannel
-    end)
-    if not ok or result == nil then
+local function getRadioChannelFromState(result)
+    if result == nil then
         return nil
     end
 
@@ -138,24 +134,24 @@ local function getRadioChannelFromState()
     return nil
 end
 
-local function getRadioTalkingFromState()
-    local stateKeys = {
-        'radioActive',
-        'radioTalking',
-        'talkingOnRadio',
-    }
+local function readVoiceStateBag()
+    local ok, proximity, radioChannel, radioActive, radioTalking, talkingOnRadio = pcall(function()
+        local state = LocalPlayer and LocalPlayer.state
+        if not state then return nil, nil, false, false, false end
 
-    for i = 1, #stateKeys do
-        local ok, value = pcall(function()
-            return LocalPlayer.state[stateKeys[i]]
-        end)
+        return state.proximity,
+            state.radioChannel,
+            state.radioActive,
+            state.radioTalking,
+            state.talkingOnRadio
+    end)
 
-        if ok and value == true then
-            return true
-        end
+    if not ok then
+        return nil, nil, false
     end
 
-    return false
+    return proximity, radioChannel,
+        radioActive == true or radioTalking == true or talkingOnRadio == true
 end
 
 RegisterNetEvent('zerio-radio:client:removedradio', function()
@@ -182,8 +178,7 @@ local function detectVoipResource()
         return nil
     end
 
-    local voipResources = { 'pma-voice', 'saltychat', 'mumble-voip', 'tokovoip_script', 'zerio-radio' }
-    for _, res in ipairs(voipResources) do
+    for _, res in ipairs(VOIP_RESOURCES) do
         if GetResourceState(res) == 'started' then
             return res
         end
@@ -214,8 +209,11 @@ local function pushVoipDisplayConfig()
 end
 
 local function getVoipState()
+    local proximityState, stateRadioChannel, stateRadioTalking = readVoiceStateBag()
+
     if not voipResource then
-        return false, 'normal', false, cachedRadioChannel, cachedRadioTalking
+        return false, 'normal', false, cachedRadioChannel, cachedRadioTalking,
+            getVoipProximityFraction('normal', proximityState)
     end
 
     local talking = false
@@ -247,7 +245,7 @@ local function getVoipState()
         end)
         talking = ok and result == true
 
-        local proximityRange = getRangeFromProximityState()
+        local proximityRange = getRangeFromProximityState(proximityState)
         if proximityRange then
             range = proximityRange
         end
@@ -258,7 +256,7 @@ local function getVoipState()
         end)
         talking = ok and result == true
 
-        local proximityRange = getRangeFromProximityState()
+        local proximityRange = getRangeFromProximityState(proximityState)
         if proximityRange then
             range = proximityRange
         end
@@ -278,9 +276,9 @@ local function getVoipState()
         range = 'normal'
     end
 
-    local stateRadioChannel = getRadioChannelFromState()
-    if stateRadioChannel ~= nil then
-        radioChannel = stateRadioChannel
+    local normalizedRadioChannel = getRadioChannelFromState(stateRadioChannel)
+    if normalizedRadioChannel ~= nil then
+        radioChannel = normalizedRadioChannel
     end
 
     local ok, result = pcall(NetworkIsPlayerTalkingOnRadio)
@@ -289,13 +287,14 @@ local function getVoipState()
     elseif radioActiveEventState then
         radioTalking = true
     else
-        radioTalking = getRadioTalkingFromState()
+        radioTalking = stateRadioTalking
     end
 
     cachedRadioChannel = radioChannel
     cachedRadioTalking = radioTalking
 
-    return talking, range, connected, radioChannel, radioTalking
+    return talking, range, connected, radioChannel, radioTalking,
+        getVoipProximityFraction(range, proximityState)
 end
 
 local function refreshVoipResource(now)
@@ -334,7 +333,7 @@ local function getPlayerStatus()
     if sbThirst ~= nil then thirst = sbThirst end
     if sbStress ~= nil then stress = sbStress end
 
-    if sbHunger == nil or sbThirst == nil then
+    if (sbHunger == nil or sbThirst == nil) and GetResourceState('qbx_core') == 'started' then
         local ok, playerData = pcall(function() return exports.qbx_core:GetPlayerData() end)
         if ok and playerData and playerData.metadata then
             hunger = playerData.metadata.hunger or hunger
@@ -356,13 +355,24 @@ local function getOxygenState()
     local inWater = IsPedSwimming(ped) or underwater
 
     if not underwater then
-        breathMaxReference = math_max(breathMaxReference, currentOxygen)
-        return 100, false, inWater
+        if currentOxygen > 0 then
+            -- Refresh the surface baseline so removing extended breathing gear
+            -- returns the Leonida oxygen meter to its compact width.
+            breathMaxReference = currentOxygen
+        end
+
+        local oxygenExtended = GetPedConfigFlag(ped, PED_CONFIG_FLAG_IS_SCUBA, true) == true
+            or breathMaxReference > 15.0
+        return 100, false, inWater, oxygenExtended
     end
 
+    -- Covers gear applied after the player has already entered the water.
+    breathMaxReference = math_max(breathMaxReference, currentOxygen)
     local denom = math_max(0.25, breathMaxReference)
     local percent = (currentOxygen / denom) * 100
-    return math_floor(math_max(0, math_min(100, percent))), true, inWater
+    local oxygenExtended = GetPedConfigFlag(ped, PED_CONFIG_FLAG_IS_SCUBA, true) == true
+        or breathMaxReference > 15.0
+    return math_floor(math_max(0, math_min(100, percent))), true, inWater, oxygenExtended
 end
 
 function Status.start(config, isFullyVisible)
@@ -389,6 +399,7 @@ function Status.start(config, isFullyVisible)
                         thirst = thirst,
                         stress = stress,
                         oxygen = lastOxygen,
+                        oxygenExtended = lastOxygenExtended,
                         underwater = lastUnderwater,
                         inWater = lastInWater,
                     })
@@ -408,19 +419,25 @@ function Status.start(config, isFullyVisible)
             local sleep = 500
 
             if isFullyVisible() then
-                local oxygen, underwater, inWater = getOxygenState()
+                local oxygen, underwater, inWater, oxygenExtended = getOxygenState()
                 local oxygenChanging = inWater or oxygen < 100 or lastInWater or lastOxygen < 100
 
                 sleep = oxygenChanging and 150 or 750
 
-                if oxygen ~= lastOxygen or underwater ~= lastUnderwater or inWater ~= lastInWater then
+                if oxygen ~= lastOxygen
+                    or oxygenExtended ~= lastOxygenExtended
+                    or underwater ~= lastUnderwater
+                    or inWater ~= lastInWater
+                then
                     lastOxygen = oxygen
+                    lastOxygenExtended = oxygenExtended
                     lastUnderwater = underwater
                     lastInWater = inWater
 
                     SendNUIMessage({
                         action = 'updateStatus',
                         oxygen = oxygen,
+                        oxygenExtended = oxygenExtended,
                         underwater = underwater,
                         inWater = inWater,
                     })
@@ -441,8 +458,7 @@ function Status.start(config, isFullyVisible)
             refreshVoipResource(GetGameTimer())
 
             if voipResource and isFullyVisible() then
-                local talking, range, connected, radioChannel, radioTalking = getVoipState()
-                local proximity = getVoipProximityFraction(range)
+                local talking, range, connected, radioChannel, radioTalking, proximity = getVoipState()
 
                 if talking ~= lastVoipTalking or range ~= lastVoipRange or connected ~= lastVoipConnected or radioChannel ~= lastRadioChannel or radioTalking ~= lastRadioTalking or proximity ~= lastVoipProximity then
                     lastVoipTalking = talking

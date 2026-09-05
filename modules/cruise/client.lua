@@ -178,6 +178,11 @@ function Cruise:startApplyLoop()
 
     CreateThread(function()
         while enabled do
+            if not self.active then
+                Wait(250)
+                goto continue
+            end
+
             Wait(0)
             if not self.active then
                 goto continue

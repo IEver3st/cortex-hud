@@ -5,6 +5,11 @@ local threads = {}
 local callbacks = {}
 local messages = {}
 local smashed = nil
+local timeouts = {}
+local serverEvents = {}
+local holdsStarted = {}
+local holdsCancelled = {}
+local vehicleDriveable = true
 
 lib = {
     showInteraction = function(interaction)
@@ -22,6 +27,14 @@ lib = {
     progress = function()
         return true
     end,
+    startInteractionHold = function(id)
+        holdsStarted[#holdsStarted + 1] = id
+        return true
+    end,
+    cancelInteractionHold = function(id)
+        holdsCancelled[#holdsCancelled + 1] = id
+        return true
+    end,
 }
 
 function GetCurrentResourceName() return 'cortex-hud' end
@@ -32,7 +45,10 @@ function RegisterNUICallback(name, callback) callbacks[name] = callback end
 function AddEventHandler() end
 function SendNUIMessage(message) messages[#messages + 1] = message end
 function CreateThread(callback) threads[#threads + 1] = callback end
-function SetTimeout() end
+function SetTimeout(_, callback) timeouts[#timeouts + 1] = callback end
+function TriggerServerEvent(name, ...)
+    serverEvents[#serverEvents + 1] = { name = name, args = { ... } }
+end
 function PlayerPedId() return 100 end
 function DoesEntityExist(entity) return entity == 100 or entity == 501 end
 function IsEntityDead() return false end
@@ -40,6 +56,7 @@ function IsPedRagdoll() return false end
 function IsPedInAnyVehicle() return false end
 function IsPedUsingAnyScenario() return false end
 function GetEntityType(entity) return entity == 501 and 2 or 1 end
+function IsVehicleDriveable() return vehicleDriveable end
 function GetIsDoorValid() return true end
 function GetEntitySpeed() return 0.0 end
 function GetVehicleDoorLockStatus() return 2 end
@@ -67,6 +84,7 @@ module.start({
     VehicleAccessInteractions = {
         enabled = true,
         requireGta6Hud = true,
+        holdDuration = 220,
         interactionDistance = 2.0,
         scanRadius = 6.0,
         activeScanInterval = 100,
@@ -109,6 +127,7 @@ local clone = assert(published['vehicle-clone-key'], 'clone interaction was not 
 local smash = assert(published['vehicle-smash-window'], 'smash interaction was not published')
 assert(clone.key == 'K' and clone.label == 'CLONE KEY')
 assert(smash.key == 'G' and smash.label == 'SMASH WINDOW')
+assert(clone.holdDuration == 220 and smash.holdDuration == 220)
 assert(clone.anchor.entity == 501 and clone.anchor.bone == 'handle_dside_f')
 assert(clone.anchor.offset.z == 0.0 and smash.anchor.offset.z == 0.0, 'access actions did not share one anchor')
 
@@ -118,5 +137,34 @@ smashEvent(41, 4)
 assert(smashed == nil, 'malformed owner payload smashed a window')
 smashEvent(41, 0)
 assert(smashed and smashed.vehicle == 501 and smashed.window == 0)
+
+vehicleDriveable = false
+smashed = nil
+smashEvent(41, 0)
+assert(smashed == nil, 'destroyed vehicle accepted a remote smash mutation')
+
+local scanOk, scanError = pcall(threads[1])
+assert(not scanOk and tostring(scanError):find('__scan_complete__', 1, true), tostring(scanError))
+assert(published['vehicle-clone-key'] == nil and published['vehicle-smash-window'] == nil,
+    'destroyed vehicle still published access interactions')
+
+vehicleDriveable = true
+scanOk, scanError = pcall(threads[1])
+assert(not scanOk and tostring(scanError):find('__scan_complete__', 1, true), tostring(scanError))
+
+commands['+cloneTest']()
+assert(holdsStarted[1] == 'vehicle-clone-key' and #serverEvents == 0,
+    'clone action ran before its quick hold completed')
+commands['-cloneTest']()
+assert(holdsCancelled[1] == 'vehicle-clone-key')
+timeouts[1]()
+assert(#serverEvents == 0, 'cancelled clone hold still reached the server')
+
+commands['+cloneTest']()
+timeouts[2]()
+assert(type(threads[2]) == 'function', 'completed clone hold did not schedule the action')
+threads[2]()
+assert(serverEvents[1] and serverEvents[1].name == 'cortex-hud:server:beginVehicleKeyClone',
+    'completed clone hold did not start the clone action')
 
 print('vehicle access interaction tests passed')

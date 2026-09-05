@@ -29,6 +29,8 @@ local GetHeliMainRotorHealth = GetHeliMainRotorHealth
 local Wait = Wait
 
 local VEHICLE_IDENTITY_LIVE_MS = 6500
+local FUEL_REFRESH_MS = 500
+local PASSIVE_GROUND_REFRESH_MS = 250
 local vehicleIdentitySequence = 0
 
 local INVALID_VEHICLE_LABELS = {
@@ -170,6 +172,10 @@ function VehicleStatusThread:start()
         local identityEngineState = false
         local identityEngineHealth = 100
         local identityFuel = 100
+        local fuelVehicle = 0
+        local cachedFuelValue = 100.0
+        local cachedHasFuelProvider = false
+        local nextFuelRefreshAt = 0
 
         local ok, err = xpcall(function()
             local ped = PlayerPedId()
@@ -190,18 +196,26 @@ function VehicleStatusThread:start()
                 end
             local vehicleType = GetVehicleType(vehicle)
             local engineHealth = convertEngineHealthToPercentage(GetVehicleEngineHealth(vehicle))
-            local rawFuelValue, hasFuelProvider = Fuel.get(vehicle)
-            local fuelValue = math.max(0, math.min(rawFuelValue or 0, 100))
             local engineState = GetIsVehicleEngineRunning(vehicle)
-            local fuel = math.floor(fuelValue)
-            Fuel.handleAlerts(vehicle, fuelValue)
             local _, lightsOn, highbeamsOn = GetVehicleLightsState(vehicle)
-
             local isAircraft = vehicleType == "heli" or vehicleType == "plane"
+            local now = GetGameTimer()
+
+            if vehicle ~= fuelVehicle or now >= nextFuelRefreshAt then
+                local rawFuelValue, hasFuelProvider = Fuel.get(vehicle)
+                cachedFuelValue = math.max(0, math.min(rawFuelValue or 0, 100))
+                cachedHasFuelProvider = hasFuelProvider
+                fuelVehicle = vehicle
+                nextFuelRefreshAt = now + FUEL_REFRESH_MS
+                Fuel.handleAlerts(vehicle, cachedFuelValue)
+            end
+
+            local fuelValue = cachedFuelValue
+            local hasFuelProvider = cachedHasFuelProvider
+            local fuel = math.floor(fuelValue)
             local identityAllowed = config.gta6HudEnabled == true
                 and config.gta6VehicleIdentification ~= false
                 and not isAircraft
-            local now = GetGameTimer()
 
             if vehicle ~= identityVehicle then
                 if identityEntryId then
@@ -403,6 +417,7 @@ function VehicleStatusThread:start()
                         })
                     end
                 else
+                local speedMs = GetEntitySpeed(vehicle)
                 local highGear = GetVehicleHighGear(vehicle)
                 local currentGear = GetVehicleCurrentGear(vehicle)
                 local newGears = highGear
@@ -416,7 +431,7 @@ function VehicleStatusThread:start()
                     gearString = ""
                 elseif currentGear == 0 then
                     gearString = "R"
-                elseif currentGear == 1 and GetEntitySpeed(vehicle) < 0.1 and engineState then
+                elseif currentGear == 1 and speedMs < 0.1 and engineState then
                     gearString = "N"
                 else
                     gearString = tostring(currentGear)
@@ -428,9 +443,9 @@ function VehicleStatusThread:start()
                 local speed
                 local normalizedSpeedUnit = string.lower(config.speedUnit)
                 if normalizedSpeedUnit == "kph" then
-                    speed = math.floor(GetEntitySpeed(vehicle) * 3.6)
+                    speed = math.floor(speedMs * 3.6)
                 else
-                    speed = math.floor(GetEntitySpeed(vehicle) * 2.236936)
+                    speed = math.floor(speedMs * 2.236936)
                 end
 
                 local rpm
@@ -536,7 +551,15 @@ function VehicleStatusThread:start()
                 end
             end
 
-            Wait(100)
+            local sleep = 100
+            if not isAircraft
+                and (config.disableSpeedometer == true or config.gta6HudEnabled == true)
+                and not identityActive
+            then
+                sleep = PASSIVE_GROUND_REFRESH_MS
+            end
+
+            Wait(sleep)
         end
         end, debug.traceback)
 

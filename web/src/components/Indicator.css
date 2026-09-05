@@ -32,8 +32,8 @@
   color: var(--hud-text);
   overflow: hidden;
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  backdrop-filter: var(--es-glass-filter);
+  -webkit-backdrop-filter: var(--es-glass-filter);
 }
 
 .indicator-container.indicator-position-relative {
@@ -147,8 +147,8 @@
   border-radius: calc(999px * var(--es-ui-scale));
   overflow: hidden;
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  backdrop-filter: var(--es-glass-filter);
+  -webkit-backdrop-filter: var(--es-glass-filter);
 }
 
 .indicator-capsules .indicator-box + .indicator-box {

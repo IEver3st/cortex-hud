@@ -283,4 +283,4 @@ const Indicator = ({
   return bar
 }
 
-export default Indicator
+export default React.memo(Indicator)

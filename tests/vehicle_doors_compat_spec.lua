@@ -1,6 +1,13 @@
 local commands = {}
 
 lib = {
+    require = function(path)
+        assert(path == 'modules.interactions.vehicle_pool')
+        return {
+            get = function() return GetGamePool('CVehicle') end,
+            getCoords = function(vehicle) return GetEntityCoords(vehicle) end,
+        }
+    end,
     showInteraction = function()
         return true
     end,

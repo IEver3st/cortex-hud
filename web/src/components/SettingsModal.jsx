@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
+import { LOCATION_DISPLAY_OPTIONS, normalizeLocationDisplayStyle } from '../locationDisplayStyle.js'
 import './SettingsModal.css'
 
 const SPEED_UNIT_OPTIONS = [
@@ -164,6 +165,9 @@ const DEFAULTS = {
     gta6AuthenticWeaponHud: false,
     gta6ShowWeaponName: true,
     gta6VehicleIdentification: true,
+    customWeaponWheel: false,
+    customRadioUi: true,
+    locationDisplayStyle: 'current',
     showDynamicWeather: false,
     showFlashFloodWarning: true,
     showHurricaneWarning: true,
@@ -172,7 +176,6 @@ const DEFAULTS = {
     statusIconShape: 'bar',
     oxygenDisplayLocation: 'statusCluster',
     backdropBlur: 1,
-    panelOpacity: 1,
 }
 
 const getPresetColor = (presetName, colorKey) => {
@@ -198,10 +201,7 @@ const buildInitialState = (settings = {}) => {
 
     const b = Number(initialState.backdropBlur)
     initialState.backdropBlur = Number.isFinite(b) ? Math.min(3, Math.max(0.25, b)) : 1
-
-    let po = Number(initialState.panelOpacity)
-    if (Number.isFinite(po) && po >= 15 && po <= 100) po = po / 100
-    initialState.panelOpacity = Number.isFinite(po) ? Math.min(1, Math.max(0.15, po)) : 1
+    initialState.locationDisplayStyle = normalizeLocationDisplayStyle(initialState.locationDisplayStyle)
 
     return initialState
 }
@@ -274,7 +274,7 @@ const SettingsModal = ({
 
                 <div className="settings-body">
                     <div className="settings-section">
-                        <div className="settings-section-title">Appearance</div>
+                        <div className="settings-section-title">HUD Style</div>
 
                         <div className="settings-row">
                             <div>
@@ -290,8 +290,8 @@ const SettingsModal = ({
 
                         <div className="settings-row">
                             <div>
-                                <div className="settings-row-label">Glass blur</div>
-                                <div className="settings-row-desc">Frost strength: panel tint + rim. FiveM CEF cannot do real backdrop blur (black rects); this simulates glass without backdrop-filter.</div>
+                                <div className="settings-row-label">Glass Blur</div>
+                                <div className="settings-row-desc">Control the background blur behind translucent HUD surfaces.</div>
                             </div>
                             <div className="settings-slider-wrap">
                                 <input
@@ -309,34 +309,20 @@ const SettingsModal = ({
 
                         <div className="settings-row">
                             <div>
-                                <div className="settings-row-label">Panel opacity</div>
-                                <div className="settings-row-desc">Glass fill strength. 15% minimum so HUD never fully disappears.</div>
+                                <div className="settings-row-label">Location Display Style</div>
+                                <div className="settings-row-desc">Turn location announcements off or choose the Current or Leonida presentation.</div>
                             </div>
-                            <div className="settings-slider-wrap">
-                                <input
-                                    type="range"
-                                    className="settings-slider"
-                                    min="15"
-                                    max="100"
-                                    step="5"
-                                    value={Math.min(100, Math.max(15, Math.round(Number(local.panelOpacity) * 100)))}
-                                    onChange={(e) => set('panelOpacity', Number(e.target.value) / 100)}
-                                />
-                                <span className="settings-slider-value">{Math.round(Number(local.panelOpacity) * 100)}%</span>
-                            </div>
+                            <CustomDropdown
+                                value={local.locationDisplayStyle}
+                                options={LOCATION_DISPLAY_OPTIONS}
+                                onChange={(val) => set('locationDisplayStyle', val)}
+                            />
                         </div>
-                    </div>
-
-                    <div className="settings-divider" />
-
-                    {}
-                    <div className="settings-section">
-                        <div className="settings-section-title">Display</div>
 
                         <div className="settings-row">
                             <div>
-                                <div className="settings-row-label">GTA 6 HUD</div>
-                                <div className="settings-row-desc">Damage-triggered vitals, active weapon, and brief GTA V place discoveries</div>
+                                <div className="settings-row-label">Leonida UI</div>
+                                <div className="settings-row-desc">Use contextual vitals, a compact weapon display, and Leonida interaction styling.</div>
                             </div>
                             <button
                                 type="button"
@@ -352,15 +338,15 @@ const SettingsModal = ({
                             <>
                                 <div className="settings-row">
                                     <div>
-                                        <div className="settings-row-label">Authentic Weapon HUD</div>
-                                        <div className="settings-row-desc">Compact GTA 6 ammo layout and minimal firearm reticle</div>
+                                        <div className="settings-row-label">Compact Weapon HUD</div>
+                                        <div className="settings-row-desc">Use the compact ammo-over-weapon layout and minimal firearm reticle.</div>
                                     </div>
                                     <button
                                         type="button"
                                         className={`settings-toggle ${local.gta6AuthenticWeaponHud ? 'active' : ''}`}
                                         onClick={() => set('gta6AuthenticWeaponHud', !local.gta6AuthenticWeaponHud)}
                                         aria-pressed={local.gta6AuthenticWeaponHud}
-                                        aria-label="Use authentic GTA 6 weapon HUD and crosshair"
+                                        aria-label="Use the compact Leonida weapon HUD and reticle"
                                     >
                                         <span className="settings-toggle-knob" />
                                     </button>
@@ -370,7 +356,7 @@ const SettingsModal = ({
                                     <div className="settings-row">
                                         <div>
                                             <div className="settings-row-label">Show Weapon Name</div>
-                                            <div className="settings-row-desc">Show the active weapon name beside its icon in GTA 6 HUD mode</div>
+                                            <div className="settings-row-desc">Show the active weapon name beside its icon when Leonida UI is enabled.</div>
                                         </div>
                                         <button
                                             type="button"
@@ -386,7 +372,7 @@ const SettingsModal = ({
                                 <div className="settings-row">
                                     <div>
                                         <div className="settings-row-label">Vehicle Introduction</div>
-                                        <div className="settings-row-desc">Show brand, model, engine health, and fuel when entering a vehicle</div>
+                                        <div className="settings-row-desc">Show the vehicle brand, model, engine health, and fuel when you enter a vehicle.</div>
                                     </div>
                                     <button
                                         type="button"
@@ -399,6 +385,12 @@ const SettingsModal = ({
                                 </div>
                             </>
                         )}
+                    </div>
+
+                    <div className="settings-divider" />
+
+                    <div className="settings-section">
+                        <div className="settings-section-title">Display</div>
 
                         <div className="settings-row">
                             <div>
@@ -417,7 +409,7 @@ const SettingsModal = ({
                                 <div className="settings-row-label">Disable Speedometer</div>
                                 <div className="settings-row-desc">
                                     {speedometerForcedOff
-                                        ? 'Disabled automatically while GTA 6 HUD mode is active'
+                                        ? 'Hidden automatically while Leonida UI is enabled.'
                                         : 'Hide the vehicle speedometer HUD element'}
                                 </div>
                             </div>
@@ -436,7 +428,7 @@ const SettingsModal = ({
                         <div className="settings-row">
                             <div>
                                 <div className="settings-row-label">Show Postal</div>
-                                <div className="settings-row-desc">Display nearest postal code</div>
+                                <div className="settings-row-desc">Display nearest postal code in the Current location style</div>
                             </div>
                             <div
                                 className={`settings-toggle ${local.showPostal ? 'active' : ''}`}
@@ -449,7 +441,7 @@ const SettingsModal = ({
                         <div className="settings-row">
                             <div>
                                 <div className="settings-row-label">Postal Distance</div>
-                                <div className="settings-row-desc">Show distance to nearest postal</div>
+                                <div className="settings-row-desc">Show distance to nearest postal in the Current location style</div>
                             </div>
                             <div
                                 className={`settings-toggle ${local.showPostalDistance ? 'active' : ''}`}
@@ -526,7 +518,7 @@ const SettingsModal = ({
                             </div>
                         </div>
 
-                        <div className="settings-row">
+                        {local.locationDisplayStyle === 'current' && <div className="settings-row">
                             <div>
                                 <div className="settings-row-label">Segmented top bar</div>
                                 <div className="settings-row-desc">Gapped capsules for compass / street / zone strip</div>
@@ -537,6 +529,50 @@ const SettingsModal = ({
                             >
                                 <div className="settings-toggle-knob" />
                             </div>
+                        </div>}
+                    </div>
+
+                    <div className="settings-divider" />
+
+                    <div className="settings-section">
+                        <div className="settings-section-title">Weapon Wheel</div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Custom Weapon Wheel</div>
+                                <div className="settings-row-desc">Use the eight-station Cortex selector while on foot</div>
+                            </div>
+                            <button
+                                type="button"
+                                className={`settings-toggle ${local.customWeaponWheel ? 'active' : ''}`}
+                                onClick={() => set('customWeaponWheel', !local.customWeaponWheel)}
+                                aria-pressed={local.customWeaponWheel}
+                                aria-label="Use custom Cortex weapon wheel"
+                            >
+                                <span className="settings-toggle-knob" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="settings-divider" />
+
+                    <div className="settings-section">
+                        <div className="settings-section-title">Vehicle Radio</div>
+
+                        <div className="settings-row">
+                            <div>
+                                <div className="settings-row-label">Custom Radio UI</div>
+                                <div className="settings-row-desc">Use the Cortex radio selector instead of the base GTA radio wheel</div>
+                            </div>
+                            <button
+                                type="button"
+                                className={`settings-toggle ${local.customRadioUi ? 'active' : ''}`}
+                                onClick={() => set('customRadioUi', !local.customRadioUi)}
+                                aria-pressed={local.customRadioUi}
+                                aria-label="Use custom Cortex radio interface"
+                            >
+                                <span className="settings-toggle-knob" />
+                            </button>
                         </div>
                     </div>
 
@@ -871,5 +907,5 @@ const SettingsModal = ({
     )
 }
 
-export default SettingsModal
+export default React.memo(SettingsModal)
 

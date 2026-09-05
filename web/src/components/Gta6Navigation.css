@@ -1,122 +1,69 @@
-.gta6-place-discovery {
-  --gta6-place-accent: #df6ba2;
-  --gta6-place-minimap-gap: calc(18px * var(--gta6-place-scale, 1));
-  --gta6-place-minimap-half-height: 9.15vh;
+.gta6-location-plaque {
+  --gta6-location-scale: 1;
   position: fixed;
-  left: calc(
-    var(--hud-minimap-left)
-    + var(--hud-minimap-width)
-    + var(--gta6-place-minimap-gap)
-  );
-  bottom: calc(
-    var(--hud-safezone-bottom)
-    + var(--gta6-place-minimap-half-height)
-    - (26px * var(--gta6-place-scale, 1))
-  );
   z-index: 1002;
   display: grid;
-  grid-template-columns:
-    calc(44px * var(--gta6-place-scale, 1))
-    calc(1px * var(--gta6-place-scale, 1))
-    minmax(0, auto);
-  align-items: center;
-  column-gap: calc(14px * var(--gta6-place-scale, 1));
-  width: min(calc(310px * var(--gta6-place-scale, 1)), calc(100vw - (32px * var(--gta6-place-scale, 1))));
-  min-height: calc(52px * var(--gta6-place-scale, 1));
-  color: rgba(240, 237, 233, 0.94);
+  place-items: center;
+  height: calc(40px * var(--gta6-location-scale));
+  padding-inline: calc(16px * var(--gta6-location-scale));
+  box-sizing: border-box;
+  overflow: hidden;
+  color: rgba(215, 211, 220, 0.92);
+  background: #29243b;
+  border: calc(2px * var(--gta6-location-scale)) solid rgba(17, 15, 23, 0.96);
+  border-radius: calc(9px * var(--gta6-location-scale));
+  box-shadow:
+    inset 0 0 0 calc(1px * var(--gta6-location-scale)) rgba(112, 104, 130, 0.72),
+    0 calc(2px * var(--gta6-location-scale)) calc(2px * var(--gta6-location-scale)) rgba(0, 0, 0, 0.58);
   opacity: 0;
   pointer-events: none;
-  transform: translate3d(0, calc(6px * var(--gta6-place-scale, 1)), 0);
+  transform: translate3d(0, calc(4px * var(--gta6-location-scale)), 0);
   transition:
-    opacity 0.24s ease-out,
-    transform 0.24s ease-out,
-    left 0.2s ease-out,
-    bottom 0.2s ease-out;
+    opacity 0.28s ease-out,
+    transform 0.28s ease-out;
 }
 
-.gta6-place-discovery.is-visible {
+.gta6-location-plaque.is-visible {
   opacity: 1;
   transform: translate3d(0, 0, 0);
 }
 
-.gta6-place-discovery.is-radar-hidden {
-  left: calc(var(--hud-minimap-left) + (10px * var(--gta6-place-scale, 1)));
-  bottom: calc(var(--hud-safezone-bottom) + (24px * var(--gta6-place-scale, 1)));
-}
-
-.gta6-place-discovery.tone-teal { --gta6-place-accent: #78b8b5; }
-.gta6-place-discovery.tone-purple { --gta6-place-accent: #aa91c2; }
-.gta6-place-discovery.tone-coral { --gta6-place-accent: #e79388; }
-.gta6-place-discovery.tone-blue { --gta6-place-accent: #7da7bd; }
-.gta6-place-discovery.tone-yellow { --gta6-place-accent: #d7c78e; }
-
-.gta6-place-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(44px * var(--gta6-place-scale, 1));
-  height: calc(44px * var(--gta6-place-scale, 1));
-  color: var(--gta6-place-accent);
-  filter: drop-shadow(0 calc(2px * var(--gta6-place-scale, 1)) calc(3px * var(--gta6-place-scale, 1)) rgba(0, 0, 0, 0.32));
-}
-
-.gta6-place-icon svg {
+.gta6-location-label {
+  display: block;
   width: 100%;
-  height: 100%;
-  overflow: visible;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.65;
-  vector-effect: non-scaling-stroke;
-}
-
-.gta6-place-divider {
-  width: 100%;
-  height: calc(38px * var(--gta6-place-scale, 1));
-  background: rgba(228, 224, 220, 0.22);
-}
-
-.gta6-place-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: calc(4px * var(--gta6-place-scale, 1));
-}
-
-.gta6-place-primary,
-.gta6-place-secondary {
-  max-width: 100%;
   overflow: hidden;
-  font-family: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
-  font-synthesis: none;
+  font-family: 'Trebuchet MS', 'Segoe UI', Arial, sans-serif;
+  font-size: calc(18px * var(--gta6-location-scale));
+  font-weight: 500;
+  letter-spacing: calc(1.15px * var(--gta6-location-scale));
   line-height: 1;
+  text-align: center;
   text-overflow: ellipsis;
-  text-shadow: 0 calc(1px * var(--gta6-place-scale, 1)) calc(3px * var(--gta6-place-scale, 1)) rgba(0, 0, 0, 0.62);
-  text-transform: uppercase;
+  text-shadow:
+    0 calc(1px * var(--gta6-location-scale)) 0 rgba(0, 0, 0, 0.72),
+    0 0 calc(2px * var(--gta6-location-scale)) rgba(218, 213, 224, 0.16);
   white-space: nowrap;
+  animation: gta6-location-label-in 0.2s ease-out;
 }
 
-.gta6-place-primary {
-  color: rgba(242, 239, 235, 0.96);
-  font-size: calc(21px * var(--gta6-place-scale, 1));
-  font-weight: 800;
-  letter-spacing: calc(0.85px * var(--gta6-place-scale, 1));
-}
+@keyframes gta6-location-label-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, calc(2px * var(--gta6-location-scale)), 0);
+  }
 
-.gta6-place-secondary {
-  color: var(--gta6-place-accent);
-  font-size: calc(12px * var(--gta6-place-scale, 1));
-  font-weight: 800;
-  letter-spacing: calc(1.05px * var(--gta6-place-scale, 1));
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gta6-place-discovery {
-    transform: none;
-    transition:
-      opacity 0.12s linear,
-      bottom 0s linear;
+  .gta6-location-plaque {
+    transition: none;
+  }
+
+  .gta6-location-label {
+    animation: none;
   }
 }

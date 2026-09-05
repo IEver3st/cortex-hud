@@ -1,0 +1,24 @@
+Pricedown (vanilla GTA ammo typeface) notice
+============================================
+
+Ammo readouts in this HUD use Pricedown Black by Ray Larabie (Typodermic),
+the typeface behind the Grand Theft Auto wordmark and the in-game HUD type.
+cortex-hud is not affiliated with or endorsed by Rockstar Games, Take-Two
+Interactive, Ray Larabie, or Typodermic Fonts.
+
+NO FONT FILE IS BUNDLED, by design. The free Typodermic Desktop license
+forbids embedding the font in a game/app/website, converting or renaming
+it, sharing it, and including it in open-source or publicly available
+software. Serving it through NUI @font-face would be exactly such a use,
+so the HUD only references a locally installed copy:
+
+  local('Pricedown Black'), local('Pricedown Bl'), local('Pricedown')
+
+To see the exact vanilla look, install Pricedown Black as a system font on
+the PC that runs the game client (one install per player). Sources:
+
+  https://typodermicfonts.com/pricedown (paid Web/Game license available)
+  https://www.dafont.com/pricedown.font (free Desktop license)
+
+Until Pricedown is installed locally, ammo falls back to Barlow Condensed
+(bundled under OFL, see barlow-condensed-OFL.txt in this folder).

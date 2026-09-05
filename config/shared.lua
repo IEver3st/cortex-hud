@@ -15,6 +15,68 @@ Config.PostalFile = "ocrp-postals.json"
 Config.speedUnit = "mph"
 Config.disableSpeedometer = false
 
+-- Native vehicle-radio replacement. Hold the normal radio-wheel control (Q /
+-- controller D-pad Left), then scroll or use left/right to move continuously.
+-- While the strip is open, R / controller B changes Live Radio/On Demand mode and
+-- is presented through cortex-lib at bottom-right. X / controller A mutes
+-- without forgetting the selected station.
+Config.Radio = {
+    enabled = true,
+    replaceDefaultWheel = true,
+    onDemandEnabled = true,
+    rememberSelection = true,
+    rememberMode = true,
+    rememberMute = false,
+    defaultStation = 'RADIO_01_CLASS_ROCK',
+    openControl = 85, -- INPUT_VEH_RADIO_WHEEL
+    nextControls = { 14, 81, 175, 180 }, -- wheel down, next radio, right, phone scroll forward
+    previousControls = { 15, 82, 174, 181 }, -- wheel up, previous radio, left, phone scroll back
+    nextTrackControl = 83,
+    previousTrackControl = 84,
+    modeControl = 80, -- INPUT_VEH_CIN_CAM (R / controller B while open)
+    muteControl = 73, -- INPUT_VEH_DUCK (X / controller A while open)
+    modeKeyboardLabel = 'R',
+    modeGamepadLabel = 'B',
+    muteKeyboardLabel = 'X',
+    muteGamepadLabel = 'A',
+    modeHintPriority = 40,
+    inputModePollInterval = 100,
+    selectionCooldown = 90,
+    inputRepeatDelay = 300,
+    inputRepeatInterval = 115,
+    quickSwitchDisplayTime = 1400,
+    metadataPollInterval = 250,
+    stations = {
+        { name = 'RADIO_36_AUDIOPLAYER', label = 'Media Player', mark = 'MP' },
+        { name = 'RADIO_37_MOTOMAMI', label = 'MOTOMAMI Los Santos', mark = 'MOTO' },
+        { name = 'RADIO_35_DLC_HEI4_MLR', label = 'The Music Locker', mark = 'ML' },
+        { name = 'RADIO_12_REGGAE', label = 'Blue Ark', mark = 'BA' },
+        { name = 'RADIO_13_JAZZ', label = 'Worldwide FM', mark = 'WW' },
+        { name = 'RADIO_14_DANCE_02', label = 'FlyLo FM', mark = 'FLY' },
+        { name = 'RADIO_15_MOTOWN', label = 'The Lowdown 91.1', mark = '91.1' },
+        { name = 'RADIO_20_THELAB', label = 'The Lab', mark = 'LAB' },
+        { name = 'RADIO_16_SILVERLAKE', label = 'Radio Mirror Park', mark = 'RMP' },
+        { name = 'RADIO_34_DLC_HEI4_KULT', label = 'Kult FM', mark = 'KULT' },
+        { name = 'RADIO_17_FUNK', label = 'Space 103.2', mark = '103.2' },
+        { name = 'RADIO_18_90S_ROCK', label = 'Vinewood Boulevard Radio', mark = 'VBR' },
+        { name = 'RADIO_21_DLC_XM17', label = 'blonded Los Santos 97.8 FM', mark = 'BLOND' },
+        { name = 'RADIO_22_DLC_BATTLE_MIX1_RADIO', label = 'Los Santos Underground Radio', mark = 'LSUR' },
+        { name = 'RADIO_23_DLC_XM19_RADIO', label = 'iFruit Radio', mark = 'iF' },
+        { name = 'RADIO_01_CLASS_ROCK', label = 'Los Santos Rock Radio', mark = 'LSRR' },
+        { name = 'RADIO_02_POP', label = 'Non-Stop-Pop FM', mark = 'NSP' },
+        { name = 'RADIO_03_HIPHOP_NEW', label = 'Radio Los Santos', mark = 'RLS' },
+        { name = 'RADIO_04_PUNK', label = 'Channel X', mark = 'X' },
+        { name = 'RADIO_05_TALK_01', label = 'West Coast Talk Radio', mark = 'WCTR' },
+        { name = 'RADIO_06_COUNTRY', label = 'Rebel Radio', mark = 'REBEL' },
+        { name = 'RADIO_07_DANCE_01', label = 'Soulwax FM', mark = 'SW' },
+        { name = 'RADIO_08_MEXICAN', label = 'East Los FM', mark = 'EL' },
+        { name = 'RADIO_09_HIPHOP_OLD', label = 'West Coast Classics', mark = 'WCC' },
+        { name = 'RADIO_11_TALK_02', label = 'Blaine County Radio', mark = 'BCR' },
+        { name = 'RADIO_27_DLC_PRHEI4', label = 'Still Slipping Los Santos', mark = 'SSLS' },
+        { name = 'RADIO_19_USER', label = 'Self Radio', mark = 'SELF' },
+    },
+}
+
 --- Land vehicles only. Toggle caps vehicle max speed at current speed. Brake, impact, slowdown, handbrake, engine off, or exit cancels.
 Config.cruiseControl = {
     enabled = true,
@@ -132,17 +194,72 @@ Config.cinematicNotifications = true
 Config.minimapOnlyInVehicle = false
 Config.fuelDisplayStyle = 'bar'
 Config.showCrosshair = false
--- Replaces the core status/ammo presentation with the GTA 6-inspired
+-- Passive screen-edge feedback. Durations and cooldowns are milliseconds.
+-- Edge effects use transparent inset shadows and never take NUI focus or pointer input.
+Config.ScreenEffects = {
+    enabled = true,
+    damage = {
+        enabled = true,
+        duration = 480,
+        cooldown = 120,
+        strength = 0.38,
+    },
+    stamina = {
+        enabled = true,
+        duration = 900,
+        cooldown = 1200,
+        strength = 0.24,
+        threshold = 1,
+        resetThreshold = 18,
+    },
+    kill = {
+        enabled = true,
+        duration = 820,
+        cooldown = 180,
+        strength = 0.72,
+    },
+}
+-- Replaces the core status/ammo presentation with the Leonida-inspired
 -- top-left vitals and top-right active weapon/ammo cluster.
 Config.gta6HudEnabled = false
--- Use the compact GTA 6 weapon/ammo lockup and its minimal firearm reticle.
--- This only has an effect while GTA 6 HUD mode is enabled.
+-- Use the compact Leonida weapon/ammo lockup and its minimal firearm reticle.
+-- This only has an effect while Leonida UI is enabled.
 Config.gta6AuthenticWeaponHud = false
--- Show the active weapon name beside its icon in GTA 6 HUD mode.
+-- Show the active weapon name beside its icon while Leonida UI is enabled.
 Config.gta6ShowWeaponName = true
--- Show the GTA 6-style vehicle introduction card when entering a vehicle.
--- This preference is only exposed while GTA 6 HUD mode is enabled.
+-- Show the Leonida-style vehicle introduction card when entering a vehicle.
+-- This preference is only exposed while Leonida UI is enabled.
 Config.gta6VehicleIdentification = true
+-- Replaces GTA's on-foot weapon wheel with the eight-station Cortex wheel.
+-- The native wheel remains authoritative when disabled, before NUI readiness,
+-- and in vehicles unless allowInVehicles is explicitly enabled.
+-- While open it mirrors vanilla: HOLD openControl (TAB/LB) to see the wheel,
+-- highlight a station with mouse/right-stick, scroll to cycle the weapons
+-- stacked in the highlighted station (falls through to the next owned station
+-- when it holds a single weapon), or press 1-9 to jump straight to a station.
+-- A quick TAB tap only views the wheel and never swaps the weapon; release
+-- TAB after navigating to equip the highlighted weapon.
+Config.WeaponWheel = {
+    enabled = false,
+    allowInVehicles = false,
+    openControl = 37, -- INPUT_SELECT_WEAPON (TAB / LB)
+    deadzone = 0.22,
+    mouseSensitivity = 2.2,
+    -- Navigation repeat rates while the wheel is open (ms, clamped 15-150).
+    -- stackCooldownMs cycles weapons inside the highlighted category;
+    -- categoryCooldownMs jumps between stations. Lower is faster, but too
+    -- low skips guns: one wheel detent must stay exactly one gun.
+    stackCooldownMs = 80,
+    categoryCooldownMs = 110,
+    screenBlur = true,
+    -- Prints fired scroll control ids to the F8 console while the wheel is
+    -- open. Enable only to diagnose scroll input, then disable again.
+    debug = false,
+    -- Add-on example:
+    -- { label = 'WEAPON_CUSTOM', name = 'Custom Weapon', icon = 'weapon_custom', category = 'rifle' }
+    -- Valid categories: sidearm, automatic, rifle, shotgun, sniper, heavy, gear, melee.
+    additionalWeapons = {},
+}
 -- Grounded world-space vehicle panel prompt. Gameplay remains owned by this
 -- resource while cortex-lib only arbitrates and presents the action.
 Config.VehicleDoorInteractions = {
@@ -152,6 +269,7 @@ Config.VehicleDoorInteractions = {
     command = 'cortexVehicleDoor',
     description = 'Open or close the nearest vehicle door',
     priority = 100,
+    holdDuration = 220,
     openLabel = 'OPEN',
     closeLabel = 'CLOSE',
     interactionDistance = 2.0,
@@ -174,6 +292,7 @@ Config.VehicleDoorInteractions = {
     serverMaxDistance = 8.0,
     requestCooldown = 220,
     panelCooldown = 280,
+    transitionTimeout = 1600,
 }
 -- Locked-vehicle actions presented together at the nearest intact side window.
 -- Key cloning uses qbx_vehiclekeys/qb-vehiclekeys when available and otherwise
@@ -183,6 +302,7 @@ Config.VehicleDoorInteractions = {
 Config.VehicleAccessInteractions = {
     enabled = true,
     requireGta6Hud = true,
+    holdDuration = 220,
     interactionDistance = 2.0,
     scanRadius = 6.0,
     activeScanInterval = 100,
@@ -247,12 +367,13 @@ Config.showFlashFloodWarning = true
 -- Hurricane segment when Dynamic_weather reports active hurricane (HUD setting).
 Config.showHurricaneWarning = true
 Config.sectionedBars = false
+-- Location presentation is independent from the broader Leonida UI mode.
+-- Supported values: 'off', 'current', 'gta6'.
+Config.locationDisplayStyle = 'current'
 -- Location strip (compass / street / zone): gapped capsule segments like sectioned health/armor bars.
 Config.sectionedIndicator = false
--- NUI glass: frost strength multiplier (0.25–3). 1 = default. CEF-safe faux glass.
+-- NUI glass blur multiplier (0.25–3). 1 = the default 12px blur.
 Config.backdropBlur = 1.0
--- Panel fill multiplier (0.15–1). Stored in cortex-lib as 15–100. Prevents fully invisible panels.
-Config.panelOpacity = 1.0
 Config.defaultHudPreset = 'classic'
 Config.oxygenDisplayLocation = 'statusCluster'
 

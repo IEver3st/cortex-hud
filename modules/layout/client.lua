@@ -1,8 +1,10 @@
 local ScreenLayout = {}
 
 local Nui = lib.require('modules.nui.client')
+local minimap = lib.require('modules.utility.shared.minimap')
 
 local started = false
+local activeConfig = nil
 local lastSafezone = -1.0
 local lastWidth = -1
 local lastHeight = -1
@@ -28,6 +30,7 @@ local function sendLayout(force)
     lastHeight = height
 
     local normalizedInset = (1.0 - safezone) * 0.5
+    local minimapBounds = minimap.getPixelBounds(activeConfig, width, height)
 
     Nui.send({
         action = 'interaction:layout',
@@ -36,12 +39,14 @@ local function sendLayout(force)
         insetBottom = math.floor((height * normalizedInset) + 0.5),
         screenWidth = width,
         screenHeight = height,
+        minimapBounds = minimapBounds,
     })
 end
 
-function ScreenLayout.start()
+function ScreenLayout.start(config)
     if started then return end
     started = true
+    activeConfig = config
 
     Nui.onReady(function()
         sendLayout(true)

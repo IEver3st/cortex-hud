@@ -29,7 +29,7 @@ test('clone-key client uses the remappable interaction command without taking NU
   assert.doesNotMatch(access, /SetNuiFocus|SetNuiFocusKeepInput/)
 })
 
-test('GTA 6 HUD renders the white-ring and pink-sweep challenge from bounded data', async () => {
+test('Leonida UI renders the white-ring and pink-sweep challenge from bounded data', async () => {
   const app = await source('web/src/App.jsx')
   const component = await source('web/src/components/VehicleCloneQte.jsx')
   const css = await source('web/src/components/VehicleCloneQte.css')

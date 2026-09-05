@@ -140,7 +140,7 @@ export function useArmorBypass(health, armor, holdMs = 1100) {
 }
 
 /**
- * Show the GTA 6 health strip briefly when armor is equipped or increased.
+ * Show the Leonida health strip briefly when armor is equipped or increased.
  * Repeated applications restart the hold so sequential pickups stay readable.
  */
 export function useArmorApplied(armor, holdMs = 5000) {

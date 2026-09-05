@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect -- entry and ignition transitions intentionally stage short-lived visual state */
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { buildProceduralMarque, clampVehicleMetric } from '../vehicleIdentity.js'
+import { resolveVehicleIdentificationStyle } from '../minimapGeometry.js'
 import './VehicleIdentification.css'
 
 const CARD_VISIBLE_MS = 5600
@@ -232,6 +233,16 @@ const VehicleIdentification = React.memo(({
   const screenWidth = Number(layout?.screenWidth) || 1920
   const screenHeight = Number(layout?.screenHeight) || 1080
   const scale = Math.max(0.72, Math.min(1.5, Math.min(screenWidth / 1920, screenHeight / 1080)))
+  const alignedStyle = resolveVehicleIdentificationStyle(layout?.minimapBounds, scale, {
+    screenWidth,
+    screenHeight,
+  })
+  const cardStyle = {
+    left: alignedStyle.left,
+    width: alignedStyle.width,
+    ...(radarVisible ? { bottom: alignedStyle.bottom } : {}),
+    '--vehicle-id-scale': scale,
+  }
 
   return (
     <section
@@ -241,7 +252,7 @@ const VehicleIdentification = React.memo(({
         radarVisible ? '' : 'is-radar-hidden',
         displayedIdentity.proceduralLogo ? 'is-procedural' : '',
       ].filter(Boolean).join(' ')}
-      style={{ '--vehicle-id-scale': scale }}
+      style={cardStyle}
       role="status"
       aria-live="polite"
       aria-hidden={!visible}

@@ -1,0 +1,180 @@
+.combat-reticle-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: transparent;
+  pointer-events: none;
+}
+
+.combat-reticle-ring,
+.combat-reticle-open,
+.combat-reticle-tazer,
+.combat-reticle-dot,
+.combat-hitmarker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+}
+
+.combat-reticle-ring {
+  width: calc(var(--combat-reticle-diameter) * var(--es-ui-scale));
+  height: calc(var(--combat-reticle-diameter) * var(--es-ui-scale));
+  box-sizing: border-box;
+  border: 1px solid rgba(247, 248, 249, 0.94);
+  border-radius: 50%;
+  box-shadow: 0 0 1px rgba(4, 5, 6, 0.88);
+  transform: translate(-50%, -50%);
+  transition: width 90ms linear, height 90ms linear;
+}
+
+.combat-reticle-ring--rpg {
+  opacity: 0.9;
+}
+
+.combat-reticle-open {
+  width: calc(34px * var(--es-ui-scale));
+  height: calc(34px * var(--es-ui-scale));
+  opacity: 0.96;
+  transform: translate(-50%, -50%);
+}
+
+.combat-reticle-open__arm {
+  position: absolute;
+  display: block;
+  background: rgba(248, 250, 252, 0.96);
+  box-shadow: 0 calc(1px * var(--es-ui-scale)) calc(2px * var(--es-ui-scale)) rgba(0, 0, 0, 0.9),
+    0 0 calc(1px * var(--es-ui-scale)) rgba(0, 0, 0, 0.9);
+}
+
+.combat-reticle-open__arm--left,
+.combat-reticle-open__arm--right {
+  top: 50%;
+  width: calc(8.5px * var(--es-ui-scale));
+  height: calc(2px * var(--es-ui-scale));
+  transform: translateY(-50%);
+  transition: left 90ms linear, right 90ms linear;
+}
+
+.combat-reticle-open__arm--left {
+  right: calc(50% + var(--combat-reticle-gap) * var(--es-ui-scale));
+}
+
+.combat-reticle-open__arm--right {
+  left: calc(50% + var(--combat-reticle-gap) * var(--es-ui-scale));
+}
+
+.combat-reticle-open__arm--stem {
+  top: calc(50% + var(--combat-reticle-gap) * var(--es-ui-scale));
+  left: 50%;
+  width: calc(2px * var(--es-ui-scale));
+  height: calc(6px * var(--es-ui-scale));
+  transform: translateX(-50%);
+  transition: top 90ms linear;
+}
+
+.combat-reticle-tazer {
+  width: calc(var(--combat-reticle-diameter) * var(--es-ui-scale));
+  height: calc(var(--combat-reticle-diameter) * var(--es-ui-scale));
+  overflow: visible;
+  color: #f4f6f8;
+  opacity: 0.9;
+  transform: translate(-50%, -50%);
+  transition: width 90ms linear, height 90ms linear;
+}
+
+.combat-reticle-tazer path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.combat-reticle-tazer__outline {
+  stroke: rgba(3, 4, 5, 0.9);
+  stroke-width: 5.25;
+}
+
+.combat-reticle-tazer__stroke {
+  stroke: currentColor;
+  stroke-width: 2.75;
+}
+
+.combat-reticle-dot {
+  width: calc(3px * var(--es-ui-scale));
+  height: calc(3px * var(--es-ui-scale));
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 calc(2px * var(--es-ui-scale)) rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+}
+
+.combat-hitmarker {
+  width: calc(16px * var(--es-ui-scale));
+  height: calc(16px * var(--es-ui-scale));
+  overflow: visible;
+  color: #f4f6f8;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.76);
+  transform-origin: center;
+  animation: combat-hitmarker 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.combat-hitmarker--knockout {
+  color: #f5d142;
+}
+
+.combat-hitmarker--critical {
+  color: #ff3038;
+}
+
+.combat-hitmarker--vehicle {
+  color: rgba(176, 182, 188, 0.42);
+}
+
+.combat-hitmarker--vehicle .combat-hitmarker__outline {
+  stroke: rgba(3, 4, 5, 0.32);
+}
+
+.combat-hitmarker path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.combat-hitmarker__outline {
+  stroke: rgba(3, 4, 5, 0.9);
+  stroke-width: 5.25;
+}
+
+.combat-hitmarker__stroke {
+  stroke: currentColor;
+  stroke-width: 2.75;
+}
+
+@keyframes combat-hitmarker {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.76);
+  }
+  16% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  58% {
+    opacity: 0.96;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combat-reticle-ring,
+  .combat-reticle-tazer,
+  .combat-reticle-open__arm {
+    transition: none;
+  }
+
+  .combat-hitmarker {
+    animation-duration: 180ms;
+  }
+}

@@ -1,4 +1,5 @@
 local VehicleDoorInteractions = {}
+local VehiclePool = lib.require('modules.interactions.vehicle_pool')
 
 local INTERACTION_ID = 'vehicle-door'
 local DOOR_OPEN_THRESHOLD = 0.1
@@ -60,6 +61,9 @@ local started = false
 local stopping = false
 local actionLocked = false
 local ownerResource = nil
+local pendingDoorState = nil
+local activeHold = nil
+local cancelHold
 
 local function distanceSquared(left, right)
     local x = left.x - right.x
@@ -74,12 +78,34 @@ local function isFeatureEnabled()
     return true
 end
 
+local function isEnteringVehicle(ped)
+    -- IsPedInAnyVehicle(ped, false) still reports false while the enter
+    -- animation plays, which left rear-door prompts visible as the player
+    -- climbed in (front door open, ped halfway inside). The atGetIn variant
+    -- covers that transition, and GetVehiclePedIsTryingToEnter covers the
+    -- approach/trying phase before the ped is flagged as inside.
+    if IsPedInAnyVehicle(ped, true) then return true end
+
+    if type(IsPedGettingIntoAVehicle) == 'function' then
+        local ok, gettingIn = pcall(IsPedGettingIntoAVehicle, ped)
+        if ok and gettingIn then return true end
+    end
+
+    if type(GetVehiclePedIsTryingToEnter) == 'function' then
+        local ok, vehicle = pcall(GetVehiclePedIsTryingToEnter, ped)
+        if ok and type(vehicle) == 'number' and vehicle ~= 0 then return true end
+    end
+
+    return false
+end
+
 local function canPlayerInteract(ped)
     return ped ~= 0
         and DoesEntityExist(ped)
         and not IsEntityDead(ped)
         and not IsPedRagdoll(ped)
         and not IsPedInAnyVehicle(ped, false)
+        and not isEnteringVehicle(ped)
         and not IsPedUsingAnyScenario(ped)
 end
 
@@ -154,6 +180,7 @@ end
 local function isPanelUsable(vehicle, definition)
     return DoesEntityExist(vehicle)
         and GetEntityType(vehicle) == 2
+        and IsVehicleDriveable(vehicle, true)
         and GetIsDoorValid(vehicle, definition.door)
         and not IsVehicleDoorDamaged(vehicle, definition.door)
         and GetVehicleDoorLockStatus(vehicle) <= 1
@@ -191,7 +218,7 @@ local function findNearestDoor(ped)
     local pedCoords = GetEntityCoords(ped)
     local scanRadius = tonumber(activeConfig.scanRadius) or 6.0
     local scanRadiusSquared = scanRadius * scanRadius
-    local vehicles = GetGamePool('CVehicle')
+    local vehicles = VehiclePool.get()
     local nearest = nil
     local previous = nil
 
@@ -199,7 +226,7 @@ local function findNearestDoor(ped)
         local vehicle = vehicles[vehicleIndex]
 
         if DoesEntityExist(vehicle)
-            and distanceSquared(pedCoords, GetEntityCoords(vehicle)) <= scanRadiusSquared
+            and distanceSquared(pedCoords, VehiclePool.getCoords(vehicle)) <= scanRadiusSquared
         then
             for doorIndex = 1, #doorDefinitions do
                 local candidate = buildCandidate(ped, pedCoords, vehicle, doorDefinitions[doorIndex])
@@ -231,9 +258,48 @@ local function findNearestDoor(ped)
 end
 
 local function hidePrompt()
+    cancelHold()
     selectedDoor = nil
     publishedTarget = nil
+    pendingDoorState = nil
     lib.hideInteraction(INTERACTION_ID)
+end
+
+local function resolveOpenState(candidate, forcedOpenState)
+    if forcedOpenState ~= nil then
+        -- Door angle replication trails the native request for several scan
+        -- ticks. Keep the requested state authoritative for presentation until
+        -- the physical angle catches up or the bounded timeout expires.
+        pendingDoorState = {
+            vehicle = candidate.vehicle,
+            door = candidate.door,
+            open = forcedOpenState,
+            startedAt = GetGameTimer(),
+        }
+
+        return forcedOpenState
+    end
+
+    local measuredOpen = GetVehicleDoorAngleRatio(candidate.vehicle, candidate.door) > DOOR_OPEN_THRESHOLD
+    local pending = pendingDoorState
+
+    if not pending
+        or pending.vehicle ~= candidate.vehicle
+        or pending.door ~= candidate.door
+    then
+        return measuredOpen
+    end
+
+    local transitionTimeout = math.min(5000, math.max(0, tonumber(activeConfig.transitionTimeout) or 1600))
+    local settled = measuredOpen == pending.open
+    local expired = GetGameTimer() - pending.startedAt >= transitionTimeout
+
+    if settled or expired then
+        pendingDoorState = nil
+        return measuredOpen
+    end
+
+    return pending.open
 end
 
 local function publishPrompt(candidate, forcedOpenState)
@@ -242,11 +308,14 @@ local function publishPrompt(candidate, forcedOpenState)
         return
     end
 
-    selectedDoor = candidate
-    local isOpen = forcedOpenState
-    if isOpen == nil then
-        isOpen = GetVehicleDoorAngleRatio(candidate.vehicle, candidate.door) > DOOR_OPEN_THRESHOLD
+    if activeHold
+        and (candidate.vehicle ~= activeHold.vehicle or candidate.door ~= activeHold.door)
+    then
+        cancelHold()
     end
+
+    selectedDoor = candidate
+    local isOpen = resolveOpenState(candidate, forcedOpenState)
 
     local label = isOpen and activeConfig.closeLabel or activeConfig.openLabel
     local targetSignature = ('%d:%d:%s'):format(candidate.vehicle, candidate.door, label)
@@ -258,6 +327,7 @@ local function publishPrompt(candidate, forcedOpenState)
         label = label,
         key = activeConfig.key,
         priority = activeConfig.priority,
+        holdDuration = tonumber(activeConfig.holdDuration) or 220,
         anchor = {
             type = 'entity-bone',
             entity = candidate.vehicle,
@@ -300,6 +370,7 @@ end
 local function applyVehicleDoor(vehicle, door, shouldOpen)
     if type(vehicle) ~= 'number' or type(door) ~= 'number' or type(shouldOpen) ~= 'boolean' then return end
     if not DoesEntityExist(vehicle) or GetEntityType(vehicle) ~= 2 then return end
+    if not IsVehicleDriveable(vehicle, true) then return end
     if door < 0 or door > 5 or door % 1 ~= 0 then return end
     if not GetIsDoorValid(vehicle, door) then return end
     if IsVehicleDoorDamaged(vehicle, door) or GetVehicleDoorLockStatus(vehicle) > 1 then return end
@@ -339,7 +410,7 @@ local function isDoorInteractionActive()
     return false
 end
 
-local function handleAction()
+local function handleAction(expectedTarget)
     if actionLocked or stopping or not isFeatureEnabled() then return end
     if not isDoorInteractionActive() then return end
 
@@ -347,6 +418,11 @@ local function handleAction()
     local target = validateSelectedDoor(ped)
     if not target then
         hidePrompt()
+        return
+    end
+    if expectedTarget
+        and (target.vehicle ~= expectedTarget.vehicle or target.door ~= expectedTarget.door)
+    then
         return
     end
 
@@ -362,10 +438,60 @@ local function handleAction()
         applyVehicleDoor(target.vehicle, target.door, shouldOpen)
     end
 
+    -- Dispatch the gesture from the accepted local action. Registry labels
+    -- can disappear/change ownership while a door is moving.
+    if GetResourceState('cortex-subtleadditions') == 'started' then
+        pcall(function()
+            exports['cortex-subtleadditions']:playVehicleDoorAnimation(target.vehicle, target.door, shouldOpen)
+        end)
+    end
     publishPrompt(target, shouldOpen)
 
     SetTimeout(tonumber(activeConfig.panelCooldown) or 280, function()
         actionLocked = false
+    end)
+end
+
+cancelHold = function()
+    if not activeHold then return end
+    activeHold = nil
+    if type(lib.cancelInteractionHold) == 'function' then
+        lib.cancelInteractionHold(INTERACTION_ID)
+    end
+end
+
+local function beginHold()
+    if activeHold or actionLocked or stopping or not isFeatureEnabled() then return end
+    if not isDoorInteractionActive() then return end
+
+    local target = validateSelectedDoor(PlayerPedId())
+    if not target then
+        hidePrompt()
+        return
+    end
+
+    -- A dependent resource may briefly outlive an older cortex-lib during a
+    -- rolling restart. Preserve the action instead of throwing in that window.
+    if type(lib.startInteractionHold) ~= 'function' then
+        handleAction(target)
+        return
+    end
+
+    local ok = lib.startInteractionHold(INTERACTION_ID)
+    if ok ~= true then return end
+
+    local token = {
+        vehicle = target.vehicle,
+        door = target.door,
+    }
+    activeHold = token
+
+    local duration = math.floor(math.max(100, math.min(2000, tonumber(activeConfig.holdDuration) or 220)))
+    SetTimeout(duration, function()
+        if activeHold ~= token then return end
+        activeHold = nil
+        lib.cancelInteractionHold(INTERACTION_ID)
+        handleAction(token)
     end)
 end
 
@@ -379,8 +505,8 @@ function VehicleDoorInteractions.start(config)
     ownerResource = GetCurrentResourceName()
     started = true
 
-    RegisterCommand('+' .. activeConfig.command, handleAction, false)
-    RegisterCommand('-' .. activeConfig.command, function() end, false)
+    RegisterCommand('+' .. activeConfig.command, beginHold, false)
+    RegisterCommand('-' .. activeConfig.command, cancelHold, false)
     RegisterKeyMapping(
         '+' .. activeConfig.command,
         activeConfig.description,
@@ -416,6 +542,7 @@ function VehicleDoorInteractions.start(config)
     AddEventHandler('onClientResourceStart', function(resourceName)
         if resourceName ~= 'cortex-lib' or not selectedDoor then return end
 
+        activeHold = nil
         publishedTarget = nil
         publishPrompt(selectedDoor)
     end)
@@ -423,6 +550,7 @@ function VehicleDoorInteractions.start(config)
     AddEventHandler('onClientResourceStop', function(resourceName)
         if resourceName ~= GetCurrentResourceName() then return end
         stopping = true
+        cancelHold()
         lib.hideInteraction(INTERACTION_ID)
     end)
 end

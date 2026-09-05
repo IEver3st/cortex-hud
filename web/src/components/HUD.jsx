@@ -30,7 +30,7 @@ function clamp(n, min, max) {
 const BAR_SECTIONS = 4
 const BAR_SECTION_PCT = 100 / BAR_SECTIONS
 
-const Gta6WeaponIcon = ({ weaponIcon, onError }) => (
+const Gta6WeaponIcon = React.memo(({ weaponIcon, onError }) => (
   <img
     src={`./weapons/${weaponIcon}.png`}
     alt=""
@@ -38,7 +38,7 @@ const Gta6WeaponIcon = ({ weaponIcon, onError }) => (
     draggable={false}
     onError={() => onError(weaponIcon)}
   />
-)
+))
 
 function getBarSectionWidths(value) {
   const v = clamp(value, 0, 100)
@@ -83,58 +83,62 @@ function withAlpha(color, alpha) {
   return color
 }
 
-const VOIP_BAR_COUNT = 8
-const VOIP_BAR_INDICES = Array.from({ length: VOIP_BAR_COUNT }, (_, k) => k + 1)
-const VOIP_CENTER = (VOIP_BAR_COUNT + 1) / 2
-
 const VOIP_RANGE_WAVES = {
-  whisper: (i) => {
-    const d = Math.abs(i - VOIP_CENTER)
-    return Math.max(22, 46 - d * 7)
-  },
-  normal: (i) => {
-    const d = Math.abs(i - VOIP_CENTER)
-    return Math.max(25, 100 - d * 18)
-  },
-  shout: (i) => {
-    const d = Math.abs(i - VOIP_CENTER)
-    return Math.max(58, 96 - d * 5.5)
-  },
+  whisper: [26, 48, 31, 57, 38, 45, 24, 41, 33],
+  normal: [38, 73, 49, 88, 57, 69, 34, 79, 52],
+  shout: [58, 91, 67, 84, 73, 96, 61, 87, 70],
 }
 
-const VoipVisualizer = ({ isTalking, color, range }) => {
+// Deliberately irregular motion keeps the signal organic without adding a JS timer.
+const VOIP_BAR_MOTION = [
+  { rest: 0.82, peak: 1.34, mid: 0.96, tail: 1.12, duration: 760, delay: -520, shift: -0.8 },
+  { rest: 0.94, peak: 1.12, mid: 0.76, tail: 1.27, duration: 910, delay: -210, shift: 0.6 },
+  { rest: 0.72, peak: 1.42, mid: 1.03, tail: 0.88, duration: 640, delay: -390, shift: -1.3 },
+  { rest: 0.88, peak: 1.08, mid: 0.79, tail: 1.18, duration: 840, delay: -680, shift: 0.2 },
+  { rest: 0.76, peak: 1.31, mid: 0.91, tail: 1.06, duration: 700, delay: -120, shift: 1.1 },
+  { rest: 0.91, peak: 1.16, mid: 0.73, tail: 1.29, duration: 960, delay: -570, shift: -0.5 },
+  { rest: 0.69, peak: 1.46, mid: 0.98, tail: 0.83, duration: 670, delay: -300, shift: 1.4 },
+  { rest: 0.86, peak: 1.11, mid: 0.77, tail: 1.22, duration: 870, delay: -740, shift: -0.2 },
+  { rest: 0.74, peak: 1.38, mid: 1.01, tail: 0.9, duration: 730, delay: -460, shift: 0.8 },
+]
+
+const VoipVisualizer = React.memo(({ isTalking, color, range }) => {
   const waveKey = VOIP_RANGE_WAVES[range] ? range : 'normal'
-  const heightFn = VOIP_RANGE_WAVES[waveKey]
-  // Stable persona per range band (no Math.random — keeps render pure).
-  const vizPersona = useMemo(() => {
-    let h = 0
-    for (let i = 0; i < waveKey.length; i += 1) h = (h + waveKey.charCodeAt(i) * (i + 3)) % 4
-    return h
-  }, [waveKey])
+  const signalShape = VOIP_RANGE_WAVES[waveKey]
 
   return (
     <div
       className={[
         'voip-waveform',
         `voip-wave-${waveKey}`,
-        `voip-viz-${vizPersona}`,
         isTalking ? 'voip-mode-talk' : 'voip-mode-idle',
       ].join(' ')}
+      aria-hidden="true"
     >
-      {VOIP_BAR_INDICES.map((i, idx) => (
-        <div
-          key={i}
-          className="voip-waveform-bar"
-          style={{
-            '--bar-index': idx,
-            '--base-height': `${heightFn(i)}%`,
-            backgroundColor: isTalking ? color : 'rgba(255, 255, 255, 0.15)',
-          }}
-        />
-      ))}
+      {signalShape.map((height, index) => {
+        const motion = VOIP_BAR_MOTION[index]
+
+        return (
+          <div
+            key={index}
+            className="voip-waveform-bar"
+            style={{
+              '--base-height': `${height}%`,
+              '--bar-rest': motion.rest,
+              '--bar-peak': motion.peak,
+              '--bar-mid': motion.mid,
+              '--bar-tail': motion.tail,
+              '--bar-duration': `${motion.duration}ms`,
+              '--bar-delay': `${motion.delay}ms`,
+              '--bar-shift': `${motion.shift}px`,
+              backgroundColor: isTalking ? color : 'rgba(255, 255, 255, 0.15)',
+            }}
+          />
+        )
+      })}
     </div>
   )
-}
+})
 
 const HUD = React.memo(({
   health,
@@ -163,6 +167,7 @@ const HUD = React.memo(({
   thirst,
   stress,
   oxygen,
+  oxygenExtended,
   underwater,
   inWater,
   voipTalking,
@@ -208,15 +213,17 @@ const HUD = React.memo(({
   gta6HudEnabled,
   gta6AuthenticWeaponHud,
   gta6ShowWeaponName,
+  locationDisplayStyle,
   sectionedBars,
   oxygenDisplayLocation,
 }) => {
   const showAmmo = ammoClip >= 0 || ammoEditMode
-  const showWaypoint = waypointDist > 0
+  const showWaypoint = waypointDist > 0 && locationDisplayStyle !== 'gta6'
   const gta6Health = clamp(Number(health) || 0, 0, 100)
   const armorValue = clamp(Number(armor) || 0, 0, 100)
   const gta6Stamina = clamp(Number(stamina) || 0, 0, 100)
   const gta6Oxygen = clamp(Number(oxygen) || 0, 0, 100)
+  const gta6HasExtendedOxygen = oxygenExtended === true
   const gta6SecondaryValue = inWater ? gta6Oxygen : gta6Stamina
   const gta6SecondaryLabel = inWater ? 'Oxygen' : 'Stamina'
 
@@ -238,6 +245,7 @@ const HUD = React.memo(({
 
   const healthFlash = useDeltaFlash(gta6Health, 420)
   const armorFlash = useDeltaFlash(armorValue, 420)
+  const oxygenFlash = useDeltaFlash(gta6Oxygen, 520)
   const armorBreak = useBreakAway(armorValue, 480)
   const armorBypassed = useArmorBypass(gta6Health, armorValue, 1100)
   const gearTick = useOneShot(currentGear, 300)
@@ -885,12 +893,17 @@ const HUD = React.memo(({
           <div
             className={[
               'gta6-vital',
-              'gta6-vital--stamina',
+              inWater ? 'gta6-vital--oxygen' : 'gta6-vital--stamina',
+              inWater && gta6HasExtendedOxygen ? 'has-extended-oxygen' : '',
+              inWater && oxygenFlash === 'damage' ? 'is-draining' : '',
               !inWater && staminaRegenerating ? 'is-regenerating' : '',
               gta6StaminaPresence.visible ? 'hud-presence-in' : 'hud-presence-out',
             ].filter(Boolean).join(' ')}
           >
-            <div className="gta6-vital-badge gta6-vital-badge--stamina" aria-hidden="true">
+            <div
+              className={`gta6-vital-badge ${inWater ? 'gta6-vital-badge--oxygen' : 'gta6-vital-badge--stamina'}`}
+              aria-hidden="true"
+            >
               {inWater ? (
                 <span className="gta6-vital-o2">
                   O<sub>2</sub>

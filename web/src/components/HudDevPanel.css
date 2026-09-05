@@ -473,6 +473,33 @@
   cursor: pointer;
 }
 
+.hud-dev-hitmarker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+  align-items: center;
+  gap: 5px;
+  min-height: 42px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.hud-dev-hitmarker-row > span {
+  color: #c9d2dc;
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.hud-dev-hitmarker-row button {
+  min-height: 26px;
+  padding: 4px 7px;
+  border: 1px solid var(--hud-dev-border);
+  border-radius: 3px;
+  background: #090c10;
+  color: var(--hud-dev-muted);
+  cursor: pointer;
+  font-size: 9px;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+
 .hud-dev-color-row {
   justify-content: flex-start;
 }
@@ -617,6 +644,11 @@
   .hud-dev-swatches button:hover {
     border-color: #d4dde7;
     transform: translateY(-1px);
+  }
+
+  .hud-dev-hitmarker-row button:hover {
+    border-color: var(--hud-dev-border-strong);
+    color: var(--hud-dev-text);
   }
 
   .hud-dev-action:hover,

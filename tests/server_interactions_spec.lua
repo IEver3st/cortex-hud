@@ -10,7 +10,15 @@ local playerCoords = { x = 0.0, y = 0.0, z = 0.0 }
 local vehicleCoords = { x = 1.0, y = 0.0, z = 0.0 }
 local vehicleSpeed = 0.0
 local vehicleLockStatus = 2
+local vehicleEngineHealth = 1000.0
 local lockMutation = nil
+local registeredExports = {}
+
+exports = setmetatable({}, {
+    __call = function(_, name, callback)
+        registeredExports[name] = callback
+    end,
+})
 
 lib = {
     require = function(path)
@@ -98,6 +106,10 @@ function GetVehicleDoorLockStatus()
     return vehicleLockStatus
 end
 
+function GetVehicleEngineHealth()
+    return vehicleEngineHealth
+end
+
 function GetResourceState()
     return 'missing'
 end
@@ -133,8 +145,10 @@ end
 dofile('modules/interactions/server.lua')
 
 local request = assert(registeredEvents['cortex-hud:server:vehicleDoor'])
+local hasVehicleAccess = assert(registeredExports.hasVehicleAccess)
 
 source = 10
+assert(hasVehicleAccess(10, 501) == false, 'standalone access existed before key cloning')
 request('41', 0, true)
 request(41, 0.5, true)
 request(41, 6, true)
@@ -174,6 +188,12 @@ request(41, 0, true)
 assert(#triggered == 2, 'missing entity reached the owner client')
 
 entityExists = true
+vehicleEngineHealth = -4000.0
+now = now + 300
+request(41, 0, true)
+assert(#triggered == 2, 'destroyed vehicle door request reached the owner client')
+vehicleEngineHealth = 1000.0
+
 local smashRequest = assert(registeredEvents['cortex-hud:server:smashVehicleWindow'])
 local beginClone = assert(registeredEvents['cortex-hud:server:beginVehicleKeyClone'])
 local finishClone = assert(registeredEvents['cortex-hud:server:finishVehicleKeyClone'])
@@ -188,6 +208,11 @@ smashRequest(41, 0)
 assert(#triggered == 2, 'distant smash request reached an owner client')
 
 vehicleCoords = { x = 1.0, y = 0.0, z = 0.0 }
+vehicleEngineHealth = -4000.0
+smashRequest(41, 0)
+assert(#triggered == 2, 'destroyed vehicle smash request reached an owner client')
+
+vehicleEngineHealth = 1000.0
 vehicleSpeed = 2.0
 smashRequest(41, 0)
 assert(#triggered == 2, 'moving-vehicle smash request reached an owner client')
@@ -231,6 +256,7 @@ finishClone(secondToken, 41)
 assert(#triggered == 8 and triggered[8].name == 'cortex-hud:client:vehicleKeyCloned')
 assert(triggered[8].door == 'standalone', 'standalone provider was not reported')
 assert(lockMutation and lockMutation.entity == 501 and lockMutation.state == 1)
+assert(hasVehicleAccess(10, 501) == true, 'cloned standalone key was not visible through access export')
 
 finishClone(secondToken, 41)
 assert(#triggered == 9 and triggered[9].name == 'cortex-hud:client:vehicleKeyCloneRejected')

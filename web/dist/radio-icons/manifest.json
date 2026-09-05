@@ -1,0 +1,254 @@
+{
+  "version": 1,
+  "generatedFrom": {
+    "repository": "https://github.com/jtaomas/GTA-V-Radio",
+    "commit": "1262633a78e33b28ae796d04ff9fc4d669427530",
+    "gtaWiki": "https://gta.fandom.com/"
+  },
+  "rights": "GTA V radio station branding and game artwork are owned by Rockstar Games and Take-Two Interactive. See web/third-party/gta-radio-icons-NOTICE.txt.",
+  "files": [
+    {
+      "stationId": "RADIO_01_CLASS_ROCK",
+      "file": "RADIO_01_CLASS_ROCK.png",
+      "bytes": 10077,
+      "sha1": "9d3edf7fbaef1cb2237ad801e87c7737141278be",
+      "sha256": "0e895c429a573136c6809d31e927503f91aee78e8ea86d5f45afb568442105cd",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/los-santos-rock-radio.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/los-santos-rock-radio.png"
+    },
+    {
+      "stationId": "RADIO_02_POP",
+      "file": "RADIO_02_POP.png",
+      "bytes": 30371,
+      "sha1": "7761c825ef367a6617b0bfa530c234c43fa3f64b",
+      "sha256": "07c1965a02d65b8073e69fad8513ad106a268203cb9223bce683144b32f02b1b",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/non-stop-pop-fm.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/non-stop-pop-fm.png"
+    },
+    {
+      "stationId": "RADIO_03_HIPHOP_NEW",
+      "file": "RADIO_03_HIPHOP_NEW.png",
+      "bytes": 10582,
+      "sha1": "ee9981d255dce243f217485463deba49fb8cc8cf",
+      "sha256": "cbffb8fe5931746b672ff4559b93404fd3e9cd950d5119b8d432c33e2ae52e06",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/radio-los-santos.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/radio-los-santos.png"
+    },
+    {
+      "stationId": "RADIO_04_PUNK",
+      "file": "RADIO_04_PUNK.png",
+      "bytes": 7826,
+      "sha1": "2a5aae027b6e51ed79ff8d836795b48c65e441d0",
+      "sha256": "3f2195deeb15357f43f2357ffcf9131719616fdd5f2975db48894ad8e36f014e",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/channel-x.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/channel-x.png"
+    },
+    {
+      "stationId": "RADIO_05_TALK_01",
+      "file": "RADIO_05_TALK_01.png",
+      "bytes": 23177,
+      "sha1": "0a99d8c7fee10772ca4d21383e1acfca40fb4d84",
+      "sha256": "f676755ff0458e81034a29dbfc9b68f967d1405dc2174351aad8832fca39a73d",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/wctr.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/wctr.png"
+    },
+    {
+      "stationId": "RADIO_06_COUNTRY",
+      "file": "RADIO_06_COUNTRY.webp",
+      "bytes": 9424,
+      "sha1": "1211f7b31ccc3f0a735fa070a782a673cb234672",
+      "sha256": "5611be8361557c71cdd48463c13dcfe951da74d98138d8f92a4cda4c1811ab4d",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/rebel-radio.webp",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/rebel-radio.webp"
+    },
+    {
+      "stationId": "RADIO_07_DANCE_01",
+      "file": "RADIO_07_DANCE_01.jpg",
+      "bytes": 15615,
+      "sha1": "7dfe90fe4ed6922d2787aaa40bb1828e9cb450ec",
+      "sha256": "24df16473dc7951358df52a392741650b3355e9eea1effbe71471e4fe50d0eda",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/soulwax-fm.jpg",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/soulwax-fm.jpg"
+    },
+    {
+      "stationId": "RADIO_08_MEXICAN",
+      "file": "RADIO_08_MEXICAN.png",
+      "bytes": 12578,
+      "sha1": "5f1b4f77c53d8f001a816db9a4ab166a42111fcd",
+      "sha256": "3ba10a905ce43fe8bd7cd4aae2267be49d6904b5391fef93d7decee0826eb433",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/east-los-fm.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/east-los-fm.png"
+    },
+    {
+      "stationId": "RADIO_09_HIPHOP_OLD",
+      "file": "RADIO_09_HIPHOP_OLD.webp",
+      "bytes": 10396,
+      "sha1": "8ee81315f55f260e6ecc0324a5882149034e5a42",
+      "sha256": "d06212229717745634945125fe9ed1392c70a0e2bfec82983c339eca284a9327",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/west-coast-classics.webp",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/west-coast-classics.webp"
+    },
+    {
+      "stationId": "RADIO_11_TALK_02",
+      "file": "RADIO_11_TALK_02.png",
+      "bytes": 18536,
+      "sha1": "5b53dffdab937850823ad265dd89a25460d1cb91",
+      "sha256": "b2e85bd12f57b224ecbef5aa3302fbc3ef53c7e605a6eb94a416fb37f4f8a4bb",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/blaine-county-talk-radio.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/blaine-county-talk-radio.png"
+    },
+    {
+      "stationId": "RADIO_12_REGGAE",
+      "file": "RADIO_12_REGGAE.png",
+      "bytes": 28948,
+      "sha1": "5474a5d20b86940ab6434b642b0976e1bc083627",
+      "sha256": "36e0b31cae40e66ca3082891d90c5d799a31ef3ae6f3641c79198e50362cbaf6",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/the-blue-ark.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/the-blue-ark.png"
+    },
+    {
+      "stationId": "RADIO_13_JAZZ",
+      "file": "RADIO_13_JAZZ.png",
+      "bytes": 10355,
+      "sha1": "0b807c777d53d7e6b712d9340d3c121089f10940",
+      "sha256": "54a311b6d1270c5bd097883b9cc7581ca242dd89c682db50cac169c71d072a48",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/worldwide-fm.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/worldwide-fm.png"
+    },
+    {
+      "stationId": "RADIO_14_DANCE_02",
+      "file": "RADIO_14_DANCE_02.png",
+      "bytes": 11639,
+      "sha1": "e05426fe7f7e5965d01e9bd0b539258bbbfef66b",
+      "sha256": "b4c42f7b0593951db012758870a9d388d4030b0ae2998d31da2ec1a16eb1b1a1",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/fly-lo-fm.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/fly-lo-fm.png"
+    },
+    {
+      "stationId": "RADIO_15_MOTOWN",
+      "file": "RADIO_15_MOTOWN.webp",
+      "bytes": 9018,
+      "sha1": "59a0073f21e9c0c0b3f35a3bce64a000b3e45cf4",
+      "sha256": "38ecf2be4d153e722887f7996f37619f0f17d3cff58f14cb9922b77d83315841",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/the-lowdown.webp",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/the-lowdown.webp"
+    },
+    {
+      "stationId": "RADIO_16_SILVERLAKE",
+      "file": "RADIO_16_SILVERLAKE.webp",
+      "bytes": 8800,
+      "sha1": "0815738dabf78f2ed93d05720dfb7e1bb8797d50",
+      "sha256": "0c261552b04ebf4dd6f4ca7e1b70126c25f0ab205f947a902649f34e2d2a43e3",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/radio-mirror-park.webp",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/radio-mirror-park.webp"
+    },
+    {
+      "stationId": "RADIO_17_FUNK",
+      "file": "RADIO_17_FUNK.png",
+      "bytes": 7550,
+      "sha1": "a27c40d0918558b0a729074be3cbacb2e5cd7f32",
+      "sha256": "38a16523493e5cba74e79c77a8dab139598324638671923594333aad4adbef50",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/space.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/space.png"
+    },
+    {
+      "stationId": "RADIO_18_90S_ROCK",
+      "file": "RADIO_18_90S_ROCK.webp",
+      "bytes": 10032,
+      "sha1": "857b6ef143c713ec1728a559c5ebaae2e9f6ee3c",
+      "sha256": "82ff24deff210e388a23f171219d6eb32ab8a8e81e9a352074bdd79609e17ecf",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/vinewood-boulevard-radio.webp",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/vinewood-boulevard-radio.webp"
+    },
+    {
+      "stationId": "RADIO_19_USER",
+      "file": "RADIO_19_USER.svg",
+      "bytes": 18661,
+      "sha1": "c37a1a1c20dab9d7be665e9c2fef5f2d81bcc9b4",
+      "sha256": "0d4f90ed15df0c55d8ebc4a94b76490b9cb06fefacc98aa7d866ab7f24119acc",
+      "source": "https://static.wikia.nocookie.net/gtawiki/images/1/10/SelfRadio-GTAV-Logo.svg?cb=20160917180231&format=original",
+      "description": "https://gta.fandom.com/wiki/File:SelfRadio-GTAV-Logo.svg"
+    },
+    {
+      "stationId": "RADIO_20_THELAB",
+      "file": "RADIO_20_THELAB.webp",
+      "bytes": 8236,
+      "sha1": "93a716ddf71a69db1a2b8e6e3113c676035f3b9b",
+      "sha256": "4194fcf514e9bf034c200e90a30aa0d87ba715fa2d3c55d59d6e80c8f6c2e284",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/the-lab.webp",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/the-lab.webp"
+    },
+    {
+      "stationId": "RADIO_21_DLC_XM17",
+      "file": "RADIO_21_DLC_XM17.webp",
+      "bytes": 9476,
+      "sha1": "f7ec495e59d0a5006e800b8190dd7da31c86b74a",
+      "sha256": "3a626d5eee29f07dc896a167f2b799163e740c22e2a234646cec82debd9d08f4",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/blonded-los-santos.webp",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/blonded-los-santos.webp"
+    },
+    {
+      "stationId": "RADIO_22_DLC_BATTLE_MIX1_RADIO",
+      "file": "RADIO_22_DLC_BATTLE_MIX1_RADIO.png",
+      "bytes": 16031,
+      "sha1": "dbc584457492f544da17dddfc1534b56ed81e403",
+      "sha256": "37890f45fef2133bb0f4fc9f527ffe5f83c5747e8eb6072dead15c6c063525ff",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/los-santos-underground-radio.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/los-santos-underground-radio.png"
+    },
+    {
+      "stationId": "RADIO_23_DLC_XM19_RADIO",
+      "file": "RADIO_23_DLC_XM19_RADIO.webp",
+      "bytes": 8118,
+      "sha1": "8c29314b2bbd365b4e7c7e7e9bf13ccfa9d0e30c",
+      "sha256": "a6c2a0254195a1ef23cba51fb11122c9b6346924291187739862d5ce095f986d",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/ifruit-radio.webp",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/ifruit-radio.webp"
+    },
+    {
+      "stationId": "RADIO_27_DLC_PRHEI4",
+      "file": "RADIO_27_DLC_PRHEI4.png",
+      "bytes": 6692,
+      "sha1": "0ec217d13ac7ba69863efce752094b161c0a1510",
+      "sha256": "398e0498028864571688ee0f443ef89349e84844097855f77f586a20cad9b9d4",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/still-slipping-los-santos.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/still-slipping-los-santos.png"
+    },
+    {
+      "stationId": "RADIO_34_DLC_HEI4_KULT",
+      "file": "RADIO_34_DLC_HEI4_KULT.webp",
+      "bytes": 13762,
+      "sha1": "dc8daaa3209a9016f0e11bd5930aa35449ee3151",
+      "sha256": "be5ceb298cbc0d8459cf803f0b4fb24d9b3ccd3b8e97af46e838a1f100ca71f5",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/kult-fm.webp",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/kult-fm.webp"
+    },
+    {
+      "stationId": "RADIO_35_DLC_HEI4_MLR",
+      "file": "RADIO_35_DLC_HEI4_MLR.png",
+      "bytes": 730,
+      "sha1": "d35cb8e9983e32248ef0974e63c7125f7a3e4cc2",
+      "sha256": "62fb397594cfc585129b1f6e764c8fecb9781350b3bd1ba0992ce5e35665754a",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/music-locker-radio.png",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/music-locker-radio.png"
+    },
+    {
+      "stationId": "RADIO_36_AUDIOPLAYER",
+      "file": "RADIO_36_AUDIOPLAYER.png",
+      "bytes": 5248,
+      "sha1": "ea21b1a3e67059c045d11c95da1fb16cbbb33f7c",
+      "sha256": "4774c6d1f8ce5265c89eca3cf0672f297fcd956e8e3d0dd52d97865c101c613a",
+      "source": "https://static.wikia.nocookie.net/gtawiki/images/0/0e/MediaPlayer-GTAO-HUDIcon.png?cb=20210722054342&format=original",
+      "description": "https://gta.fandom.com/wiki/File:MediaPlayer-GTAO-HUDIcon.png"
+    },
+    {
+      "stationId": "RADIO_37_MOTOMAMI",
+      "file": "RADIO_37_MOTOMAMI.svg",
+      "bytes": 413919,
+      "sha1": "34ba469629087f7e338586f04a4386fcff286f16",
+      "sha256": "c2412adccdc90d9835d9caac9d5196d36c1a018b190c9010ac991952ccce2ed0",
+      "source": "https://raw.githubusercontent.com/jtaomas/GTA-V-Radio/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/motomami.svg",
+      "description": "https://github.com/jtaomas/GTA-V-Radio/blob/1262633a78e33b28ae796d04ff9fc4d669427530/public/radiostation/motomami.svg"
+    }
+  ]
+}

@@ -9,6 +9,9 @@ local HasStreamedTextureDictLoaded = HasStreamedTextureDictLoaded
 local AddReplaceTexture = AddReplaceTexture
 local SetMinimapClipType = SetMinimapClipType
 local SetMinimapComponentPosition = SetMinimapComponentPosition
+local SetScriptGfxAlign = SetScriptGfxAlign
+local GetScriptGfxPosition = GetScriptGfxPosition
+local ResetScriptGfxAlign = ResetScriptGfxAlign
 local SetBlipAlpha = SetBlipAlpha
 local GetNorthRadarBlip = GetNorthRadarBlip
 local SetBigmapActive = SetBigmapActive
@@ -23,6 +26,9 @@ local EndScaleformMovieMethod = EndScaleformMovieMethod
 local AddEventHandler = AddEventHandler
 local GetCurrentResourceName = GetCurrentResourceName
 local Wait = Wait
+local math_floor = math.floor
+local math_max = math.max
+local string_byte = string.byte
 
 local minimapReady = false
 local zoomDataApplied = false
@@ -246,7 +252,7 @@ local function removeHealthArmorBars()
     end)
 end
 
-local function applyMinimapLayout(config)
+function minimap.getLayout(config)
     local minimapConfig = (config and config.Minimap) or {}
     local aspectOffset = getAspectOffset()
     local clipType = minimapConfig.clipType or 0
@@ -263,20 +269,69 @@ local function applyMinimapLayout(config)
     local blurSizeX = minimapConfig.blurSizeX or 0.262
     local blurSizeY = minimapConfig.blurSizeY or 0.300
 
-    SetMinimapClipType(clipType)
-    SetMinimapComponentPosition('minimap', 'L', 'B', x, minimapY, sizeX, sizeY)
-    SetMinimapComponentPosition('minimap_mask', 'L', 'B', x, maskY, maskSizeX, maskSizeY)
-    SetMinimapComponentPosition('minimap_blur', 'L', 'B', x - 0.01, blurY, blurSizeX, blurSizeY)
-
-    debugLog(config, "Applied layout x=%.4f width=%.4f height=%.4f clipType=%d.", x, sizeX, sizeY, clipType)
-
     return {
         clipType = clipType,
+        alignX = 'L',
+        alignY = 'B',
+        posX = x,
+        posY = minimapY,
         left = x,
         bottom = 0.047,
         width = sizeX,
         height = sizeY,
+        maskY = maskY,
+        maskWidth = maskSizeX,
+        maskHeight = maskSizeY,
+        blurY = blurY,
+        blurWidth = blurSizeX,
+        blurHeight = blurSizeY,
     }
+end
+
+function minimap.getPixelBounds(config, screenWidth, screenHeight)
+    local layout = minimap.getLayout(config)
+    local width = tonumber(screenWidth) or 1920
+    local height = tonumber(screenHeight) or 1080
+
+    -- Map the same L/B-aligned rectangle used by the minimap native into
+    -- absolute screen coordinates. The game applies safe-zone and aspect-ratio
+    -- behavior here, so the NUI does not need to approximate either one.
+    SetScriptGfxAlign(string_byte(layout.alignX), string_byte(layout.alignY))
+    local leftNormalized, topNormalized = GetScriptGfxPosition(
+        layout.posX,
+        layout.posY - layout.height
+    )
+    local rightNormalized, bottomNormalized = GetScriptGfxPosition(
+        layout.posX + layout.width,
+        layout.posY
+    )
+    ResetScriptGfxAlign()
+
+    local left = math_floor((leftNormalized * width) + 0.5)
+    local top = math_floor((topNormalized * height) + 0.5)
+    local right = math_floor((rightNormalized * width) + 0.5)
+    local bottomEdge = math_floor((bottomNormalized * height) + 0.5)
+
+    return {
+        left = left,
+        top = top,
+        bottom = math_max(0, height - bottomEdge),
+        width = math_max(1, right - left),
+        height = math_max(1, bottomEdge - top),
+    }
+end
+
+local function applyMinimapLayout(config)
+    local layout = minimap.getLayout(config)
+
+    SetMinimapClipType(layout.clipType)
+    SetMinimapComponentPosition('minimap', layout.alignX, layout.alignY, layout.posX, layout.posY, layout.width, layout.height)
+    SetMinimapComponentPosition('minimap_mask', layout.alignX, layout.alignY, layout.posX, layout.maskY, layout.maskWidth, layout.maskHeight)
+    SetMinimapComponentPosition('minimap_blur', layout.alignX, layout.alignY, layout.posX - 0.01, layout.blurY, layout.blurWidth, layout.blurHeight)
+
+    debugLog(config, "Applied layout x=%.4f width=%.4f height=%.4f clipType=%d.", layout.posX, layout.width, layout.height, layout.clipType)
+
+    return layout
 end
 
 local function refreshMinimapRender(config, layout, options)

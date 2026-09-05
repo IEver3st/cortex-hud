@@ -37,6 +37,7 @@ local VehicleStatusThread = lib.require("modules.threads.client.vehicle_status")
 local CruiseControl = lib.require("modules.cruise.client")
 local Bridge = lib.require("modules.bridge.client")
 local AmmoState = lib.require("modules.threads.client.ammo_state")
+local ScreenEffects = lib.require('modules.effects.client')
 
 local HEALTH_DAMAGE_HOLD_MS = 25000
 local ARMOR_APPLIED_HOLD_MS = 6000
@@ -50,6 +51,8 @@ local visibilityReasons = {
     qbxCharacter = true,
     qbxSpawn = true
 }
+
+local fullyVisible = false
 
 local aircraftHudForced = false
 local minimapVisible = true
@@ -67,15 +70,23 @@ local function debugMinimap(message, ...)
     print(("[cortex-hud:minimap] " .. message):format(...))
 end
 
-local function isFullyVisible()
+local function refreshFullyVisible()
     for _, allowed in pairs(visibilityReasons) do
         if not allowed then
+            fullyVisible = false
             return false
         end
     end
 
+    fullyVisible = true
     return true
 end
+
+local function isFullyVisible()
+    return fullyVisible
+end
+
+refreshFullyVisible()
 
 local function shouldRadarBeVisible()
     if not isFullyVisible() or not minimapVisible then
@@ -141,6 +152,7 @@ end
 
 local function setVisibilityReason(reason, visible)
     visibilityReasons[reason] = visible
+    refreshFullyVisible()
     return updateVisibility(("reason:%s"):format(reason), true)
 end
 
@@ -307,6 +319,7 @@ end
 
 function hud.start(config)
     activeConfig = config
+    local playerId = PlayerId()
 
     Bridge.onPlayerLoaded(function()
         setVisibilityReason('framework', true)
@@ -412,6 +425,7 @@ function hud.start(config)
 
     CreateThread(function()
         local HideHudComponentThisFrame = HideHudComponentThisFrame
+        local HOMING_LAUNCHER_HASH = `WEAPON_HOMINGLAUNCHER`
         while true do
             HideHudComponentThisFrame(1)
             HideHudComponentThisFrame(2)
@@ -419,7 +433,15 @@ function hud.start(config)
             HideHudComponentThisFrame(4)
             HideHudComponentThisFrame(5)
             HideHudComponentThisFrame(13)
-            HideHudComponentThisFrame(14)
+            -- The homing launcher's lock-on brackets, target box, and tone
+            -- are all part of native component 14. Keep 14 hidden for every
+            -- other weapon so the custom reticle never stacks, but leave it
+            -- visible while the homing launcher is equipped so vanilla can
+            -- show what is actually being locked onto.
+            local homingEquipped = GetSelectedPedWeapon(PlayerPedId()) == HOMING_LAUNCHER_HASH
+            if not homingEquipped then
+                HideHudComponentThisFrame(14)
+            end
             HideHudComponentThisFrame(17)
             HideHudComponentThisFrame(20)
             Wait(0)
@@ -535,7 +557,7 @@ function hud.start(config)
                 local health = GetEntityHealth(ped)
                 local maxHealth = GetEntityMaxHealth(ped)
                 local armor = GetPedArmour(ped)
-                local staminaUsed = tonumber(GetPlayerSprintStaminaRemaining(PlayerId())) or 0
+                local staminaUsed = tonumber(GetPlayerSprintStaminaRemaining(playerId)) or 0
 
                 local healthBase = math_max(1, maxHealth - 100)
                 local healthPercent = math_max(0, math_min(100, ((health - 100) / healthBase) * 100))
@@ -555,6 +577,7 @@ function hud.start(config)
                     staminaPercent = math_min(staminaPercent, math_max(0, math_min(100, meleeStamina)))
                 end
                 local staminaRounded = math_floor(staminaPercent + 0.5)
+                ScreenEffects.updateStamina(staminaRounded)
                 local staminaRegenerating = lastStaminaPercent >= 0
                     and staminaPercent > lastStaminaPercent + 0.05
                     and staminaPercent < 99.95
@@ -758,23 +781,39 @@ function hud.start(config)
 
     local GetSelectedPedWeapon = GetSelectedPedWeapon
     local GetWeapontypeGroup = GetWeapontypeGroup
+    local GetPedAccuracy = GetPedAccuracy
+    local GetEntitySpeed = GetEntitySpeed
     local GetWeaponTimeBetweenShots = GetWeaponTimeBetweenShots
     local GetAmmoInClip = GetAmmoInClip
     local GetAmmoInPedWeapon = GetAmmoInPedWeapon
     local GetMaxAmmoInClip = GetMaxAmmoInClip
     local IsPedWeaponReadyToShoot = IsPedWeaponReadyToShoot
+    local IsPedShooting = IsPedShooting
+    local IsEntityInAir = IsEntityInAir
+    local IsAimCamActive = IsAimCamActive
     local UNARMED_HASH = `WEAPON_UNARMED`
     local lastAmmoClip = -1
     local lastAmmoReserve = -1
     local lastIsArmed = false
     local lastWeaponType = 'none'
+    local lastWeaponReticleType = 'none'
     local lastWeaponIcon = nil
     local lastWeaponName = nil
     local lastWeaponUsesCharge = false
     local lastWeaponChargeReady = true
     local lastWeaponChargeProgress = 100
+    local lastWeaponBloom = 0
+    local lastWeaponAiming = false
+    local VEHICLE_HITMARKER_COOLDOWN_MS = 350
+    local lastVehicleHitmarkerAt = -VEHICLE_HITMARKER_COOLDOWN_MS
     local chargeStateByHash = {}
     local lastKnownClipByWeapon = {}
+    local reticleBloomState = {
+        weaponHash = nil,
+        value = 0,
+        recoil = 0,
+        updatedAt = GetGameTimer(),
+    }
 
     local chargeWeaponHashes = {
         [`WEAPON_RAYPISTOL`] = true,
@@ -792,13 +831,155 @@ function hud.start(config)
         [`GROUP_HEAVY`] = 'heavy',
         [`GROUP_THROWN`] = 'thrown',
         [`GROUP_MELEE`] = 'melee',
+        [`GROUP_STUNGUN`] = 'stun',
         [`GROUP_PETROLCAN`] = 'utility',
         [`GROUP_FIREEXTINGUISHER`] = 'utility',
     }
 
-    local function getWeaponType(weaponHash)
-        return weaponGroupTypes[GetWeapontypeGroup(weaponHash)] or 'weapon'
+    local firearmGroups = {
+        [`GROUP_PISTOL`] = true,
+        [`GROUP_SMG`] = true,
+        [`GROUP_MG`] = true,
+        [`GROUP_RIFLE`] = true,
+        [`GROUP_SHOTGUN`] = true,
+        [`GROUP_SNIPER`] = true,
+        [`GROUP_HEAVY`] = true,
+    }
+
+    local automaticWeaponGroups = {
+        [`GROUP_SMG`] = true,
+        [`GROUP_MG`] = true,
+        [`GROUP_RIFLE`] = true,
+    }
+
+    -- GTA's weapon group does not expose firing mode. These automatic weapons
+    -- live in mixed pistol/heavy groups, so keep the small vanilla/known-alias
+    -- exception set explicit instead of guessing from rate of fire.
+    local automaticWeaponHashes = {
+        [`WEAPON_APPISTOL`] = true,
+        [`WEAPON_PISTOL_AP`] = true,
+        [`WEAPON_MACHINEPISTOL`] = true,
+        [`WEAPON_TECPISTOL`] = true,
+        [`WEAPON_MINIGUN`] = true,
+        [`WEAPON_HEAVY_MINIGUN`] = true,
+        [`WEAPON_RAYMINIGUN`] = true,
+    }
+
+    -- Dedicated heavy reticles. Stunguns sit outside the firearm groups, so
+    -- they need an explicit hash match. Launchers share GROUP_HEAVY with the
+    -- minigun, so match them by hash before the generic single-fire fallback.
+    local tazerWeaponHashes = {
+        [`WEAPON_STUNGUN`] = true,
+        [`WEAPON_STUNGUN_MP`] = true,
+    }
+
+    local homingWeaponHashes = {
+        [`WEAPON_HOMINGLAUNCHER`] = true,
+    }
+
+    local rpgWeaponHashes = {
+        [`WEAPON_RPG`] = true,
+        [`WEAPON_HEAVY_RPG`] = true,
+        [`WEAPON_GRENADELAUNCHER`] = true,
+        [`WEAPON_HEAVY_GRENADE_LAUNCHER`] = true,
+        [`WEAPON_COMPACTLAUNCHER`] = true,
+        [`WEAPON_FIREWORK`] = true,
+        [`WEAPON_RAILGUN`] = true,
+        [`WEAPON_RAILGUNXM3`] = true,
+        [`WEAPON_EMPLAUNCHER`] = true,
+        [`WEAPON_SNOWLAUNCHER`] = true,
+    }
+
+    local criticalHitBones = {
+        [31086] = true, -- SKEL_Head
+    }
+
+    local function getWeaponType(weaponGroup)
+        return weaponGroupTypes[weaponGroup] or 'weapon'
     end
+
+    local function getWeaponReticleType(weaponHash, weaponGroup)
+        if tazerWeaponHashes[weaponHash] then
+            return 'tazer'
+        end
+
+        -- Kept as a signal so the NUI layer can stand down: the homing
+        -- launcher uses the vanilla lock-on UI and never draws a custom
+        -- center reticle.
+        if homingWeaponHashes[weaponHash] then
+            return 'homing'
+        end
+
+        if rpgWeaponHashes[weaponHash] then
+            return 'rpg'
+        end
+
+        if weaponGroup == `GROUP_SHOTGUN` then
+            return 'shotgun'
+        end
+
+        if automaticWeaponGroups[weaponGroup] or automaticWeaponHashes[weaponHash] then
+            return 'automatic'
+        end
+
+        if firearmGroups[weaponGroup] or weaponGroup == `GROUP_STUNGUN` then
+            return 'single'
+        end
+
+        return 'none'
+    end
+
+    local function isHitmarkerWeapon(weaponHash)
+        if type(weaponHash) ~= 'number' then
+            return false
+        end
+
+        if tazerWeaponHashes[weaponHash] then
+            return true
+        end
+
+        return firearmGroups[GetWeapontypeGroup(weaponHash)] == true
+    end
+
+    AddEventHandler('entityDamaged', function(victim, culprit, weaponHash, _baseDamage)
+        if not isFullyVisible()
+            or culprit ~= PlayerPedId()
+            or victim == culprit
+            or not DoesEntityExist(victim)
+            or not isHitmarkerWeapon(weaponHash)
+        then
+            return
+        end
+
+        local kind
+        if IsEntityAPed(victim) then
+            kind = 'regular'
+            local foundBone, bone = GetPedLastDamageBone(victim)
+            local hasCriticalBone = (foundBone == true or foundBone == 1) and criticalHitBones[bone] == true
+
+            if hasCriticalBone then
+                kind = 'critical'
+            elseif IsPedDeadOrDying(victim, true) then
+                kind = 'knockout'
+            end
+        elseif IsEntityAVehicle(victim) then
+            local now = GetGameTimer()
+            local elapsedMs = now - lastVehicleHitmarkerAt
+            if elapsedMs >= 0 and elapsedMs < VEHICLE_HITMARKER_COOLDOWN_MS then
+                return
+            end
+
+            lastVehicleHitmarkerAt = now
+            kind = 'vehicle'
+        else
+            return
+        end
+
+        SendNUIMessage({
+            action = 'combat:hitmarker',
+            kind = kind,
+        })
+    end)
 
     local function getWeaponName(weaponIcon, fallback)
         if type(weaponIcon) ~= 'string' then
@@ -869,6 +1050,56 @@ function hud.start(config)
         return false, math_max(0, math_min(99, progress))
     end
 
+    local function resetReticleBloom()
+        reticleBloomState.weaponHash = nil
+        reticleBloomState.value = 0
+        reticleBloomState.recoil = 0
+        reticleBloomState.updatedAt = GetGameTimer()
+    end
+
+    local function approach(current, target, maxDelta)
+        if current < target then
+            return math_min(target, current + maxDelta)
+        end
+
+        return math_max(target, current - maxDelta)
+    end
+
+    local function getReticleBloom(ped, weaponHash, isAiming)
+        local now = GetGameTimer()
+        if reticleBloomState.weaponHash ~= weaponHash then
+            resetReticleBloom()
+            reticleBloomState.weaponHash = weaponHash
+            reticleBloomState.updatedAt = now
+        end
+
+        local elapsedMs = now - reticleBloomState.updatedAt
+        if elapsedMs < 1 or elapsedMs > 100 then
+            elapsedMs = 50
+        end
+        reticleBloomState.updatedAt = now
+
+        local playerAccuracy = math_max(0, math_min(100, tonumber(GetPedAccuracy(ped)) or 50))
+        local accuracyBloom = (100 - playerAccuracy) * 0.12
+        local movementBloom = math_min(42, math_max(0, tonumber(GetEntitySpeed(ped)) or 0) * 12)
+        local airBloom = IsEntityInAir(ped) and 26 or 0
+        local hipFireBloom = isAiming and 0 or 10
+
+        if IsPedShooting(ped) then
+            reticleBloomState.recoil = math_min(55, reticleBloomState.recoil + 18)
+        else
+            local recoilRecovery = isAiming and 0.10 or 0.07
+            reticleBloomState.recoil = math_max(0, reticleBloomState.recoil - elapsedMs * recoilRecovery)
+        end
+
+        local targetBloom = math_min(100,
+            accuracyBloom + movementBloom + airBloom + hipFireBloom + reticleBloomState.recoil)
+        local changeRate = targetBloom > reticleBloomState.value and 0.55 or (isAiming and 0.16 or 0.11)
+        reticleBloomState.value = approach(reticleBloomState.value, targetBloom, elapsedMs * changeRate)
+
+        return math_floor(math_max(0, math_min(100, reticleBloomState.value)) + 0.5)
+    end
+
     local weaponIconByHash = {}
     do
         local rawManifest = LoadResourceFile(GetCurrentResourceName(), 'web/dist/weapons/manifest.json')
@@ -893,16 +1124,33 @@ function hud.start(config)
         local clipAmmo = -1
         local reserveAmmo = -1
         local weaponType = 'none'
+        local weaponReticleType = 'none'
         local weaponIcon = nil
         local weaponName = nil
         local weaponUsesCharge = false
         local weaponChargeReady = true
         local weaponChargeProgress = 100
+        local weaponBloom = 0
+        local weaponAiming = false
 
         if isArmed then
-            weaponType = getWeaponType(weaponHash)
+            local weaponGroup = GetWeapontypeGroup(weaponHash)
+            weaponType = getWeaponType(weaponGroup)
+            weaponReticleType = getWeaponReticleType(weaponHash, weaponGroup)
             weaponIcon = weaponIconByHash[weaponHash]
             weaponName = getWeaponName(weaponIcon, weaponType)
+            -- The homing launcher keeps the vanilla lock-on UI, so it never
+            -- needs custom bloom tracking even while Leonida reticles are on.
+            if weaponReticleType ~= 'none'
+                and weaponReticleType ~= 'homing'
+                and config.gta6HudEnabled == true
+                and config.gta6AuthenticWeaponHud == true
+            then
+                weaponAiming = IsAimCamActive()
+                weaponBloom = getReticleBloom(ped, weaponHash, weaponAiming)
+            else
+                resetReticleBloom()
+            end
             weaponUsesCharge = isChargeWeapon(weaponHash, weaponIcon, weaponName)
             if weaponUsesCharge then
                 weaponChargeReady, weaponChargeProgress = getWeaponChargeState(ped, weaponHash)
@@ -925,25 +1173,30 @@ function hud.start(config)
             if clipReadWasSuccessful then
                 lastKnownClipByWeapon[weaponHash] = clipAmmo
             end
+        else
+            resetReticleBloom()
         end
 
-        return isArmed, clipAmmo, reserveAmmo, weaponType, weaponIcon, weaponName,
-            weaponUsesCharge, weaponChargeReady, weaponChargeProgress
+        return isArmed, clipAmmo, reserveAmmo, weaponType, weaponReticleType, weaponIcon, weaponName,
+            weaponUsesCharge, weaponChargeReady, weaponChargeProgress, weaponBloom, weaponAiming
     end
 
     local function sendCurrentWeaponState()
-        local isArmed, clipAmmo, reserveAmmo, weaponType, weaponIcon, weaponName,
-            weaponUsesCharge, weaponChargeReady, weaponChargeProgress = getCurrentWeaponState()
+        local isArmed, clipAmmo, reserveAmmo, weaponType, weaponReticleType, weaponIcon, weaponName,
+            weaponUsesCharge, weaponChargeReady, weaponChargeProgress, weaponBloom, weaponAiming = getCurrentWeaponState()
 
         lastAmmoClip = clipAmmo
         lastAmmoReserve = reserveAmmo
         lastIsArmed = isArmed
         lastWeaponType = weaponType
+        lastWeaponReticleType = weaponReticleType
         lastWeaponIcon = weaponIcon
         lastWeaponName = weaponName
         lastWeaponUsesCharge = weaponUsesCharge
         lastWeaponChargeReady = weaponChargeReady
         lastWeaponChargeProgress = weaponChargeProgress
+        lastWeaponBloom = weaponBloom
+        lastWeaponAiming = weaponAiming
 
         SendNUIMessage({
             action = 'updateAmmo',
@@ -951,11 +1204,14 @@ function hud.start(config)
             ammoReserve = reserveAmmo,
             isArmed = isArmed,
             weaponType = weaponType,
+            weaponReticleType = weaponReticleType,
             weaponIcon = weaponIcon,
             weaponName = weaponName,
             weaponUsesCharge = weaponUsesCharge,
             weaponChargeReady = weaponChargeReady,
             weaponChargeProgress = weaponChargeProgress,
+            weaponBloom = weaponBloom,
+            weaponAiming = weaponAiming,
         })
     end
 
@@ -977,42 +1233,55 @@ function hud.start(config)
             local sleep = 750
 
             if isFullyVisible() then
-                local isArmed, clipAmmo, reserveAmmo, weaponType, weaponIcon, weaponName,
-                    weaponUsesCharge, weaponChargeReady, weaponChargeProgress = getCurrentWeaponState()
+                local isArmed, clipAmmo, reserveAmmo, weaponType, weaponReticleType, weaponIcon, weaponName,
+                    weaponUsesCharge, weaponChargeReady, weaponChargeProgress, weaponBloom, weaponAiming = getCurrentWeaponState()
 
                 if isArmed then
-                    sleep = weaponUsesCharge and not weaponChargeReady and 50 or 100
+                    local reticleIsActive = weaponReticleType ~= 'none'
+                        and weaponReticleType ~= 'homing'
+                        and config.gta6HudEnabled == true
+                        and config.gta6AuthenticWeaponHud == true
+                    sleep = (reticleIsActive or (weaponUsesCharge and not weaponChargeReady)) and 50 or 100
 
                     if clipAmmo ~= lastAmmoClip
                         or reserveAmmo ~= lastAmmoReserve
                         or isArmed ~= lastIsArmed
                         or weaponType ~= lastWeaponType
+                        or weaponReticleType ~= lastWeaponReticleType
                         or weaponIcon ~= lastWeaponIcon
                         or weaponName ~= lastWeaponName
                         or weaponUsesCharge ~= lastWeaponUsesCharge
                         or weaponChargeReady ~= lastWeaponChargeReady
                         or weaponChargeProgress ~= lastWeaponChargeProgress
+                        or weaponBloom ~= lastWeaponBloom
+                        or weaponAiming ~= lastWeaponAiming
                     then
                         lastAmmoClip = clipAmmo
                         lastAmmoReserve = reserveAmmo
                         lastIsArmed = isArmed
                         lastWeaponType = weaponType
+                        lastWeaponReticleType = weaponReticleType
                         lastWeaponIcon = weaponIcon
                         lastWeaponName = weaponName
                         lastWeaponUsesCharge = weaponUsesCharge
                         lastWeaponChargeReady = weaponChargeReady
                         lastWeaponChargeProgress = weaponChargeProgress
+                        lastWeaponBloom = weaponBloom
+                        lastWeaponAiming = weaponAiming
                         SendNUIMessage({
                             action = 'updateAmmo',
                             ammoClip = clipAmmo,
                             ammoReserve = reserveAmmo,
                             isArmed = isArmed,
                             weaponType = weaponType,
+                            weaponReticleType = weaponReticleType,
                             weaponIcon = weaponIcon,
                             weaponName = weaponName,
                             weaponUsesCharge = weaponUsesCharge,
                             weaponChargeReady = weaponChargeReady,
                             weaponChargeProgress = weaponChargeProgress,
+                            weaponBloom = weaponBloom,
+                            weaponAiming = weaponAiming,
                         })
                     end
                 else
@@ -1022,20 +1291,26 @@ function hud.start(config)
                         lastAmmoReserve = -1
                         lastIsArmed = false
                         lastWeaponType = 'none'
+                        lastWeaponReticleType = 'none'
                         lastWeaponIcon = nil
                         lastWeaponName = nil
                         lastWeaponUsesCharge = false
                         lastWeaponChargeReady = true
                         lastWeaponChargeProgress = 100
+                        lastWeaponBloom = 0
+                        lastWeaponAiming = false
                         SendNUIMessage({
                             action = 'updateAmmo',
                             ammoClip = -1,
                             ammoReserve = -1,
                             isArmed = false,
                             weaponType = 'none',
+                            weaponReticleType = 'none',
                             weaponUsesCharge = false,
                             weaponChargeReady = true,
                             weaponChargeProgress = 100,
+                            weaponBloom = 0,
+                            weaponAiming = false,
                         })
                     end
                 end
@@ -1186,6 +1461,10 @@ function hud.start(config)
 
     AddEventHandler('es_nos:update', handleNosUpdate)
     AddEventHandler('cortex_nos:update', handleNosUpdate)
+end
+
+function hud.isVisible()
+    return isFullyVisible()
 end
 
 return hud

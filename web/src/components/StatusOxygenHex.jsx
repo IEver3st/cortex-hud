@@ -22,7 +22,7 @@ function clamp01(n) {
 
 
 
-export default function StatusOxygenHex({ value, variant = 'tray', className = '' }) {
+function StatusOxygenHex({ value, variant = 'tray', className = '' }) {
 
   const clipId = React.useId().replace(/:/g, '')
 
@@ -73,4 +73,6 @@ export default function StatusOxygenHex({ value, variant = 'tray', className = '
   )
 
 }
+
+export default React.memo(StatusOxygenHex)
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import HUD from './components/HUD'
 import AircraftHUD from './components/AircraftHUD'
 import Indicator from './components/Indicator'
@@ -8,11 +8,30 @@ import VehicleCloneQte from './components/VehicleCloneQte'
 import SniperScope from './components/SniperScope'
 import SettingsModal from './components/SettingsModal'
 import HudDevPanel from './components/HudDevPanel'
+import RadioSelector from './components/RadioSelector'
+import WeaponWheel from './components/WeaponWheel'
+import ScreenEffects from './components/ScreenEffects'
+import CombatReticle from './components/CombatReticle'
 import { isHudDevBrowser, loadDevPlayfieldColor, saveDevPlayfieldColor } from './hudDevEnv'
 import { applyDevSettingsSave } from './hudDevApply'
 import { postNui } from './nui'
+import {
+  HITMARKER_DURATION_MS,
+  normalizeHitmarkerKind,
+  normalizeWeaponBloom,
+  normalizeWeaponReticleType,
+} from './combatFeedback.js'
+import { normalizeLocationDisplayStyle } from './locationDisplayStyle.js'
+import { createFallbackMinimapBounds, normalizeMinimapBounds } from './minimapGeometry.js'
+import { INITIAL_RADIO_STATE, normalizeRadioState } from './radioModel.js'
+import {
+  DEV_WEAPON_WHEEL_STATE,
+  INITIAL_WEAPON_WHEEL_STATE,
+  normalizeWeaponWheelState,
+} from './weaponWheelModel.js'
 import { normalizeVehicleIdentity } from './vehicleIdentity.js'
 import { shouldShowSpeedometer } from './hudVisibility.js'
+import { hasActiveScreenEffects, normalizeScreenEffectMessage } from './screenEffects.js'
 
 function App() {
   const [devPlayfieldColor, setDevPlayfieldColor] = useState(() =>
@@ -114,7 +133,6 @@ function App() {
       voipAccent: '#22c55e',
       ammo: '#a3e635',
       backdropBlur: 1,
-      panelOpacity: 1,
     },
     colors: {
       health: '#10b981',
@@ -140,6 +158,8 @@ function App() {
     gta6AuthenticWeaponHud: false,
     gta6ShowWeaponName: true,
     gta6VehicleIdentification: true,
+    customWeaponWheel: false,
+    locationDisplayStyle: 'current',
     vehicleIdentity: null,
     sniperScopeVisible: false,
     sniperScopeWeapon: 'SNIPER',
@@ -149,18 +169,26 @@ function App() {
     sectionedBars: false,
     sectionedIndicator: false,
     oxygenDisplayLocation: 'statusCluster',
+    oxygenExtended: false,
     isArmed: false,
     weaponType: 'none',
+    weaponReticleType: 'none',
     weaponIcon: null,
     weaponName: '',
     weaponUsesCharge: false,
     weaponChargeReady: true,
     weaponChargeProgress: 100,
+    weaponBloom: 0,
+    weaponAiming: false,
     interactionLayout: {
       insetRight: 0,
       insetBottom: 0,
       screenWidth: isHudDevBrowser ? window.innerWidth : 1920,
       screenHeight: isHudDevBrowser ? window.innerHeight : 1080,
+      minimapBounds: createFallbackMinimapBounds(
+        isHudDevBrowser ? window.innerWidth : 1920,
+        isHudDevBrowser ? window.innerHeight : 1080,
+      ),
     },
     radarVisible: true,
 
@@ -184,8 +212,8 @@ function App() {
 
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsData, setSettingsData] = useState({})
+  const settingsRenderKey = useMemo(() => JSON.stringify(settingsData), [settingsData])
   const [cinematicMode, setCinematicMode] = useState(false)
-  const [vehicleIdentityActive, setVehicleIdentityActive] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [dragPos, setDragPos] = useState(null)
   const dragPosRef = useRef(null)
@@ -197,6 +225,20 @@ function App() {
   const [cloneQte, setCloneQte] = useState(null)
   const [cloneQtePressNonce, setCloneQtePressNonce] = useState(0)
   const cloneQteRef = useRef(null)
+  const [radioState, setRadioState] = useState(INITIAL_RADIO_STATE)
+  const [weaponWheelState, setWeaponWheelState] = useState(INITIAL_WEAPON_WHEEL_STATE)
+  const [screenEffects, setScreenEffects] = useState({ damage: null, stamina: null, kill: null })
+  const screenEffectNonceRef = useRef(0)
+  const [hitmarker, setHitmarker] = useState(null)
+  const hitmarkerNonceRef = useRef(0)
+
+  const showHitmarker = useCallback((value) => {
+    const kind = normalizeHitmarkerKind(value)
+    if (!kind) return
+
+    hitmarkerNonceRef.current += 1
+    setHitmarker({ kind, nonce: hitmarkerNonceRef.current })
+  }, [])
 
   useEffect(() => {
     editModeRef.current = editMode
@@ -205,6 +247,17 @@ function App() {
   useEffect(() => {
     hudDataRef.current = hudData
   }, [hudData])
+
+  useEffect(() => {
+    if (!hitmarker) return undefined
+
+    const nonce = hitmarker.nonce
+    const timeout = window.setTimeout(() => {
+      setHitmarker((current) => current?.nonce === nonce ? null : current)
+    }, HITMARKER_DURATION_MS)
+
+    return () => window.clearTimeout(timeout)
+  }, [hitmarker])
 
   useEffect(() => {
     if (!isHudDevBrowser) return undefined
@@ -228,6 +281,7 @@ function App() {
               ...prev.interactionLayout,
               screenWidth,
               screenHeight,
+              minimapBounds: createFallbackMinimapBounds(screenWidth, screenHeight),
             },
           }
         })
@@ -248,24 +302,39 @@ function App() {
     document.documentElement.style.setProperty('--es-backdrop-blur', String(blur))
     const norm = (blur - 0.25) / 2.75
     document.documentElement.style.setProperty('--es-backdrop-norm', String(norm))
-
-    let op = Number(hudData.theme?.panelOpacity)
-    if (Number.isFinite(op) && op >= 15 && op <= 100) op = op / 100
-    if (!Number.isFinite(op)) op = 1
-    op = Math.min(1, Math.max(0.15, op))
-    document.documentElement.style.setProperty('--es-panel-opacity', String(op))
-
-    const normAtDefaultBlur = (1 - 0.25) / 2.75
-    const frostMult = Math.min(1.15, Math.max(0.82, 1 + 0.4 * (norm - normAtDefaultBlur)))
-    const fillAlpha = Math.min(1, Math.max(0.15, op * frostMult))
-    document.documentElement.style.setProperty('--es-glass-fill-alpha', String(fillAlpha))
-  }, [hudData.theme?.backdropBlur, hudData.theme?.panelOpacity])
+  }, [hudData.theme?.backdropBlur])
 
   const handleMessage = useCallback((event) => {
     const data = event.data
     if (!data || typeof data !== 'object') return
 
     switch (data.action) {
+      case 'screenEffect:trigger': {
+        const effect = normalizeScreenEffectMessage(data)
+        if (!effect) break
+
+        screenEffectNonceRef.current += 1
+        setScreenEffects((previous) => ({
+          ...previous,
+          [effect.effect]: { ...effect, nonce: screenEffectNonceRef.current },
+        }))
+        break
+      }
+      case 'radio:state':
+      case 'radio:metadata':
+      case 'radio:inputMode':
+        setRadioState((previous) => normalizeRadioState(data, previous))
+        break
+      case 'radio:visibility':
+        setRadioState((previous) => normalizeRadioState({ visible: data.visible }, previous))
+        break
+      case 'weaponWheel:open':
+      case 'weaponWheel:update':
+        setWeaponWheelState((previous) => normalizeWeaponWheelState(data, previous))
+        break
+      case 'weaponWheel:close':
+        setWeaponWheelState((previous) => normalizeWeaponWheelState({ visible: false }, previous))
+        break
       case 'vehicleCloneQte:start': {
         const next = data.data && typeof data.data === 'object' ? data.data : null
         if (!next || typeof next.nonce !== 'string' || !next.nonce || next.nonce.length > 96) break
@@ -304,6 +373,8 @@ function App() {
           thirst: data.thirst ?? prev.thirst,
           stress: data.stress ?? prev.stress,
           oxygen: data.oxygen ?? prev.oxygen,
+          oxygenExtended:
+            typeof data.oxygenExtended === 'boolean' ? data.oxygenExtended : prev.oxygenExtended,
           underwater: data.underwater ?? prev.underwater,
           inWater: data.inWater ?? prev.inWater,
         }))
@@ -371,6 +442,12 @@ function App() {
           gta6VehicleIdentification: Object.prototype.hasOwnProperty.call(data, 'gta6VehicleIdentification')
             ? data.gta6VehicleIdentification !== false
             : prev.gta6VehicleIdentification,
+          customWeaponWheel: Object.prototype.hasOwnProperty.call(data, 'customWeaponWheel')
+            ? data.customWeaponWheel === true
+            : prev.customWeaponWheel,
+          locationDisplayStyle: Object.prototype.hasOwnProperty.call(data, 'locationDisplayStyle')
+            ? normalizeLocationDisplayStyle(data.locationDisplayStyle)
+            : prev.locationDisplayStyle,
           sectionedBars: data.sectionedBars ?? prev.sectionedBars,
           sectionedIndicator: data.sectionedIndicator ?? prev.sectionedIndicator,
           oxygenDisplayLocation: data.oxygenDisplayLocation ?? prev.oxygenDisplayLocation,
@@ -481,6 +558,9 @@ function App() {
           waypointUnit: data.waypointUnit,
         }))
         break
+      case 'combat:hitmarker':
+        showHitmarker(data.kind)
+        break
       case 'updateAmmo':
         setHudData((prev) => ({
           ...prev,
@@ -488,6 +568,8 @@ function App() {
           ammoReserve: data.ammoReserve,
           isArmed: data.isArmed ?? prev.isArmed,
           weaponType: typeof data.weaponType === 'string' ? data.weaponType : prev.weaponType,
+          weaponReticleType: normalizeWeaponReticleType(data.weaponReticleType)
+            ?? prev.weaponReticleType,
           weaponIcon:
             typeof data.weaponIcon === 'string' && /^weapon_[a-z0-9_]+$/i.test(data.weaponIcon)
               ? data.weaponIcon.toLowerCase()
@@ -504,6 +586,12 @@ function App() {
           weaponChargeProgress: Number.isFinite(Number(data.weaponChargeProgress))
             ? Math.min(100, Math.max(0, Math.round(Number(data.weaponChargeProgress))))
             : prev.weaponChargeProgress,
+          weaponBloom: Object.prototype.hasOwnProperty.call(data, 'weaponBloom')
+            ? normalizeWeaponBloom(data.weaponBloom)
+            : prev.weaponBloom,
+          weaponAiming: typeof data.weaponAiming === 'boolean'
+            ? data.weaponAiming
+            : prev.weaponAiming,
         }))
         break
       case 'interaction:layout': {
@@ -516,6 +604,7 @@ function App() {
             insetBottom: Math.min(screenHeight * 0.2, Math.max(0, Number(data.insetBottom) || 0)),
             screenWidth,
             screenHeight,
+            minimapBounds: normalizeMinimapBounds(data.minimapBounds, { screenWidth, screenHeight }),
           },
         }))
         break
@@ -666,12 +755,19 @@ function App() {
       default:
         break
     }
-  }, [ammoEditMode])
+  }, [ammoEditMode, showHitmarker])
 
   useEffect(() => {
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [handleMessage])
+
+  const handleScreenEffectEnd = useCallback((effectName, nonce) => {
+    setScreenEffects((previous) => {
+      if (previous[effectName]?.nonce !== nonce) return previous
+      return { ...previous, [effectName]: null }
+    })
+  }, [])
 
   useEffect(() => {
     if (isHudDevBrowser) {
@@ -833,6 +929,12 @@ function App() {
     setCinematicMode(Boolean(enabled))
   }, [])
 
+  const handleToggleDevWeaponWheel = useCallback((visible) => {
+    setWeaponWheelState((previous) => visible
+      ? { ...DEV_WEAPON_WHEEL_STATE, revision: previous.revision + 1 }
+      : { ...previous, visible: false })
+  }, [])
+
   const handleCloneQteComplete = useCallback((result) => {
     const active = cloneQteRef.current
     if (!active || result?.nonce !== active.nonce) return
@@ -884,7 +986,11 @@ function App() {
     !cinematicMode &&
     !editMode &&
     !ammoEditMode &&
-    !cloneQte
+    !cloneQte &&
+    !radioState.visible &&
+    !weaponWheelState.visible &&
+    !hitmarker &&
+    !hasActiveScreenEffects(screenEffects)
 
   if (appUiEmpty && !isHudDevBrowser) {
     return null
@@ -896,10 +1002,12 @@ function App() {
     && !settingsOpen
     && !editMode
     && !ammoEditMode
-  const showMainHud = hudData.visible || editMode || ammoEditMode
+    && !weaponWheelState.visible
+  const showMainHud = (hudData.visible || editMode || ammoEditMode) && !weaponWheelState.visible
   const showAircraftHud = hudData.aircraftVisible
     && (hudData.visible || hudData.forceAircraftHud)
     && !editMode
+    && !weaponWheelState.visible
   const playerInVehicle = Boolean(hudData.vehicleVisible || hudData.aircraftVisible)
 
   return (
@@ -911,6 +1019,9 @@ function App() {
           : undefined
       }
     >
+      <ScreenEffects effects={screenEffects} onEffectEnd={handleScreenEffectEnd} />
+      <RadioSelector state={radioState} />
+      <WeaponWheel state={weaponWheelState} />
       <SniperScope
         visible={showSniperScope}
         zoom={hudData.sniperScopeZoom}
@@ -924,17 +1035,32 @@ function App() {
         layout={hudData.interactionLayout}
         onComplete={handleCloneQteComplete}
       />
-      {!playerInVehicle && hudData.isArmed && hudData.weaponType !== 'melee' && !showSniperScope && (
-        hudData.gta6HudEnabled && hudData.gta6AuthenticWeaponHud
-          ? (
-              <div className="gta6-crosshair" aria-hidden="true">
-                <span className="gta6-crosshair-arm gta6-crosshair-arm--left" />
-                <span className="gta6-crosshair-arm gta6-crosshair-arm--right" />
-                <span className="gta6-crosshair-arm gta6-crosshair-arm--stem" />
-              </div>
-            )
-          : hudData.showCrosshair && <div className="crosshair-dot" aria-hidden="true" />
-      )}
+      <CombatReticle
+        showAuthenticReticle={
+          !playerInVehicle
+          && hudData.isArmed
+          && hudData.weaponType !== 'melee'
+          && hudData.weaponReticleType !== 'homing'
+          && !showSniperScope
+          && hudData.gta6HudEnabled
+          && hudData.gta6AuthenticWeaponHud
+          && !weaponWheelState.visible
+        }
+        showClassicDot={
+          !playerInVehicle
+          && hudData.isArmed
+          && hudData.weaponType !== 'melee'
+          && hudData.weaponReticleType !== 'homing'
+          && !showSniperScope
+          && !(hudData.gta6HudEnabled && hudData.gta6AuthenticWeaponHud)
+          && hudData.showCrosshair
+          && !weaponWheelState.visible
+        }
+        weaponReticleType={hudData.weaponReticleType}
+        weaponBloom={hudData.weaponBloom}
+        weaponAiming={hudData.weaponAiming}
+        hitmarker={hitmarker}
+      />
       {editMode && (
         <div className="edit-mode-overlay">
           <div className="edit-mode-header">
@@ -968,7 +1094,7 @@ function App() {
       )}
       {showMainHud && (
         <div className={`main-hud-layer${showSniperScope ? ' main-hud-layer--scope-hidden' : ''}`}>
-          {!hudData.gta6HudEnabled && <Indicator
+          {hudData.locationDisplayStyle === 'current' && <Indicator
             heading={hudData.heading}
             street={hudData.street}
             zone={hudData.zone}
@@ -999,17 +1125,15 @@ function App() {
               vehicleVisible={Boolean(hudData.vehicleIdentity)}
               radarVisible={hudData.radarVisible}
               layout={hudData.interactionLayout}
-              onActiveChange={setVehicleIdentityActive}
             />
           )}
-          {hudData.gta6HudEnabled && (
+          {hudData.locationDisplayStyle === 'gta6' && (
             <Gta6Navigation
               street={hudData.street}
               zone={hudData.zone}
               zoneCode={hudData.zoneCode}
               radarVisible={hudData.radarVisible}
               layout={hudData.interactionLayout}
-              suspended={vehicleIdentityActive}
             />
           )}
           <HUD
@@ -1047,6 +1171,7 @@ function App() {
             thirst={hudData.thirst}
             stress={hudData.stress}
             oxygen={hudData.oxygen}
+            oxygenExtended={hudData.oxygenExtended}
             underwater={hudData.underwater}
             inWater={hudData.inWater}
             voipTalking={hudData.voipTalking}
@@ -1094,6 +1219,7 @@ function App() {
             gta6HudEnabled={hudData.gta6HudEnabled}
             gta6AuthenticWeaponHud={hudData.gta6AuthenticWeaponHud}
             gta6ShowWeaponName={hudData.gta6ShowWeaponName}
+            locationDisplayStyle={hudData.locationDisplayStyle}
             ammoEditMode={ammoEditMode}
             onAmmoDrag={handleAmmoDrag}
             layout={hudData.layout}
@@ -1125,7 +1251,7 @@ function App() {
         </div>
       )}
       <SettingsModal
-        key={JSON.stringify(settingsData)}
+        key={settingsRenderKey}
         visible={settingsOpen && !editMode && !ammoEditMode}
         showDynamicWeatherSetting={hudData.dynamicWeatherResourceAvailable || isHudDevBrowser}
         settings={settingsData}
@@ -1143,6 +1269,9 @@ function App() {
           cinematicMode={cinematicMode}
           onToggleCinematic={handleDevCinematic}
           onOpenSettingsModal={handleOpenDevSettingsModal}
+          onPreviewHitmarker={showHitmarker}
+          weaponWheelVisible={weaponWheelState.visible}
+          onToggleWeaponWheelPreview={handleToggleDevWeaponWheel}
           playfieldColor={devPlayfieldColor}
           onPlayfieldColorChange={setDevPlayfieldColor}
         />

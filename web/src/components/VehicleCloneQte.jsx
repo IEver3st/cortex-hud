@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   isVehicleCloneHit,
   normalizeVehicleCloneChallenge,
@@ -168,4 +168,4 @@ function VehicleCloneQte({ challenge, pressNonce, layout, onComplete }) {
   )
 }
 
-export default VehicleCloneQte
+export default memo(VehicleCloneQte)
