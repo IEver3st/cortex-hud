@@ -17,7 +17,7 @@ local lastThirst = -1
 local lastStress = -1
 local lastOxygen = 100
 local lastUnderwater = false
---- Full-lung capacity from native at surface (base ~10s; scales with lung stat / SetPedMaxTimeUnderwater).
+
 local breathMaxReference = 10.0
 
 local lastVoipTalking = nil
@@ -47,7 +47,7 @@ local function getRangeFromProximityState()
     if type(result) == 'table' then
         local index = result.index
         if index ~= nil then
-            -- pma-voice uses 1-indexed: 1=whisper, 2=normal, 3=shout
+            
             if index <= 1 then
                 return 'whisper'
             elseif index >= 3 then
@@ -84,7 +84,6 @@ local function getRangeFromProximityState()
     return nil
 end
 
---- 0–1 for NUI VOIP meter (hex/circle tray). Prefers `LocalPlayer.state.proximity` when numeric; else maps voice range.
 local function getVoipProximityFraction(range)
     local ok, result = pcall(function()
         return LocalPlayer.state['proximity']
@@ -226,7 +225,6 @@ local function getVoipState()
     if voipResource == 'pma-voice' then
         local ok, result
 
-        -- Check connection: try native first, then export, then assume connected
         ok, result = pcall(MumbleIsConnected)
         if ok and result then
             connected = true
@@ -237,7 +235,7 @@ local function getVoipState()
             if ok and result == true then
                 connected = true
             else
-                -- If pma-voice resource is running, assume connected
+                
                 connected = GetResourceState('pma-voice') == 'started'
             end
         end
@@ -354,10 +352,9 @@ local function getOxygenState()
     local currentOxygen = GetPlayerUnderwaterTimeRemaining(playerId)
     local underwater = IsPedSwimmingUnderWater(ped) or currentOxygen <= 9.99
 
-    -- Submerged level > 0.5 trips during surface swim. Underwater-swim flag matches breath HUD.
-    -- If lungs aren't full while flag is false (e.g. seabed), still report remaining air.
+    
     if not underwater and currentOxygen > 9.99 then
-        -- Remaining time at full breath equals max capacity; do not assume 10.0 (lung upgrades go higher).
+        
         breathMaxReference = math_max(breathMaxReference, currentOxygen)
         return 100, false
     end
@@ -371,7 +368,6 @@ function Status.start(config, isFullyVisible)
     voipResource = detectVoipResource()
     nextVoipResourceCheckAt = 0
 
-    -- Status update thread (hunger, thirst, stress — slow)
     CreateThread(function()
         while not Bridge.isPlayerLoaded() do
             Wait(200)
@@ -401,7 +397,6 @@ function Status.start(config, isFullyVisible)
         end
     end)
 
-    -- Oxygen update thread (fast while oxygen is changing, slower while player is dry/full)
     CreateThread(function()
         while not Bridge.isPlayerLoaded() do
             Wait(200)
@@ -432,7 +427,6 @@ function Status.start(config, isFullyVisible)
         end
     end)
 
-    -- VOIP update thread
     CreateThread(function()
         while not Bridge.isPlayerLoaded() do
             Wait(200)
@@ -472,7 +466,6 @@ function Status.start(config, isFullyVisible)
         end
     end)
 
-    -- Send initial config to NUI
     CreateThread(function()
         while not Bridge.isPlayerLoaded() do
             Wait(200)

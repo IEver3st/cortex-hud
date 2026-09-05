@@ -6,7 +6,7 @@ import './StatusOxygenHex.css'
 
 
 
-/** Flat-top hex in 0–100 viewBox (matches HUD status hex). */
+
 
 const OXYGEN_HEX_PATH = 'M15 30 L50 10 L85 30 L85 70 L50 90 L15 70 Z'
 
@@ -20,13 +20,7 @@ function clamp01(n) {
 
 
 
-/**
 
- * Oxygen bar-layout glyph: same nested-hex stack as health/armor in the cluster
-
- * (outer ghost hex + clipped inner fill) + white lungs.
-
- */
 
 export default function StatusOxygenHex({ value, variant = 'tray', className = '' }) {
 

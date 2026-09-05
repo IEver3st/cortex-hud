@@ -13,10 +13,8 @@ local lastAlertVehicle = 0
 local lastFuelValue = nil
 local lastDebugPrint = 0
 
--- ============================================================================
--- Known fuel script exports, checked in priority order.
--- Each entry: { resource, getter }
--- ============================================================================
+
+
 
 local KNOWN_EXPORTS = {
     { "ox_fuel",     "GetFuel" },
@@ -39,14 +37,11 @@ local KNOWN_EXPORTS = {
     { "lj-fuel",     "GetFuel" },
 }
 
--- Cache the resolved export so we don't scan every frame
 local cachedResource = nil
 local cachedGetter = nil
 local cacheChecked = false
 
--- ============================================================================
--- Helpers
--- ============================================================================
+
 
 local function callExport(resourceName, getter, vehicle)
     local ok, fn = pcall(function()
@@ -74,15 +69,14 @@ local function getStateFuel(vehicle)
     return nil
 end
 
---- Scan KNOWN_EXPORTS for the first resource that is started and returns a
---- valid number. Caches the result so subsequent calls skip the scan.
+
 local function detectExport(vehicle)
     if cacheChecked and cachedResource then
         local result = callExport(cachedResource, cachedGetter, vehicle)
         if type(result) == "number" then
             return result, cachedResource .. ":" .. cachedGetter
         end
-        -- Cached export stopped working — clear cache and rescan
+        
         cachedResource = nil
         cachedGetter = nil
         cacheChecked = false
@@ -106,9 +100,7 @@ local function detectExport(vehicle)
     return nil, nil
 end
 
--- ============================================================================
--- Alerts
--- ============================================================================
+
 
 local function getAlertConfig()
     local fc = config.Fuel or {}
@@ -137,7 +129,6 @@ function Fuel.handleAlerts(vehicle, fuel)
     local fuelValue = tonumber(fuel)
     if type(fuelValue) ~= "number" then return end
 
-    -- Reset tracking when vehicle changes
     if lastAlertVehicle ~= vehicle then
         lastAlertVehicle = vehicle
         lastFuelValue = fuelValue
@@ -165,18 +156,14 @@ function Fuel.handleAlerts(vehicle, fuel)
     lastFuelValue = fuelValue
 end
 
--- ============================================================================
--- Public API
--- ============================================================================
 
---- Backward-compatible no-op. The old module used this for the "ask" mode
---- context menu prompt, which has been removed.
+
+
+
 function Fuel.init() end
 
---- Get the current fuel level for a vehicle.
---- @param vehicle number  The vehicle entity handle
---- @return number fuel     Fuel level 0-100
---- @return boolean hasFuelProvider  True if an external fuel script was used
+
+
 function Fuel.get(vehicle)
     if not vehicle or vehicle == 0 then
         return 0, false
@@ -186,14 +173,12 @@ function Fuel.get(vehicle)
     local result = nil
     local source = "none"
 
-    -- 1. Statebag (ox_lib / entity state)
     local stateFuel = getStateFuel(vehicle)
     if type(stateFuel) == "number" then
         result = stateFuel
         source = "statebag"
     end
 
-    -- 2. Known fuel script exports
     if type(result) ~= "number" then
         local detected, detectedSource = detectExport(vehicle)
         if type(detected) == "number" then
@@ -202,7 +187,6 @@ function Fuel.get(vehicle)
         end
     end
 
-    -- 3. Handle zero-as-invalid (fuel script returned 0 but native says otherwise)
     if type(result) == "number" and fc.treatZeroAsInvalid and result <= 0 then
         local native = GetVehicleFuelLevel(vehicle)
         if native > 0 then
@@ -211,7 +195,6 @@ function Fuel.get(vehicle)
         end
     end
 
-    -- 4. Native GTA fallback
     if type(result) ~= "number" then
         if fc.fallbackToNative == false then
             return 0, false
@@ -220,9 +203,8 @@ function Fuel.get(vehicle)
         source = "native"
     end
 
-    -- A fuel provider means either an external resource export or a statebag
-    -- was used (e.g. ox_fuel sets entity.state.fuel). Only the native GTA
-    -- fallback is NOT considered a fuel provider.
+    
+    
     local hasFuelProvider = source == "statebag"
         or source:sub(1, 7) == "export:"
 

@@ -33,7 +33,6 @@ local DISALLOWED_TYPES = {
     trailer = true,
 }
 
---- @return number min speed in m/s
 function Cruise:minSpeedMs()
     local minDisp = (cc and type(cc.minSpeed) == "number" and cc.minSpeed) or 15
     local unit = string.lower(config.speedUnit or "mph")
@@ -43,7 +42,6 @@ function Cruise:minSpeedMs()
     return minDisp / 2.236936
 end
 
---- @return number display speed (int) from m/s
 function Cruise:speedToDisplay(ms)
     local unit = string.lower(config.speedUnit or "mph")
     if unit == "kph" then
@@ -52,7 +50,6 @@ function Cruise:speedToDisplay(ms)
     return math.floor(ms * 2.236936 + 0.5)
 end
 
---- @return number slowdown tolerance in m/s before cruise cancels
 function Cruise:slowdownToleranceMs()
     local toleranceDisp = (cc and type(cc.slowdownTolerance) == "number" and cc.slowdownTolerance) or 2
     local unit = string.lower(config.speedUnit or "mph")
@@ -193,7 +190,6 @@ function Cruise:startApplyLoop()
                 goto continue
             end
 
-            -- brake / handbrake cancel
             if IsControlPressed(0, 72) or IsControlPressed(0, 76) then
                 self:clear()
                 goto continue

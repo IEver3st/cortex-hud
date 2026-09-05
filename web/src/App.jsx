@@ -133,7 +133,7 @@ function App() {
     oxygenDisplayLocation: 'statusCluster',
     isArmed: false,
     radarVisible: true,
-    // Browser dev only: 'esx' | 'qb' | null (null = use hudData.framework)
+    
     devFrameworkOverride: isHudDevBrowser ? 'esx' : null,
     dynamicWeatherShow: false,
     dynamicWeatherResourceAvailable: false,
@@ -184,7 +184,7 @@ function App() {
     if (!Number.isFinite(op)) op = 1
     op = Math.min(1, Math.max(0.15, op))
     document.documentElement.style.setProperty('--es-panel-opacity', String(op))
-    // CEF: no real backdrop-filter — frost slider scales rim (--es-backdrop-norm) + fill density.
+    
     const normAtDefaultBlur = (1 - 0.25) / 2.75
     const frostMult = Math.min(1.15, Math.max(0.82, 1 + 0.4 * (norm - normAtDefaultBlur)))
     const fillAlpha = Math.min(1, Math.max(0.15, op * frostMult))
@@ -322,8 +322,7 @@ function App() {
         }
         setHudData((prev) => ({
           ...prev,
-          // Lua only sends show:true when the feature is enabled; do not gate on prev.showDynamicWeather
-          // (weather can message before updateStatusConfig applies the saved toggle).
+
           dynamicWeatherShow: true,
           dynamicWeatherDisplay: data.clientDisplay ?? prev.dynamicWeatherDisplay,
           dynamicWeatherSeason: data.season != null && data.season !== '' ? String(data.season) : prev.dynamicWeatherSeason,

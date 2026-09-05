@@ -127,7 +127,6 @@ local function toBoolean(value, default)
     return default == true
 end
 
---- Full cruise (on) unless server config sets cruiseControl.autoThrottle = false (speed limiter)
 local function cruiseModeFullDefault()
     local cc = config.cruiseControl
     if not cc then
@@ -323,7 +322,6 @@ local AMMO_POSITION_OPTIONS = {
     { value = 'bottom-center', label = 'Bottom Middle' },
 }
 
---- Dynamic_weather (or dynamic_weather) is running and exposes a snapshot or public weather exports.
 local function isDynamicWeatherResourceReady()
     for _, resName in ipairs({ 'Dynamic_weather', 'dynamic_weather' }) do
         if GetResourceState(resName) == 'started' then
@@ -1128,8 +1126,7 @@ end
 RegisterNUICallback('settings:save', function(data, cb)
     persistSettingsData(data)
 
-    -- Merge NUI payload: getSetting may still return nil for keys es_lib does not know yet,
-    -- which would otherwise leave buildDefaultSettings() values and drop toggles like showDynamicWeather.
+    
     local merged = Settings.get()
     if type(data) == 'table' then
         for k, v in pairs(data) do

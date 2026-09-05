@@ -2,7 +2,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  /* .app uses pointer-events: none for FiveM pass-through; dev UI must opt in */
+  
   pointer-events: auto;
   z-index: 2147483000;
   max-height: 100vh;

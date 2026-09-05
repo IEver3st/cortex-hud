@@ -1,7 +1,4 @@
-/**
- * Mirrors config/shared.lua HudPresets (layout + theme + defaults) for browser dev
- * so layout/color preset changes apply without Lua.
- */
+
 export const HUD_LAYOUT_PRESETS = {
   classic: {
     label: 'Classic',

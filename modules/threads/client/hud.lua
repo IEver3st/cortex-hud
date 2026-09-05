@@ -101,7 +101,7 @@ local function updateVisibility(reason, forceRadarApply)
     if forceRadarApply or radarVisible ~= lastRadarState then
         local wasRadarOn = lastRadarState == true
         DisplayRadar(radarVisible)
-        -- toggleHud skips minimap.refresh; game keeps expanded radar until SetRadarBigmapEnabled/SetBigmapActive reset
+        
         if radarVisible and not wasRadarOn then
             minimap.collapseBigmap()
         elseif not radarVisible and wasRadarOn then
@@ -399,23 +399,22 @@ function hud.start(config)
     CreateThread(function()
         local HideHudComponentThisFrame = HideHudComponentThisFrame
         while true do
-            -- Keep native DisplayHud on so weapon wheel / selection UI still work; NUI handles rest.
-            -- DisplayHud(false) with custom HUD breaks the weapon wheel in many builds.
+
             DisplayHud(true)
 
-            HideHudComponentThisFrame(1) -- Wanted Stars
-            HideHudComponentThisFrame(2) -- Weapon Icon
-            HideHudComponentThisFrame(3) -- Cash
-            HideHudComponentThisFrame(4) -- MP Message
-            HideHudComponentThisFrame(5) -- Vehicle Name (reticle)
-            HideHudComponentThisFrame(6) -- Vehicle Name
-            HideHudComponentThisFrame(7) -- Area Name
-            HideHudComponentThisFrame(8) -- Street Name / Waypoint Distance
-            HideHudComponentThisFrame(9) -- Help Text
-            HideHudComponentThisFrame(14) -- Reticle / crosshair (NUI replaces when enabled)
-            HideHudComponentThisFrame(13) -- Cash Change
-            HideHudComponentThisFrame(17) -- Saving Game
-            HideHudComponentThisFrame(20) -- Weapon Wheel Stats
+            HideHudComponentThisFrame(1) 
+            HideHudComponentThisFrame(2) 
+            HideHudComponentThisFrame(3) 
+            HideHudComponentThisFrame(4) 
+            HideHudComponentThisFrame(5) 
+            HideHudComponentThisFrame(6) 
+            HideHudComponentThisFrame(7) 
+            HideHudComponentThisFrame(8) 
+            HideHudComponentThisFrame(9) 
+            HideHudComponentThisFrame(14) 
+            HideHudComponentThisFrame(13) 
+            HideHudComponentThisFrame(17) 
+            HideHudComponentThisFrame(20) 
             Wait(0)
         end
     end)
@@ -574,7 +573,7 @@ function hud.start(config)
         end
     end)
 
-    -- Waypoint distance tracker
+    
     local GetFirstBlipInfoId = GetFirstBlipInfoId
     local DoesBlipExist = DoesBlipExist
     local GetBlipInfoIdCoord = GetBlipInfoIdCoord
@@ -641,7 +640,7 @@ function hud.start(config)
         end
     end)
 
-    -- Weapon ammo tracker
+    
     local GetSelectedPedWeapon = GetSelectedPedWeapon
     local GetAmmoInClip = GetAmmoInClip
     local GetAmmoInPedWeapon = GetAmmoInPedWeapon

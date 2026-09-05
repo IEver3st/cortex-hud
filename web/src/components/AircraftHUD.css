@@ -5,7 +5,6 @@
     font-family: var(--font-hud);
 }
 
-/* CEF: no backdrop blur (black rect). Outline only. */
 .aircraft-readouts {
     position: fixed;
     right: calc(4vw * var(--es-ui-scale));

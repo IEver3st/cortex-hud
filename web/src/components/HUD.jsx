@@ -9,6 +9,14 @@ import { GiFullMotorcycleHelmet } from 'react-icons/gi'
 import AmmoIcon from '../assets/machine-gun-magazine.svg'
 import { resolveAnchorStyle } from './layout'
 import StatusOxygenHex from './StatusOxygenHex'
+import SlidingNumber from './SlidingNumber'
+import {
+  usePresence,
+  useOneShot,
+  useDeltaFlash,
+  useBreakAway,
+  useReloadPulse,
+} from '../hooks/hudMotion'
 
 import './HUD.css'
 
@@ -84,7 +92,12 @@ const VOIP_RANGE_WAVES = {
 const VoipVisualizer = ({ isTalking, color, range }) => {
   const waveKey = VOIP_RANGE_WAVES[range] ? range : 'normal'
   const heightFn = VOIP_RANGE_WAVES[waveKey]
-  const vizPersona = useMemo(() => Math.floor(Math.random() * 4), [waveKey])
+  // Stable persona per range band (no Math.random — keeps render pure).
+  const vizPersona = useMemo(() => {
+    let h = 0
+    for (let i = 0; i < waveKey.length; i += 1) h = (h + waveKey.charCodeAt(i) * (i + 3)) % 4
+    return h
+  }, [waveKey])
 
   return (
     <div
@@ -121,10 +134,8 @@ const HUD = React.memo(({
   fuel,
   hasFuelProvider,
   engineHealth,
-  engineState,
   cruiseActive,
   cruiseSpeed,
-  headlights,
   belt,
   harness,
   useSeatbelt,
@@ -172,6 +183,33 @@ const HUD = React.memo(({
   sectionedBars,
   oxygenDisplayLocation,
 }) => {
+  const showAmmo = ammoClip >= 0 || ammoEditMode
+  const showWaypoint = waypointDist > 0
+
+  const speedoPresence = usePresence(vehicleVisible, 220)
+  const ammoPresence = usePresence(showAmmo, 240)
+  const waypointPresence = usePresence(showWaypoint, 260)
+
+  const healthFlash = useDeltaFlash(health, 420)
+  const armorBreak = useBreakAway(Math.max(armor, 0), 480)
+  const gearTick = useOneShot(currentGear, 300)
+  const cruisePop = useOneShot(cruiseActive ? `on-${cruiseSpeed}` : null, 420)
+  const reloadPulse = useReloadPulse(ammoClip, ammoReserve, 360)
+
+  const talkToken = (voipTalking || radioTalking) ? 'talk' : null
+  const voipTalkRamp = useOneShot(talkToken, 320)
+
+  const displayClip = ammoClip >= 0 ? ammoClip : 12
+  const displayReserve = ammoClip >= 0 ? ammoReserve : 85
+  const ammoLow = displayClip > 0 && displayClip <= 5
+  const ammoEmpty = displayClip === 0
+
+  const oxygenUrgency = useMemo(() => {
+    const v = clamp(Number(oxygen) || 0, 0, 100)
+    // 0–1: higher = more urgent (lower oxygen)
+    return clamp((35 - v) / 35, 0, 1)
+  }, [oxygen])
+
   useEffect(() => {
     applyUiScale(getUiScale())
     const handleResize = () => applyUiScale(getUiScale())
@@ -320,6 +358,10 @@ const HUD = React.memo(({
     : 'standalone'
   const isStandaloneFramework = normalizedFramework === 'standalone'
 
+  const showStandaloneVoip = showVoip
+    && (!isStandaloneFramework || standaloneVoipHudEnabled)
+  // Presence computed after framework normalize; tray-eligible check applied at render.
+
   const statusTrayStyle = useMemo(() => {
     const width = clamp(Number(statusRingWidth) || 42, 28, 84)
     const height = clamp(Number(statusRingHeight) || 48, 28, 90)
@@ -444,10 +486,16 @@ const HUD = React.memo(({
   }, [ammoPos, ammoPositionPreset, layout, ammoEditMode])
 
   const healthColorClass = useMemo(() => {
-    if (health <= 20) return 'critical'
+    if (health <= 20) return 'critical health-heartbeat'
     if (health <= 40) return 'low'
     return ''
   }, [health])
+
+  const healthFlashClass = healthFlash === 'damage'
+    ? 'flash-damage'
+    : healthFlash === 'heal'
+      ? 'flash-heal'
+      : ''
 
   const healthSectionWidths = useMemo(() => getBarSectionWidths(health), [health])
   const armorSectionWidths = useMemo(() => getBarSectionWidths(Math.max(armor, 0)), [armor])
@@ -523,10 +571,13 @@ const HUD = React.memo(({
         <div
           key="voip-tray"
           className={[
-            'status-tray-item status-voip',
+            'status-tray-item',
+            'status-item-enter',
+            'status-voip',
             voiceHot ? 'status-voip--voice' : '',
             radioHot ? 'status-voip--radio' : '',
             voipConnected ? '' : 'status-voip--disconnected',
+            voipTalkRamp ? 'voip-talk-ramp' : '',
           ].filter(Boolean).join(' ')}
         >
           <div
@@ -565,10 +616,13 @@ const HUD = React.memo(({
         <div
           key="voip-tray"
           className={[
-            'status-tray-item status-voip',
+            'status-tray-item',
+            'status-item-enter',
+            'status-voip',
             voiceHot ? 'status-voip--voice' : '',
             radioHot ? 'status-voip--radio' : '',
             voipConnected ? '' : 'status-voip--disconnected',
+            voipTalkRamp ? 'voip-talk-ramp' : '',
           ].filter(Boolean).join(' ')}
         >
           <div className="status-circle-wrap status-voip-circle-wrap">
@@ -611,6 +665,20 @@ const HUD = React.memo(({
       else if (value <= 25) state = 'low'
     }
 
+    const oxygenUrgent = type === 'oxygen' && oxygenUrgency > 0.15
+    const oxygenStyle = oxygenUrgent
+      ? { '--oxygen-pulse-ms': `${Math.round(900 - oxygenUrgency * 520)}ms` }
+      : undefined
+    const itemClass = [
+      'status-tray-item',
+      'status-item-enter',
+      state,
+      `status-${type}`,
+      oxygenUrgent ? 'status-oxygen-urgent' : '',
+      type === 'health' && healthFlashClass ? healthFlashClass : '',
+      type === 'armor' && armorBreak.breaking ? 'armor-breaking' : '',
+    ].filter(Boolean).join(' ')
+
     const oxygenBarHexShell = (extraClass = '') => (
       <div
         className={`status-icon-shell-hexagon ${extraClass}`.trim()}
@@ -627,7 +695,7 @@ const HUD = React.memo(({
 
     if (normalizedStatusShape === 'hexagon') {
       return (
-        <div key={type} className={`status-tray-item ${state} status-${type}`}>
+        <div key={type} className={itemClass} style={oxygenStyle}>
           <div className="status-icon-shell-hexagon" style={{ position: 'relative', width: 'var(--status-ring-width)', height: 'var(--status-ring-height)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg viewBox="0 0 100 100" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '125%', height: '125%', opacity: 0.45, zIndex: 0 }}>
               <path d="M15 30 L50 10 L85 30 L85 70 L50 90 L15 70 Z" fill="var(--status-color)" />
@@ -647,14 +715,14 @@ const HUD = React.memo(({
     if (normalizedStatusShape === 'bar') {
       if (type === 'oxygen') {
         return (
-          <div key={type} className={`status-tray-item ${state} status-${type} status-tray-item--oxygen-only`}>
+          <div key={type} className={`${itemClass} status-tray-item--oxygen-only`} style={oxygenStyle}>
             {oxygenBarHexShell('status-icon-shell-hexagon--bar')}
           </div>
         )
       }
       const fillPct = clamp(displayValue, 0, 1) * 100
       return (
-        <div key={type} className={`status-tray-item ${state} status-${type}`}>
+        <div key={type} className={itemClass} style={oxygenStyle}>
           <div className="status-meter-line">
             <div className="status-meter-line-fill" style={{ height: `${fillPct}%`, width: '100%' }} />
           </div>
@@ -673,7 +741,7 @@ const HUD = React.memo(({
       const circumference = 2 * Math.PI * r
       const dashOffset = circumference * (1 - pct)
       return (
-        <div key={type} className={`status-tray-item ${state} status-${type}`}>
+        <div key={type} className={itemClass} style={oxygenStyle}>
           <div className="status-circle-wrap">
             <svg className="status-circle-svg" viewBox="0 0 100 100">
               <circle className="status-circle-track" cx="50" cy="50" r={r} />
@@ -697,7 +765,7 @@ const HUD = React.memo(({
     }
 
     return (
-      <div key={type} className={`status-tray-item ${state} status-${type}`}>
+      <div key={type} className={itemClass} style={oxygenStyle}>
         <div className="status-icon-shell">
           <div className="status-icon-fill" style={{ height: `${clamp(displayValue, 0, 1) * 100}%` }} />
           <div className="status-icon-core">
@@ -708,29 +776,44 @@ const HUD = React.memo(({
     )
   }
 
+  const voipStandaloneShow = showStandaloneVoip && !voipTrayEligible
+  const voipStandalonePresence = usePresence(voipStandaloneShow, 240)
+
   return (
     <>
-      {showVoip && (!isStandaloneFramework || standaloneVoipHudEnabled) && !voipTrayEligible && (
-        <div className={`voip-container-modern voip-variant-${voipVariant} ${voipConnected ? '' : 'muted'} ${voipTalking ? 'talking' : ''} ${radioTalking ? 'radio-talking' : ''}`} style={voipStyle}>
-          <div className="voip-content-modern">
-            <div className="voip-indicator-group">
-              <div className="voip-main-stack">
-                <VoipVisualizer
-                  isTalking={voipTalking || radioTalking}
-                  color={radioTalking ? '#ff4444' : 'var(--voip-accent)'}
-                  range={voipRange}
-                />
-                <div className="voip-range-modern">
-                  <span className={`voip-pip-modern ${voipRange === 'whisper' || voipRange === 'normal' || voipRange === 'shout' ? 'on' : ''}`} />
-                  <span className={`voip-pip-modern ${voipRange === 'normal' || voipRange === 'shout' ? 'on' : ''}`} />
-                  <span className={`voip-pip-modern ${voipRange === 'shout' ? 'on' : ''}`} />
+      {voipStandalonePresence.mounted && (
+        <div className="hud-presence-shell" style={voipStyle}>
+          <div
+            className={[
+              'voip-container-modern',
+              `voip-variant-${voipVariant}`,
+              voipConnected ? '' : 'muted',
+              voipTalking ? 'talking' : '',
+              radioTalking ? 'radio-talking' : '',
+              voipTalkRamp ? 'voip-talk-ramp' : '',
+              voipStandalonePresence.visible ? 'hud-presence-in' : 'hud-presence-out',
+            ].filter(Boolean).join(' ')}
+          >
+            <div className="voip-content-modern">
+              <div className="voip-indicator-group">
+                <div className="voip-main-stack">
+                  <VoipVisualizer
+                    isTalking={voipTalking || radioTalking}
+                    color={radioTalking ? '#ff4444' : 'var(--voip-accent)'}
+                    range={voipRange}
+                  />
+                  <div className="voip-range-modern">
+                    <span className={`voip-pip-modern ${voipRange === 'whisper' || voipRange === 'normal' || voipRange === 'shout' ? 'on' : ''}`} />
+                    <span className={`voip-pip-modern ${voipRange === 'normal' || voipRange === 'shout' ? 'on' : ''}`} />
+                    <span className={`voip-pip-modern ${voipRange === 'shout' ? 'on' : ''}`} />
+                  </div>
                 </div>
+                {voipConnected && radioChannel > 0 && (
+                  <div className="voip-radio-icon-modern voip-radio-chip-in" key={radioChannel}>
+                    <FaWalkieTalkie />
+                  </div>
+                )}
               </div>
-              {voipConnected && radioChannel > 0 && (
-                <div className="voip-radio-icon-modern">
-                  <FaWalkieTalkie />
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -740,7 +823,14 @@ const HUD = React.memo(({
         {barRailMode && (
           <div className="hud-bar-deck">
             <div className={`hud-container${sectionedBars ? ' hud-container--sectioned-bars' : ''}`}>
-              <div className={`hud-bar armor-bar ${armor > 0 ? '' : 'is-hidden'}`}>
+              <div
+                className={[
+                  'hud-bar',
+                  'armor-bar',
+                  armorBreak.show || armorBreak.breaking ? '' : 'is-hidden',
+                  armorBreak.breaking ? 'armor-breaking' : '',
+                ].filter(Boolean).join(' ')}
+              >
                 <div className="bar-icon"><IoShieldHalf /></div>
                 <div className="bar-value">{Math.max(armor, 0)}</div>
                 <div className={`bar-track${sectionedBars ? ' bar-track--sectioned' : ''}`}>
@@ -760,7 +850,7 @@ const HUD = React.memo(({
                   )}
                 </div>
               </div>
-              <div className={`hud-bar health-bar ${healthColorClass}`}>
+              <div className={`hud-bar health-bar ${healthColorClass} ${healthFlashClass}`.trim()}>
                 <div className="bar-icon"><FaHeart /></div>
                 <div className="bar-value">{health}</div>
                 <div className={`bar-track${sectionedBars ? ' bar-track--sectioned' : ''}`}>
@@ -796,7 +886,7 @@ const HUD = React.memo(({
           <div className={`status-tray shape-${normalizedStatusShape}`} style={statusTrayStyle}>
             {voipTrayEligible && renderVoipStatusTraySlot()}
             {(normalizedStatusShape === 'hexagon' || normalizedStatusShape === 'circle') && renderStatusMeter(health, <FaHeart />, 'health')}
-            {(normalizedStatusShape === 'hexagon' || normalizedStatusShape === 'circle') && armor > 0 && renderStatusMeter(armor, <IoShieldHalf />, 'armor')}
+            {(normalizedStatusShape === 'hexagon' || normalizedStatusShape === 'circle') && (armorBreak.show || armorBreak.breaking) && renderStatusMeter(armor, <IoShieldHalf />, 'armor')}
             {!isStandaloneFramework && hunger <= hungerThreshold && renderStatusMeter(hunger, <FaBurger />, 'hunger')}
             {!isStandaloneFramework && thirst <= thirstThreshold && renderStatusMeter(thirst, <FaDroplet />, 'thirst')}
             {!isStandaloneFramework && stress > 0 && stressThreshold > 0 && stress >= 100 - stressThreshold && renderStatusMeter(stress, <LuBrain />, 'stress', true)}
@@ -805,16 +895,42 @@ const HUD = React.memo(({
         )}
       </div>
 
-      {waypointDist > 0 && (
-        <div className="waypoint-distance" style={waypointStyle}>
-          <FaLocationDot className="waypoint-icon" />
-          <span className="waypoint-value">{waypointDist.toFixed(2)}</span>
-          <span className="waypoint-unit">{waypointUnit}</span>
+      {waypointPresence.mounted && (
+        <div className="hud-presence-shell" style={waypointStyle}>
+          <div
+            className={[
+              'waypoint-distance',
+              waypointPresence.visible ? 'hud-presence-in' : 'hud-presence-out',
+            ].join(' ')}
+          >
+            <FaLocationDot className="waypoint-icon waypoint-pin-pulse" />
+            <span className="waypoint-value">
+              <SlidingNumber
+                value={Math.floor(Math.max(0, waypointDist))}
+                durationMs={160}
+                className="waypoint-sliding"
+              />
+              <span className="waypoint-frac">
+                {`.${String(Math.floor((Math.max(0, waypointDist) % 1) * 100)).padStart(2, '0')}`}
+              </span>
+            </span>
+            <span className="waypoint-unit">{waypointUnit}</span>
+          </div>
         </div>
       )}
 
-      {vehicleVisible && (
-        <div className="speedo-container" style={speedoStyle} onMouseDown={handleMouseDown}>
+      {speedoPresence.mounted && (
+        <div
+          className="hud-presence-shell"
+          style={speedoStyle}
+          onMouseDown={handleMouseDown}
+        >
+        <div
+          className={[
+            'speedo-container',
+            speedoPresence.visible ? 'hud-presence-in' : 'hud-presence-out',
+          ].join(' ')}
+        >
           <div className="speedo-ring">
             <svg className="speedo-svg" viewBox="0 0 100 100" aria-hidden="true">
               <circle className="speedo-track" cx="50" cy="50" r="45" />
@@ -844,18 +960,24 @@ const HUD = React.memo(({
               <div className="speedo-speed">{speed}</div>
               <div className="speedo-unit">{speedUnit.toUpperCase()}</div>
               {currentGear && (
-                <div className="speedo-gear" style={{ color: rpmColor.color, textShadow: `0 0 calc(8px * var(--es-ui-scale)) ${rpmColor.glow}` }}>
+                <div
+                  className={`speedo-gear${gearTick ? ' gear-tick' : ''}`}
+                  style={{ color: rpmColor.color, textShadow: `0 0 calc(8px * var(--es-ui-scale)) ${rpmColor.glow}` }}
+                >
                   {currentGear}
                 </div>
               )}
             </div>
             {useRadialFuel && hasFuelProvider && (
-              <div className="speedo-fuel-radial-label">
+              <div className={`speedo-fuel-radial-label${fuelLow ? ' fuel-low-breathe' : ''}`}>
                 <BsFuelPumpFill />
               </div>
             )}
             {cruiseActive && (
-              <div className="speedo-cruise-sign" aria-label={`Cruise set speed ${cruiseSpeed}`}>
+              <div
+                className={`speedo-cruise-sign${cruisePop ? ' cruise-pop' : ''}`}
+                aria-label={`Cruise set speed ${cruiseSpeed}`}
+              >
                 <div className="speedo-cruise-sign__masthead" aria-hidden="true">
                   <span className="speedo-cruise-sign__word">SPEED</span>
                   <span className="speedo-cruise-sign__word">LIMIT</span>
@@ -866,7 +988,7 @@ const HUD = React.memo(({
           </div>
           <div className="speedo-status">
             {hasFuelProvider && !useRadialFuel && (
-              <div className={`speedo-statusItem speedo-statusItem-fuel ${fuel / 100 <= 0.15 ? 'warning' : ''}`}>
+              <div className={`speedo-statusItem speedo-statusItem-fuel ${fuelLow ? 'warning fuel-low-breathe' : ''}`}>
                 <div className="speedo-statusBar speedo-statusBar-vertical">
                   <div className="speedo-statusFill speedo-statusFill-vertical" style={{ height: `${fuel}%` }} />
                 </div>
@@ -876,7 +998,7 @@ const HUD = React.memo(({
               </div>
             )}
             {engineHealth / 100 <= 0.65 && (
-              <div className={`speedo-statusItem speedo-statusIcon ${engineHealth / 100 <= 0.35 ? 'critical' : 'warning'}`}>
+              <div className={`speedo-statusItem speedo-statusIcon engine-warning-in ${engineHealth / 100 <= 0.35 ? 'critical engine-critical-blink' : 'warning'}`}>
                 <div className="speedo-statusIcon-label">
                   <PiEngineFill />
                 </div>
@@ -891,7 +1013,10 @@ const HUD = React.memo(({
                     </div>
                   </div>
                 ) : (
-                  <div className={`speedo-statusIcon ${!belt ? 'critical' : ''}`} style={{ opacity: !belt ? 1 : 0 }}>
+                  <div
+                    className={`speedo-statusIcon ${!belt ? 'critical seatbelt-alert' : 'seatbelt-ok'}`}
+                    style={{ opacity: !belt ? 1 : 0 }}
+                  >
                     <div className="speedo-statusIcon-label">
                       <PiSeatbeltFill />
                     </div>
@@ -901,23 +1026,37 @@ const HUD = React.memo(({
             )}
           </div>
         </div>
+        </div>
       )}
 
-      {(ammoClip >= 0 || ammoEditMode) && (
+      {ammoPresence.mounted && (
         <div
-          className={`ammo-display ammo-variant-${ammoVariant}`}
+          className="hud-presence-shell"
           style={ammoContainerStyle}
           onMouseDown={ammoEditMode ? handleAmmoMouseDown : undefined}
         >
-          <div className="ammo-icon-box">
-            <img src={AmmoIcon} className="ammo-main-icon" alt="ammo" />
-          </div>
-          <div className="ammo-divider" />
-          <div className="ammo-info-stack">
-            <div className="ammo-clip" style={{ color: ammoColor || 'var(--ammo-color)' }}>
-              {ammoClip >= 0 ? ammoClip : 12}
+          <div
+            className={[
+              'ammo-display',
+              `ammo-variant-${ammoVariant}`,
+              ammoPresence.visible ? 'hud-presence-in' : 'hud-presence-out',
+              ammoLow ? 'ammo-low' : '',
+              ammoEmpty ? 'ammo-empty' : '',
+              reloadPulse ? 'ammo-reload' : '',
+            ].filter(Boolean).join(' ')}
+          >
+            <div className="ammo-icon-box">
+              <img src={AmmoIcon} className="ammo-main-icon" alt="ammo" />
             </div>
-            <div className="ammo-reserve">{ammoClip >= 0 ? ammoReserve : 85}</div>
+            <div className="ammo-divider" />
+            <div className="ammo-info-stack">
+              <div className="ammo-clip" style={{ color: ammoColor || 'var(--ammo-color)' }}>
+                <SlidingNumber value={displayClip} durationMs={180} />
+              </div>
+              <div className="ammo-reserve">
+                <SlidingNumber value={displayReserve} durationMs={240} />
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -927,6 +1066,5 @@ const HUD = React.memo(({
 
 HUD.displayName = 'HUD'
 export default HUD
-
 
 

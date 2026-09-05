@@ -17,9 +17,7 @@ function pickColor(saved, colorKey, themeKey, colorPreset) {
   return colorPreset.theme[themeKey] || colorPreset.theme.health
 }
 
-/**
- * Map SettingsModal save payload → hudData patch (browser dev; mirrors Lua resolveHudPresentation partially).
- */
+
 export function applyDevSettingsSave(saved, prev) {
   const layoutName = saved.layoutPreset && HUD_LAYOUT_PRESETS[saved.layoutPreset]
     ? saved.layoutPreset
