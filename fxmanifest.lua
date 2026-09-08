@@ -3,7 +3,7 @@ game 'gta5'
 
 author 'Ever3st'
 description 'Minimalist High-Performance HUD'
-version '1.0.1'
+version '1.0.2'
 
 dependency 'cortex-lib'
 

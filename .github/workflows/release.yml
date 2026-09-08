@@ -21,6 +21,8 @@ env:
     modules
     shared
     stream
+    web/third-party
+    data/radio_catalog.json
     web/dist
 
 jobs:

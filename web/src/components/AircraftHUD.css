@@ -1,3 +1,4 @@
+/* Use translucent containers without backdrop filtering on the NUI surface. */
 .aircraft-hud-wrapper {
     position: fixed;
     inset: 0;
@@ -17,8 +18,8 @@
     border-radius: calc(6px * var(--es-ui-scale));
     border: 1px solid rgba(255, 255, 255, calc(0.22 + var(--es-backdrop-norm, 0.27) * 0.28));
     box-shadow: none;
-    backdrop-filter: var(--es-glass-filter);
-    -webkit-backdrop-filter: var(--es-glass-filter);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     transition: transform 0.4s ease;
 }
 
@@ -69,8 +70,8 @@
     border-radius: calc(4px * var(--es-ui-scale));
     border: 1px solid rgba(255, 255, 255, calc(0.22 + var(--es-backdrop-norm, 0.27) * 0.28));
     box-shadow: none;
-    backdrop-filter: var(--es-glass-filter);
-    -webkit-backdrop-filter: var(--es-glass-filter);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     transition: transform 0.4s ease;
 }
 
